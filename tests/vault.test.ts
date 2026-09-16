@@ -2,9 +2,9 @@ import { base58 } from "@scure/base";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccountInfoResult } from "@arch-network/arch-sdk";
 import { createRouterClient } from "../src/client.js";
-import { TESTNET, TESTNET_VENUES } from "../src/config/testnet.js";
-import { assetsForShares, decodeVault, estimateVault, sharesForAssets } from "../src/vault.js";
-import { applyFee, decodeAddress, deriveAssociatedTokenAddress, U64_MAX } from "../src/utils.js";
+import { TESTNET, TESTNET_VENUES } from "../src/config/networks.js";
+import { assetsForShares, decodeVault, estimateVault, prepareVaultQuote, sharesForAssets } from "../src/vault.js";
+import { applyFee, decodeAddress, deriveAddress, deriveAssociatedTokenAddress, U64_MAX } from "../src/utils.js";
 import { buildInput, expectedRouterInstruction, namedFixture } from "./transactions/fixtures.js";
 import contract from "./fixtures/vault/contract.json" with { type: "json" };
 
@@ -68,6 +68,33 @@ function setup(usd = false, redeem = false) {
 }
 
 describe("vault contract", () => {
+  it("resolves and validates accounts with selected programs and venue identities", () => {
+    const { accounts, vault, reserve } = setup(false, true);
+    const programs = { ...TESTNET, vaultProgramId: key(61), tokenProgramId: key(62), associatedTokenProgramId: key(63) };
+    const venue = { address: key(64), assetMint: key(65), shareMint: key(66) };
+    const reserveAddress = deriveAddress(programs.vaultProgramId, "reserve", decodeAddress(venue.shareMint));
+    const escrow = deriveAddress(programs.vaultProgramId, "escrow", decodeAddress(venue.shareMint));
+    for (const [offset, address] of [[265, venue.assetMint], [297, venue.shareMint], [329, reserveAddress], [361, escrow]] as const) {
+      vault.set(decodeAddress(address), offset);
+    }
+    reserve.set(decodeAddress(venue.assetMint)); reserve.set(decodeAddress(venue.address), 32);
+    accounts.forEach((account, i) => { account.owner = decodeAddress(i === 0 ? programs.vaultProgramId : programs.tokenProgramId); });
+    const map = new Map([venue.address, venue.assetMint, venue.shareMint, reserveAddress].map((address, i) => [address, accounts[i]!]));
+    const quote = prepareVaultQuote(map, venue, "vaultRedeem", now, programs);
+    const tail = new Uint8Array(8); setU64(tail, 0, 42n);
+    expect(quote.resolved).toEqual({
+      kind: "vaultRedeem", outputMint: venue.assetMint, vault: venue.address, reserve: reserveAddress, escrow,
+      redemptionEntry: deriveAddress(programs.vaultProgramId, "redeem", decodeAddress(venue.address), tail),
+      protocolFeeShares: deriveAssociatedTokenAddress(key(41), venue.shareMint, programs),
+      managerFeeShares: deriveAssociatedTokenAddress(key(41), venue.shareMint, programs),
+      eventAuthority: deriveAddress(programs.vaultProgramId, "__event_authority"),
+    });
+    expect(quote.estimate(1000n)).toBe(assetsForShares(1000n, 10_000n, 10_000n) - applyFee(decodeVault(vault).redeemFee, assetsForShares(1000n, 10_000n, 10_000n)));
+    accounts[0]!.owner = decodeAddress(TESTNET.vaultProgramId);
+    expect(() => prepareVaultQuote(map, venue, "vaultRedeem", now, programs))
+      .toThrow(expect.objectContaining({ code: "INVALID_ACCOUNT" }));
+  });
+
   it("decodes the untouched Rust account fixture, including an offset byte view", () => {
     const bytes = new Uint8Array(620);
     bytes.set(rawVault(), 3);
@@ -189,7 +216,7 @@ describe("direct vault quoteExactIn", () => {
     expect(second.estimatedAmountOut).toBe(997n);
     expect(second.instructions[0]!.accounts[10]).not.toEqual(first.instructions[0]!.accounts[10]);
     expect(base58.encode(second.instructions[0]!.accounts[11]!.pubkey))
-      .toBe(deriveAssociatedTokenAddress(key(43), request.inputMint));
+      .toBe(deriveAssociatedTokenAddress(key(43), request.inputMint, TESTNET));
     expect(source.getAccounts).toHaveBeenCalledTimes(2);
   });
 

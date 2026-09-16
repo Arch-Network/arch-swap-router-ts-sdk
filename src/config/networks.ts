@@ -1,4 +1,6 @@
-/** Fixed deployment identities; intentionally not configurable through the client. */
+import type { Address } from "../types.js";
+
+/** Fixed deployments; callers select a network rather than supplying addresses. */
 export const TESTNET = Object.freeze({
   routerProgramId: "E5j9e2KTsP3cfde7ao8JvkCQzeMC2oKFB3JaaSVps2Uo",
   vaultProgramId: "DXSMCcZfjMXe1HTNF1m2CJ5L8zj1cLAKG8SrLvtb3mRa",
@@ -32,3 +34,31 @@ export const TESTNET_VENUES = Object.freeze({
     tokenMintB: TESTNET_MINTS.aUSD,
   }),
 });
+
+export type Network = "testnet" | "mainnet";
+export type NetworkMints = Readonly<Record<keyof typeof TESTNET_MINTS, Address>>;
+export type ProgramIds = Readonly<Record<keyof typeof TESTNET, Address>>;
+export interface VaultVenue {
+  readonly address: Address;
+  readonly assetMint: Address;
+  readonly shareMint: Address;
+}
+export interface NetworkConfig {
+  readonly programs: ProgramIds;
+  readonly mints: NetworkMints;
+  readonly venues: {
+    readonly btcVault: VaultVenue;
+    readonly usdVault: VaultVenue;
+    readonly clamm: {
+      readonly address: Address;
+      readonly tokenMintA: Address;
+      readonly tokenMintB: Address;
+    };
+  };
+}
+
+export const NETWORKS = Object.freeze({
+  testnet: Object.freeze({ programs: TESTNET, mints: TESTNET_MINTS, venues: TESTNET_VENUES }),
+  // Replace with the mainnet deployment when its program, mint and venue addresses are known.
+  mainnet: null,
+} satisfies Record<Network, NetworkConfig | null>);

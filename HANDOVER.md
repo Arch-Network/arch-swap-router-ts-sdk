@@ -6,11 +6,22 @@ The older graph/ranking design has been replaced by explicit fixed routes.
 
 ## Current state
 
-Checkpoint 5 and the receive-sizing addition are complete. The public surface is
-`createRouterClient({ source })` with `quoteExactIn` and `quoteForOutput`, plus mint constants,
-`SUPPORTED_PAIRS`, errors, and the small request/result/reader types.
+Checkpoint 5, receive sizing, and network selection are complete. The public surface is
+`createRouterClient({ source, network: "testnet" | "mainnet" })` with `quoteExactIn`
+and `quoteForOutput`, readonly `network`, `mints`, and `supportedPairs` metadata,
+errors, and the small request/result/reader types. Omitted network defaults to
+testnet. Existing `TESTNET_MINTS` and `SUPPORTED_PAIRS` exports remain testnet aliases.
 The fixed testnet registry contains all 12 directed pairs among aBTC, aUSD,
 primeBTC, and primeUSD.
+
+[src/config/networks.ts](src/config/networks.ts) owns deployment identities.
+Mainnet is explicitly unconfigured (`null`): construction succeeds, its client
+has null mints and no supported pairs, and both quote methods reject with
+`NETWORK_NOT_CONFIGURED` before reads. Replace that entry with mainnet programs,
+mints and venues later. Fixed routes are instantiated per client; loaders,
+owner checks, derivation and the builder use the selected config. No mutable
+global switch or testnet fallback is used. The application must supply a reader
+for the selected network and recreate the client when switching.
 
 All 12 directions return estimates and instructions when observed state permits.
 Direct vault quotes use one four-account batch; CLAMM/multi-hop quotes use two
@@ -117,8 +128,11 @@ pnpm build
 pnpm test
 ```
 
-All 389 current tests, typecheck, build, and a separate strict check of the test
-files pass after receive sizing. Native CLAMM/vault fixtures cover all 12 quote
+All 401 current tests, typecheck, build, and a separate strict check of the test
+files pass after network selection. Coverage includes mainnet rejection without
+reads, default/explicit testnet parity, coexisting clients, and synthetic alternate
+deployment identities through account resolution and construction.
+Native CLAMM/vault fixtures cover all 12 quote
 directions, shared read counts and multi-hop composition. The 18 original
 transaction fixtures are intact;
 tests now compare only their router instruction. Size expectations remain

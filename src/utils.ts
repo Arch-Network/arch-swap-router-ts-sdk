@@ -1,6 +1,6 @@
 import { PubkeyUtil, type AccountInfoResult, type AccountMeta, type Pubkey } from "@arch-network/arch-sdk";
 import { base58 } from "@scure/base";
-import { TESTNET } from "./config/testnet.js";
+import type { ProgramIds } from "./config/networks.js";
 import { RouterSdkError } from "./errors.js";
 import type { Address, RouterDataSource } from "./types.js";
 
@@ -116,22 +116,18 @@ export function deriveProgramAddress(
   return [base58.encode(address), bump];
 }
 
-export function deriveVaultAddress(seed: string, ...seeds: Uint8Array[]): Address {
-  return deriveProgramAddress([new TextEncoder().encode(seed), ...seeds], TESTNET.vaultProgramId)[0];
+export function deriveAddress(programId: Address, seed: string, ...seeds: Uint8Array[]): Address {
+  return deriveProgramAddress([new TextEncoder().encode(seed), ...seeds], programId)[0];
 }
 
-export function deriveClammAddress(seed: string, ...seeds: Uint8Array[]): Address {
-  return deriveProgramAddress([new TextEncoder().encode(seed), ...seeds], TESTNET.clammProgramId)[0];
-}
-
-export function deriveAssociatedTokenAddress(owner: Address, mint: Address): Address {
+export function deriveAssociatedTokenAddress(owner: Address, mint: Address, programs: ProgramIds): Address {
   return base58.encode(
     PubkeyUtil.getAssociatedTokenAddress(
       decodeAddress(mint),
       decodeAddress(owner),
       true, // Arch's 32-byte x-only keys do not pass the SDK's SEC1 curve guard.
-      decodeAddress(TESTNET.tokenProgramId),
-      decodeAddress(TESTNET.associatedTokenProgramId),
+      decodeAddress(programs.tokenProgramId),
+      decodeAddress(programs.associatedTokenProgramId),
     ),
   );
 }

@@ -20,7 +20,7 @@ Frontend examples and package/browser verification remain next.
 ## Public API and fixed routes
 
 ```ts
-const router = createRouterClient({ source });
+const router = createRouterClient({ source, network: "testnet" });
 
 const swap = await router.quoteExactIn({
   inputMint,
@@ -61,10 +61,21 @@ when it receives a result and decides when to refresh. Keep `deadlineMs` for
 on-chain execution expiry; it is not a guarantee of quote freshness.
 
 Retain the injected `RouterDataSource.getAccounts(addresses)` returning ordered
-`AccountInfoResult | null` values. Use the fixed testnet deployment and venues
-internally. Export mint constants and a readonly `SUPPORTED_PAIRS` list for the
-frontend. Remove caller-supplied deployment/venue configuration and the old
+`AccountInfoResult | null` values. Select a fixed deployment at client creation:
+`network: "testnet" | "mainnet"`, defaulting to testnet. Keep program IDs, mints
+and venues together in `src/config/networks.ts`; instantiate the fixed paths
+with selected mints and pass config through loaders, derivation and construction.
+Expose readonly `network`, `mints` and `supportedPairs` on the client for the
+frontend. Retain existing `TESTNET_MINTS`/`SUPPORTED_PAIRS` testnet aliases.
+Remove caller-supplied deployment/venue configuration and the old
 `quoteRoutesExactIn` method without compatibility aliases.
+
+Mainnet is an explicit unconfigured placeholder for now. Its client can be
+created, but has null mints and an empty pair list; both quote methods reject
+with `NETWORK_NOT_CONFIGURED` before any reads. Filling its config later enables
+the same fixed paths without changing quote math. Never fall back to testnet.
+The application supplies a reader for the selected network and recreates the
+client on network changes; no SDK endpoints or mutable global network switch.
 
 Explicitly configure both directions of these six pairs:
 
@@ -81,7 +92,8 @@ Lookup uses mint addresses, with ordered venue operations specified for each
 direction. There is no traversal, candidate enumeration, or fallback route.
 Unsupported or identical mint pairs reject with `UNSUPPORTED_PAIR` before reads.
 Supported calls calculate estimates from observed state and reject if the fixed
-route is unavailable; there are no remaining quote placeholders.
+route is unavailable. All testnet quote paths are implemented; mainnet awaits
+deployment configuration.
 
 ## Validation ownership and cleanup
 
@@ -189,7 +201,7 @@ is pending; do not invent a flag or offer queued redemption as a swap fallback.
   examples contain no quote timestamp, ranking, candidate-list, size-verification,
   or guaranteed-execution contract.
 
-Defaults: testnet only, exact-input execution with either input or receive-side sizing,
+Defaults: testnet (mainnet selectable but unconfigured), exact-input execution with either input or receive-side sizing,
 wallet required for the combined call, pinned
 Arch SDK dependencies, no new dependencies, no frontend migration, and no live
 transactions in the scaffold simplification pass.

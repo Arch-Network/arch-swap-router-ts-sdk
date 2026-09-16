@@ -1,7 +1,8 @@
 # Arch swap router TypeScript SDK
 
 A compact, browser-oriented SDK for fixed-pair swap estimates and router
-instructions on Arch testnet. One quote call returns one estimate with its
+instructions on Arch. Testnet is configured; mainnet is a selectable placeholder.
+One quote call returns one estimate with its
 instructions, sized from either a fixed input or an approximate receive amount.
 Supported pairs use explicit one-to-three-hop routes
 through the two vaults and the aBTC/aUSD CLAMM.
@@ -20,21 +21,21 @@ See [SIMPLIFICATION_PLAN.md](SIMPLIFICATION_PLAN.md) for the agreed scope,
 ```ts
 import {
   createRouterClient,
-  SUPPORTED_PAIRS,
-  TESTNET_MINTS,
   type RouterDataSource,
 } from "@arch-network/swap-router-sdk";
 
-// The application supplies its normalized, batched indexer/RPC reader.
+// The application supplies a normalized, batched reader for the selected network.
 declare const source: RouterDataSource;
 declare const walletAddress: string;
 
-const router = createRouterClient({ source });
+const router = createRouterClient({ network: "testnet", source });
+const mints = router.mints;
+if (!mints) throw new Error("Selected network is not configured");
 
-// SUPPORTED_PAIRS lists the 12 supported inputMint/outputMint combinations.
+// router.supportedPairs lists this network's supported input/output combinations.
 const swap = await router.quoteExactIn({
-  inputMint: TESTNET_MINTS.aUSD,
-  outputMint: TESTNET_MINTS.primeUSD,
+  inputMint: mints.aUSD,
+  outputMint: mints.primeUSD,
   amountIn: 1_000_000n,
   slippageBps: 50,
   user: walletAddress,
@@ -43,14 +44,29 @@ const swap = await router.quoteExactIn({
 
 // Receive-side entry: calculate the fixed input for a desired output estimate.
 const receive = await router.quoteForOutput({
-  inputMint: TESTNET_MINTS.aBTC,
-  outputMint: TESTNET_MINTS.aUSD,
+  inputMint: mints.aBTC,
+  outputMint: mints.aUSD,
   amountOut: 100_000_000n, // Desired output in raw units, before slippage.
   slippageBps: 50,
   user: walletAddress,
   deadlineMs: Date.now() + 120_000,
 });
 ```
+
+`network` accepts `"testnet" | "mainnet"` and defaults to `"testnet"`. Each
+client keeps its selected deployment; create a new client with the matching
+reader when switching networks. The SDK does not choose RPC/indexer endpoints.
+Use readonly `router.network`, `router.mints`, and `router.supportedPairs` for
+frontend metadata. Existing `TESTNET_MINTS` and `SUPPORTED_PAIRS` exports remain
+testnet-only aliases.
+
+`createRouterClient({ network: "mainnet", source })` succeeds today, with
+`mints: null` and `supportedPairs: []`. Both quote methods throw
+`RouterSdkError` with code `NETWORK_NOT_CONFIGURED` before any account reads.
+There is no testnet fallback. Fill the `mainnet` entry in
+[src/config/networks.ts](src/config/networks.ts) with its program IDs, mints and
+venues when available. Routes use the selected mints; account validation,
+PDA/ATA derivation and instructions use the selected program IDs.
 
 The `SwapQuote` contains `inputMint`, `outputMint`, `amountIn`,
 `estimatedAmountOut`, `minAmountOut`, `instructions`, and `deadlineMs`.

@@ -1,21 +1,21 @@
 import type { AccountMeta, Instruction } from "@arch-network/arch-sdk";
 import { encodeRouteExactInV1 } from "../codecs/instruction.js";
-import { TESTNET } from "../config/testnet.js";
+import type { ProgramIds } from "../config/networks.js";
 import { RouterSdkError } from "../errors.js";
 import type { Address } from "../types.js";
 import { account, decodeAddress, deriveAssociatedTokenAddress } from "../utils.js";
 import type { BuildSwapInput, ResolvedStep } from "./types.js";
 
-function venueAccounts(step: ResolvedStep): AccountMeta[] {
+function venueAccounts(step: ResolvedStep, programs: ProgramIds): AccountMeta[] {
   if (step.kind === "clamm") {
     return [
-      account(TESTNET.clammProgramId),
+      account(programs.clammProgramId),
       ...[step.pool, step.tokenVaultA, step.tokenVaultB, ...step.tickArrays,
         step.oracle, ...step.supplementalTickArrays].map((key) => account(key, true)),
     ];
   }
   const accounts = [
-    account(TESTNET.vaultProgramId),
+    account(programs.vaultProgramId),
     account(step.vault, true),
     account(step.reserve, true),
   ];
@@ -27,12 +27,12 @@ function venueAccounts(step: ResolvedStep): AccountMeta[] {
     account(step.managerFeeShares, true),
     account(step.eventAuthority),
   );
-  if (step.kind === "vaultRedeem") accounts.push(account(TESTNET.systemProgramId));
+  if (step.kind === "vaultRedeem") accounts.push(account(programs.systemProgramId));
   return accounts;
 }
 
 /** Build the router instruction from resolved state; no reads or transaction policy. */
-export function buildRouterInstruction(input: BuildSwapInput): Instruction {
+export function buildRouterInstruction(input: BuildSwapInput, programs: ProgramIds): Instruction {
   if (!Number.isSafeInteger(input.deadlineMs) || input.deadlineMs < 0) {
     throw new RouterSdkError("INVALID_INSTRUCTION", "deadlineMs must be a nonnegative safe integer.");
   }
@@ -53,15 +53,15 @@ export function buildRouterInstruction(input: BuildSwapInput): Instruction {
     if (step.kind === "vaultMint") writableMints.add(step.outputMint);
     if (step.kind === "vaultRedeem") writableMints.add(mints[index]!);
   }
-  const accounts = [account(input.user, true, true), account(TESTNET.tokenProgramId)];
+  const accounts = [account(input.user, true, true), account(programs.tokenProgramId)];
   for (const mint of mints) {
     accounts.push(
       account(mint, writableMints.has(mint)),
-      account(deriveAssociatedTokenAddress(input.user, mint), true),
+      account(deriveAssociatedTokenAddress(input.user, mint, programs), true),
     );
   }
-  for (const step of input.steps) accounts.push(...venueAccounts(step));
+  for (const step of input.steps) accounts.push(...venueAccounts(step, programs));
   // This trailer enables router-owned creation of every missing user ATA.
-  accounts.push(account(TESTNET.associatedTokenProgramId), account(TESTNET.systemProgramId));
-  return { program_id: decodeAddress(TESTNET.routerProgramId), accounts, data };
+  accounts.push(account(programs.associatedTokenProgramId), account(programs.systemProgramId));
+  return { program_id: decodeAddress(programs.routerProgramId), accounts, data };
 }

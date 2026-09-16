@@ -1,10 +1,12 @@
 # Tests
 
 `client.test.ts` verifies request validation and unsupported/identical pairs,
-all before reads.
+all before reads. It also covers default/explicit testnet metadata, immutable
+selection, unknown networks, and both mainnet quote methods rejecting before reads.
 `config/routes.test.ts` checks all 12 directed pairs against
 native fixture paths, operation/venue order, route continuity, unique mints,
 one-to-three-hop lengths, and immutable public pair metadata.
+It verifies that the same paths use a selected deployment's mint addresses.
 
 `utils.test.ts` checks shared address helpers and SDK-delegated ATA and
 vault/reserve/escrow derivation against Rust account-validation fixtures. Integer
@@ -20,6 +22,8 @@ and overflow. All four direct public quote paths match existing Rust account
 lists and encode the quoted amounts, final minimum and exact deadline. Tests
 verify one four-account batch, fresh subsequent reads, changed fee recipients
 and queue tails, missing state, wrong owners/relationships, and transport errors.
+Alternate deployment coverage verifies selected vault/mint identities, owners,
+reserve/escrow/entry/event PDAs, and fee ATAs.
 See [vault provenance and native behavior corrections](fixtures/vault/README.md).
 
 `clamm.test.ts` checks native serialized pool/tick layouts, 11 native tick prices,
@@ -33,6 +37,9 @@ Rust instruction account lists; encoded input/minimum/deadline and window
 limits are verified. Direct vault quotes read once; CLAMM routes share two
 batches total, with no repeated keys or construction reads. See
 [CLAMM provenance and regeneration](fixtures/clamm/README.md).
+Network coverage checks default/explicit testnet quote parity while a mainnet
+client coexists, plus alternate CLAMM pool/mint identities, account owners,
+tick/oracle PDAs and tick-to-pool validation through both loading stages.
 
 `quoteForOutput` is tested against all 12 native composed outputs. Each result
 matches a forward quote at the calculated input, while one raw input unit less
@@ -52,6 +59,8 @@ byte/account/privilege coverage, including duplicate fee/tick positions and
 native supplemental-array encoding. The fixture's leading input-ATA instruction
 is deliberately not returned. The router's ATA/system trailer is retained and
 construction performs no network reads.
+An alternate-program test verifies the selected router and CPI programs, user
+ATAs, and ATA/system trailer while preserving the native account order and bytes.
 
 Transaction-size enforcement and tests for redundant fixed-route runtime guards
 were removed under the simplification plan. Original fixture JSON, generators,

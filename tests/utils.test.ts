@@ -10,7 +10,7 @@ import {
   inputForOutput,
   U64_MAX,
 } from "../src/utils.js";
-import { TESTNET, TESTNET_MINTS } from "../src/config/testnet.js";
+import { TESTNET, TESTNET_MINTS } from "../src/config/networks.js";
 import { RouterSdkError } from "../src/errors.js";
 import type { RouterDataSource } from "../src/types.js";
 
@@ -43,7 +43,7 @@ describe("Arch SDK derivation compatibility", () => {
     [TESTNET_MINTS.primeBTC, "48iL9oYHb14NazPBFN3mHjemCSLj5Tgxf9a9N3taww12"],
     [TESTNET_MINTS.primeUSD, "6fitWMWz7VYdQbhquSGwM1JPR2yCYn5iupMWUDYCfC2a"],
   ])("matches the Rust ATA fixture for %s", (mint, expected) => {
-    expect(deriveAssociatedTokenAddress(operator, mint)).toBe(expected);
+    expect(deriveAssociatedTokenAddress(operator, mint, TESTNET)).toBe(expected);
   });
 
   it.each([

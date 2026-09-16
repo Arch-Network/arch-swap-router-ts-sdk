@@ -2,10 +2,10 @@ import { base58 } from "@scure/base";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccountInfoResult } from "@arch-network/arch-sdk";
 import { createRouterClient, TESTNET_MINTS } from "../src/index.js";
-import { TESTNET, TESTNET_VENUES } from "../src/config/testnet.js";
+import { NETWORKS, TESTNET, TESTNET_VENUES } from "../src/config/networks.js";
 import { FIXED_ROUTES } from "../src/config/routes.js";
 import { decodePool, decodeTickArray, loadClamm, prepareClammQuote, simulateClamm, tickSqrtPrice, tickWindow } from "../src/clamm.js";
-import { decodeAddress, deriveClammAddress, U64_MAX } from "../src/utils.js";
+import { decodeAddress, deriveAddress, U64_MAX } from "../src/utils.js";
 import { buildInput, expectedRouterInstruction, fixtures, namedFixture } from "./transactions/fixtures.js";
 import native from "./fixtures/clamm/native.json" with { type: "json" };
 import vaultContract from "./fixtures/vault/contract.json" with { type: "json" };
@@ -67,6 +67,44 @@ function emptyTickArray(start: number): Uint8Array {
 }
 
 describe("native CLAMM contract", () => {
+  it("uses selected pool, mints and programs through both account stages", () => {
+    const key = (byte: number) => base58.encode(new Uint8Array(32).fill(byte));
+    const programs = { ...TESTNET, clammProgramId: key(61), tokenProgramId: key(62), systemProgramId: key(63) };
+    const venue = { address: key(64), tokenMintA: key(65), tokenMintB: key(66) };
+    const config = { ...NETWORKS.testnet, programs, venues: { ...TESTNET_VENUES, clamm: venue } };
+    const { accounts } = setup();
+    const pool = accounts.get(poolAddress)!;
+    pool.owner = decodeAddress(programs.clammProgramId);
+    pool.data.set(decodeAddress(venue.tokenMintA), 101); pool.data.set(decodeAddress(venue.tokenMintB), 181);
+    accounts.delete(poolAddress); accounts.set(venue.address, pool);
+    for (const [oldMint, mint] of [[TESTNET_MINTS.aBTC, venue.tokenMintA], [TESTNET_MINTS.aUSD, venue.tokenMintB]]) {
+      const account = accounts.get(oldMint!)!;
+      account.owner = decodeAddress(programs.tokenProgramId);
+      accounts.delete(oldMint!); accounts.set(mint!, account);
+    }
+    const state = loadClamm(accounts, true, config);
+    expect(state.resolved).toMatchObject({
+      pool: venue.address, outputMint: venue.tokenMintB,
+      oracle: deriveAddress(programs.clammProgramId, "oracle", decodeAddress(venue.address)),
+    });
+    state.addresses.forEach((address, i) => {
+      expect(address).toBe(deriveAddress(programs.clammProgramId, "tick_array", decodeAddress(venue.address), new TextEncoder().encode(String(state.starts[i]))));
+      const data = emptyTickArray(state.starts[i]!); data.set(decodeAddress(venue.address), 9956);
+      accounts.set(address, info(data, programs.clammProgramId));
+    });
+    const estimate = prepareClammQuote(state, accounts).estimate(1_000_000_000n);
+    expect(estimate).toBe(BigInt(native.cases[0]!.expected.amountOut!));
+    // Empty system-owned ticks use this deployment's system program too.
+    const first = state.addresses[0]!;
+    accounts.set(first, info(new Uint8Array(), programs.systemProgramId));
+    expect(prepareClammQuote(state, accounts).estimate(1_000_000_000n)).toBe(estimate);
+    // An array for the old testnet pool must be rejected even under the right owner.
+    accounts.set(first, info(emptyTickArray(state.starts[0]!), programs.clammProgramId));
+    expect(() => prepareClammQuote(state, accounts)).toThrow(expect.objectContaining({ code: "INVALID_ACCOUNT" }));
+    pool.owner = decodeAddress(TESTNET.clammProgramId);
+    expect(() => loadClamm(accounts, true, config)).toThrow(expect.objectContaining({ code: "INVALID_ACCOUNT" }));
+  });
+
   it.each(native.ticks)("matches native tick $tick", ({ tick, sqrtPrice }) => {
     expect(tickSqrtPrice(tick)).toBe(BigInt(sqrtPrice));
   });
@@ -86,7 +124,7 @@ describe("native CLAMM contract", () => {
   it("decodes native packed tick bytes with signed i128 liquidity", () => {
     const raw = bytes(native.tickArray), padded = new Uint8Array(raw.length + 5);
     padded.set(raw, 3);
-    expect(decodeTickArray(padded.subarray(3, -2), -11264, 128)).toEqual([
+    expect(decodeTickArray(padded.subarray(3, -2), -11264, 128, TESTNET_VENUES.clamm.address)).toEqual([
       { index: -11264, liquidityNet: -123456789012345678901n },
       { index: -128, liquidityNet: 987654321n },
     ]);
@@ -95,7 +133,7 @@ describe("native CLAMM contract", () => {
   it.each(native.cases)("matches native swap $name", (fixture) => {
     const pool = decodePool(bytes(fixture.pool));
     expect(tickWindow(pool.tickCurrentIndex, pool.tickSpacing, fixture.aToB)).toEqual(fixture.starts);
-    const state = loadClamm(setup(bytes(fixture.pool)).accounts, fixture.aToB);
+    const state = loadClamm(setup(bytes(fixture.pool)).accounts, fixture.aToB, NETWORKS.testnet);
     expect(state.resolved.sqrtPriceLimit).toBe(BigInt(fixture.limit));
     const ticks = fixture.ticks.map((tick) => ({ index: tick.index, liquidityNet: BigInt(tick.liquidityNet) }))
       .sort((a, b) => fixture.aToB ? b.index - a.index : a.index - b.index);
@@ -142,7 +180,7 @@ describe("native CLAMM contract", () => {
     (data: Uint8Array) => { data[9956] = 0; return data; },
     (data: Uint8Array) => { data[12] = 2; return data; },
   ])("rejects malformed ticks %#", (mutate) => {
-    expect(() => decodeTickArray(mutate(bytes(native.tickArray)), -11264, 128))
+    expect(() => decodeTickArray(mutate(bytes(native.tickArray)), -11264, 128, TESTNET_VENUES.clamm.address))
       .toThrow(expect.objectContaining({ code: "INVALID_ACCOUNT" }));
   });
 });
@@ -150,6 +188,20 @@ describe("native CLAMM contract", () => {
 describe("fixed route quotes", () => {
   beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(Number(now) * 1000); });
   afterEach(() => { vi.restoreAllMocks(); });
+
+  it.each(["quoteExactIn", "quoteForOutput"] as const)("keeps explicit testnet %s identical while a mainnet client coexists", async (method) => {
+    const { source, request, client } = setup();
+    const mainnetSource = { getAccounts: vi.fn(async () => { throw new Error("Unexpected mainnet read"); }) };
+    const mainnet = createRouterClient({ source: mainnetSource, network: "mainnet" });
+    const testnet = createRouterClient({ source, network: "testnet" });
+    const input = { ...request, inputMint: TESTNET_MINTS.primeBTC, outputMint: TESTNET_MINTS.primeUSD, amountOut: 1_000_000n };
+    const expected = await client[method](input);
+    const [actual, unavailable] = await Promise.allSettled([testnet[method](input), mainnet[method](input)]);
+    expect(actual).toEqual({ status: "fulfilled", value: expected });
+    expect(unavailable).toMatchObject({ status: "rejected", reason: { code: "NETWORK_NOT_CONFIGURED" } });
+    expect(source.getAccounts).toHaveBeenCalledTimes(4);
+    expect(mainnetSource.getAccounts).not.toHaveBeenCalled();
+  });
 
   it.each(native.routes)("quotes $input → $output against native composition", async (expected) => {
     const { accounts, source, request, client } = setup();
@@ -176,7 +228,7 @@ describe("fixed route quotes", () => {
     let offset = 26;
     for (const step of route.steps) {
       if (step.venue === "clamm") {
-        const clamm = loadClamm(accounts, step.inputMint === TESTNET_MINTS.aBTC);
+        const clamm = loadClamm(accounts, step.inputMint === TESTNET_MINTS.aBTC, NETWORKS.testnet);
         setU128(data, offset + 2, clamm.resolved.sqrtPriceLimit);
         expect(source.getAccounts.mock.calls[1]![0]).toEqual(clamm.addresses);
         offset += 19;
@@ -258,7 +310,7 @@ describe("fixed route quotes", () => {
 
   it.each([null, "empty", "initialized"])("handles native empty ticks represented as %s", async (kind) => {
     const { accounts, client, request } = setup();
-    const state = loadClamm(accounts, true);
+    const state = loadClamm(accounts, true, NETWORKS.testnet);
     for (const [i, address] of state.addresses.entries()) {
       accounts.set(address, kind === null ? null : kind === "empty"
         ? info(new Uint8Array(), TESTNET.systemProgramId) : info(emptyTickArray(state.starts[i]!)));
@@ -270,7 +322,7 @@ describe("fixed route quotes", () => {
     "quotes initialized tick crossings through the public API: %s", async (name) => {
       const fixture = native.cases.find((c) => c.name === name)!;
       const { accounts, source, client, request } = setup(bytes(fixture.pool));
-      const state = loadClamm(accounts, fixture.aToB);
+      const state = loadClamm(accounts, fixture.aToB, NETWORKS.testnet);
       for (const [i, address] of state.addresses.entries()) {
         const start = state.starts[i]!, data = emptyTickArray(start);
         for (const tick of fixture.ticks) {
@@ -301,7 +353,7 @@ describe("fixed route quotes", () => {
   it("repeats boundary instruction slots while fetching their address only once", async () => {
     const fixture = native.cases.find((c) => c.name === "lower-bound")!;
     const { accounts, client, source, request } = setup(bytes(fixture.pool));
-    const state = loadClamm(accounts, true);
+    const state = loadClamm(accounts, true, NETWORKS.testnet);
     expect(state.addresses).toHaveLength(1);
     expect(state.resolved.tickArrays).toEqual(Array(3).fill(state.addresses[0]));
     expect(state.resolved.supplementalTickArrays).toEqual([]);
@@ -330,7 +382,7 @@ describe("fixed route quotes", () => {
 
   it("rejects tick transport failures, malformed batches and invalid ownership", async () => {
     const { accounts, source, client, request } = setup();
-    const state = loadClamm(accounts, true);
+    const state = loadClamm(accounts, true, NETWORKS.testnet);
     const error = new Error("Tick batch unavailable");
     source.getAccounts.mockImplementationOnce(async (keys) => keys.map((key) => accounts.get(key) ?? null))
       .mockRejectedValueOnce(error);
@@ -359,7 +411,7 @@ describe("fixed route quotes", () => {
 
   it("validates tick ownership/pool identity even if the swap would not reach that array", () => {
     const { accounts } = setup();
-    const state = loadClamm(accounts, true);
+    const state = loadClamm(accounts, true, NETWORKS.testnet);
     const ticks = new Map(state.addresses.map((address) => [address, null as AccountInfoResult | null]));
     const data = emptyTickArray(state.starts[2]!); data[9956] = 0;
     ticks.set(state.addresses[2]!, info(data));
@@ -367,7 +419,7 @@ describe("fixed route quotes", () => {
   });
 
   it("uses the decimal PDA seed pinned by the Rust instruction fixture", () => {
-    const address = deriveClammAddress("tick_array", decodeAddress(poolAddress), new TextEncoder().encode("56320"));
+    const address = deriveAddress(TESTNET.clammProgramId, "tick_array", decodeAddress(poolAddress), new TextEncoder().encode("56320"));
     expect(address).toBe(namedFixture("direct-clamm-btc").hops[0]!.accounts[4]!.pubkey);
   });
 });

@@ -11,6 +11,8 @@ All 12 fixed directions have estimates and instructions. Direct vault Mint/Redee
 quotes use one four-account batch; CLAMM routes use two shared batches total.
 The internal builder returns only the router instruction with its ATA/system
 trailer, without separate ATA creation, compute-budget instructions, or sizing.
+Clients select testnet (default) or mainnet. Testnet is configured; mainnet is
+an explicit placeholder whose quotes reject before fetching accounts.
 
 ## Checkpoint overview
 
@@ -235,12 +237,36 @@ crossings, u64 precision, rounding, and capacity/state failures. Typecheck, buil
 all **389 tests**, and strict test-file typechecking pass. Frontend integration
 and live execution remain separate work; checkpoint 6 is still pending.
 
+### Network selection addition
+
+Completed 2026-09-16. `createRouterClient({ source, network })` accepts testnet
+(default) or mainnet and holds one immutable deployment selection. Program IDs,
+mints and venues live in `src/config/networks.ts`; the same fixed route topology
+uses selected mints. Account loaders, ownership checks, PDA/ATA derivation and
+instruction assembly receive the selected configuration; quote math is unchanged.
+
+Mainnet is an explicit `null` placeholder. Client construction succeeds, while
+both quote methods reject with `NETWORK_NOT_CONFIGURED` before reads. There is
+no fallback to testnet. Clients expose readonly `network`, `mints` (null when
+unconfigured), and `supportedPairs` (empty when unconfigured). Existing testnet
+metadata exports are retained. The app supplies a matching reader and creates
+a new client on network changes; the SDK owns no endpoints or transport switch.
+
+Typecheck, build, all **401 tests**, and strict test-file typechecking pass.
+Tests cover no-read mainnet rejection, default/explicit testnet parity,
+coexisting clients, selected route mints, and alternate deployment identities
+through loaders and construction. Existing native fixtures and read budgets
+are unchanged. Mainnet deployment, frontend integration and live verification
+remain pending; checkpoint 6 is still next.
+
 ## 6. Frontend example and package verification
 
 - [ ] Demonstrate a batched reader normalizing `owner`/`data` to `Uint8Array`, one
   quote call, and application-owned compilation, sizing, signing, and submission.
 - [ ] Document refresh timing and deadline handling as frontend responsibilities.
   Resolve indexer cache misses in the app reader before returning account absence.
+- [ ] Use client mint/pair metadata and a matching reader for the selected network;
+  show mainnet as unconfigured until its deployment addresses are supplied.
 - [ ] Verify an installed tarball in Node and a real browser, including PDA
   derivation and a fixture-backed quote. Document the small explicit `Buffer`
   setup required by Arch SDK 0.0.28; avoid broad Node polyfills.
@@ -262,7 +288,8 @@ documentation update.
 ## Completion rules
 
 Keep the package private, the existing pinned dependencies, and exact-input
-testnet scope. Graph discovery, ranking, configurable venues, PropAMM, broader
+execution. Testnet is configured; mainnet is selectable but unconfigured.
+Graph discovery, ranking, caller-configurable venues, PropAMM, broader
 tick windows, prefetch optimizations, and expanded receipt helpers are deferred.
 The application owns refresh, final transaction sizing, signing, submission,
 deadlines around signing, confirmation, and retries.

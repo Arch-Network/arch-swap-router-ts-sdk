@@ -1,4 +1,5 @@
 import type { AccountInfoResult, Instruction } from "@arch-network/arch-sdk";
+import type { Network, NetworkMints } from "./config/networks.js";
 
 /** Base58 public key; decoded and length-checked at the byte-conversion boundary. */
 export type Address = string;
@@ -34,10 +35,16 @@ export interface SwapQuote {
 }
 
 export interface RouterClientOptions {
+  /** Defaults to testnet. The supplied reader must use the same network. */
+  readonly network?: Network;
   readonly source: RouterDataSource;
 }
 
 export interface RouterClient {
+  readonly network: Network;
+  /** Null until the selected network's deployment is configured. */
+  readonly mints: NetworkMints | null;
+  readonly supportedPairs: readonly { readonly inputMint: Address; readonly outputMint: Address }[];
   quoteExactIn(request: QuoteExactInRequest): Promise<SwapQuote>;
   /** The returned transaction still spends a fixed input; output may vary within slippage. */
   quoteForOutput(request: QuoteForOutputRequest): Promise<SwapQuote>;

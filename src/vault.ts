@@ -1,17 +1,15 @@
 // Minimal arch-vaults state/preview port, aligned with native Mint and Redeem.
 // Source revisions, layout and math fixtures: tests/fixtures/vault/README.md.
 import { base58 } from "@scure/base";
-import { TESTNET } from "./config/testnet.js";
+import type { ProgramIds, VaultVenue } from "./config/networks.js";
 import { RouterSdkError } from "./errors.js";
 import type { ResolvedStep } from "./transactions/types.js";
-import type { Address } from "./types.js";
 import {
   accountData, applyFee, decodeAddress, decodeMint, decodeTokenAccount,
-  deriveAssociatedTokenAddress, deriveVaultAddress, mulDiv, u64, type AccountMap, type Fee,
+  deriveAssociatedTokenAddress, deriveAddress, mulDiv, u64, type AccountMap, type Fee,
 } from "./utils.js";
 
 type Operation = "vaultMint" | "vaultRedeem";
-interface VaultVenue { readonly address: Address; readonly assetMint: Address; readonly shareMint: Address }
 
 /** Fixed zero-copy offsets include the discriminator. Decode only fields used here. */
 export function decodeVault(data: Uint8Array) {
@@ -92,15 +90,15 @@ export function estimateVault(
 }
 
 export function prepareVaultQuote(
-  accounts: AccountMap, venue: VaultVenue, operation: Operation, now: bigint,
+  accounts: AccountMap, venue: VaultVenue, operation: Operation, now: bigint, programs: ProgramIds,
 ): { estimate: (amountIn: bigint) => bigint; resolved: ResolvedStep } {
   const shareKey = decodeAddress(venue.shareMint);
-  const reserveAddress = deriveVaultAddress("reserve", shareKey);
-  const vault = decodeVault(accountData(accounts, venue.address, TESTNET.vaultProgramId));
-  const reserve = decodeTokenAccount(accountData(accounts, reserveAddress, TESTNET.tokenProgramId));
-  decodeMint(accountData(accounts, venue.assetMint, TESTNET.tokenProgramId));
-  const shares = decodeMint(accountData(accounts, venue.shareMint, TESTNET.tokenProgramId));
-  const escrow = deriveVaultAddress("escrow", shareKey);
+  const reserveAddress = deriveAddress(programs.vaultProgramId, "reserve", shareKey);
+  const vault = decodeVault(accountData(accounts, venue.address, programs.vaultProgramId));
+  const reserve = decodeTokenAccount(accountData(accounts, reserveAddress, programs.tokenProgramId));
+  decodeMint(accountData(accounts, venue.assetMint, programs.tokenProgramId));
+  const shares = decodeMint(accountData(accounts, venue.shareMint, programs.tokenProgramId));
+  const escrow = deriveAddress(programs.vaultProgramId, "escrow", shareKey);
   if (vault.assetMint !== venue.assetMint || vault.shareMint !== venue.shareMint
     || vault.reserve !== reserveAddress || vault.escrow !== escrow
     || reserve.mint !== venue.assetMint || reserve.owner !== venue.address) {
@@ -110,9 +108,9 @@ export function prepareVaultQuote(
   const estimate = (amountIn: bigint) => estimateVault(vault, reserve.amount, shares.supply, operation, amountIn, now);
   const common = {
     vault: venue.address, reserve: reserveAddress,
-    protocolFeeShares: deriveAssociatedTokenAddress(vault.protocolFeeRecipient, venue.shareMint),
-    managerFeeShares: deriveAssociatedTokenAddress(vault.feeRecipient, venue.shareMint),
-    eventAuthority: deriveVaultAddress("__event_authority"),
+    protocolFeeShares: deriveAssociatedTokenAddress(vault.protocolFeeRecipient, venue.shareMint, programs),
+    managerFeeShares: deriveAssociatedTokenAddress(vault.feeRecipient, venue.shareMint, programs),
+    eventAuthority: deriveAddress(programs.vaultProgramId, "__event_authority"),
   };
   if (operation === "vaultMint") {
     return { estimate, resolved: { ...common, kind: operation, outputMint: venue.shareMint } };
@@ -123,7 +121,7 @@ export function prepareVaultQuote(
     estimate,
     resolved: {
       ...common, kind: operation, outputMint: venue.assetMint, escrow,
-      redemptionEntry: deriveVaultAddress("redeem", decodeAddress(venue.address), tail),
+      redemptionEntry: deriveAddress(programs.vaultProgramId, "redeem", decodeAddress(venue.address), tail),
     },
   };
 }

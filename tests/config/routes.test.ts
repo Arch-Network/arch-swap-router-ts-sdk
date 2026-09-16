@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { FIXED_ROUTES, SUPPORTED_PAIRS } from "../../src/config/routes.js";
-import { TESTNET_MINTS, TESTNET_VENUES } from "../../src/config/testnet.js";
+import { fixedRoutes, FIXED_ROUTES, SUPPORTED_PAIRS } from "../../src/config/routes.js";
+import { TESTNET_MINTS, TESTNET_VENUES } from "../../src/config/networks.js";
 import { namedFixture } from "../transactions/fixtures.js";
 
 const directedFixtures = [
@@ -12,6 +12,15 @@ const directedFixtures = [
 ];
 
 describe("fixed testnet routes", () => {
+  it("uses selected mints throughout the same fixed paths", () => {
+    const mints = { aBTC: "btc", aUSD: "usd", primeBTC: "prime-btc", primeUSD: "prime-usd" };
+    const replace = new Map(Object.entries(TESTNET_MINTS).map(([name, address]) => [address as string, mints[name as keyof typeof mints]]));
+    expect(fixedRoutes(mints)).toEqual(FIXED_ROUTES.map((route) => ({
+      inputMint: replace.get(route.inputMint), outputMint: replace.get(route.outputMint),
+      steps: route.steps.map((step) => ({ ...step, inputMint: replace.get(step.inputMint), outputMint: replace.get(step.outputMint) })),
+    })));
+  });
+
   it("offers each distinct directed pair exactly once", () => {
     const mints = Object.values(TESTNET_MINTS);
     const pairs = SUPPORTED_PAIRS.map((pair) => `${pair.inputMint}:${pair.outputMint}`);

@@ -1,11 +1,12 @@
 // Exact-input subset of arch-swap's CLAMM helpers, checked against native Rust.
 // Provenance and independent fixtures: tests/fixtures/clamm/README.md.
 import { base58 } from "@scure/base";
-import { TESTNET, TESTNET_VENUES } from "./config/testnet.js";
+import type { NetworkConfig } from "./config/networks.js";
+import type { Address } from "./types.js";
 import { RouterSdkError } from "./errors.js";
 import type { ResolvedStep } from "./transactions/types.js";
 import {
-  accountData, decodeAddress, decodeMint, deriveClammAddress, divRoundUp,
+  accountData, decodeAddress, decodeMint, deriveAddress, divRoundUp,
   readU128, u64, u128, u256, type AccountMap,
 } from "./utils.js";
 
@@ -83,12 +84,12 @@ export function tickWindow(tick: number, spacing: number, aToB: boolean): number
     .filter((start) => start >= Math.floor(MIN_TICK / span) * span && start <= MAX_TICK);
 }
 
-export function decodeTickArray(data: Uint8Array, start: number, spacing: number): InitializedTick[] {
+export function decodeTickArray(data: Uint8Array, start: number, spacing: number, poolAddress: Address): InitializedTick[] {
   if (data.length !== 9988 || ![69, 97, 189, 190, 110, 7, 66, 187].every((b, i) => data[i] === b)) {
     throw new RouterSdkError("INVALID_ACCOUNT", "Invalid CLAMM tick array length or discriminator.");
   }
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-  if (view.getInt32(8, true) !== start || base58.encode(data.subarray(9956)) !== TESTNET_VENUES.clamm.address) {
+  if (view.getInt32(8, true) !== start || base58.encode(data.subarray(9956)) !== poolAddress) {
     throw new RouterSdkError("INVALID_ACCOUNT", "Tick array does not match the selected pool/window.");
   }
   const ticks: InitializedTick[] = [];
@@ -146,36 +147,36 @@ export function simulateClamm(pool: Pool, ticks: readonly InitializedTick[], amo
   return { amountIn: amount - remaining, amountOut, feeAmount, sqrtPrice: price, liquidity };
 }
 
-export function loadClamm(accounts: AccountMap, aToB: boolean) {
-  const venue = TESTNET_VENUES.clamm;
-  const pool = decodePool(accountData(accounts, venue.address, TESTNET.clammProgramId));
+export function loadClamm(accounts: AccountMap, aToB: boolean, { programs, venues }: NetworkConfig) {
+  const venue = venues.clamm;
+  const pool = decodePool(accountData(accounts, venue.address, programs.clammProgramId));
   if (pool.tokenMintA !== venue.tokenMintA || pool.tokenMintB !== venue.tokenMintB) {
     throw new RouterSdkError("INVALID_ACCOUNT", "CLAMM pool does not match the selected pair.");
   }
-  for (const mint of [pool.tokenMintA, pool.tokenMintB]) decodeMint(accountData(accounts, mint, TESTNET.tokenProgramId));
+  for (const mint of [pool.tokenMintA, pool.tokenMintB]) decodeMint(accountData(accounts, mint, programs.tokenProgramId));
   const starts = tickWindow(pool.tickCurrentIndex, pool.tickSpacing, aToB);
   if (starts.length === 0) throw new RouterSdkError("INSUFFICIENT_LIQUIDITY", "No CLAMM tick window.");
   const last = starts[starts.length - 1]!;
   const limit = tickSqrtPrice(aToB ? Math.max(last, MIN_TICK) : Math.min(last + pool.tickSpacing * ARRAY_SIZE - 1, MAX_TICK));
   const poolKey = decodeAddress(venue.address);
-  const addresses = starts.map((start) => deriveClammAddress("tick_array", poolKey, new TextEncoder().encode(String(start))));
+  const addresses = starts.map((start) => deriveAddress(programs.clammProgramId, "tick_array", poolKey, new TextEncoder().encode(String(start))));
   const finalAddress = addresses[addresses.length - 1]!;
   const resolved: ResolvedStep = {
     kind: "clamm", outputMint: aToB ? pool.tokenMintB : pool.tokenMintA,
     pool: venue.address, tokenVaultA: pool.tokenVaultA, tokenVaultB: pool.tokenVaultB,
     tickArrays: [addresses[0]!, addresses[1] ?? finalAddress, addresses[2] ?? finalAddress],
-    oracle: deriveClammAddress("oracle", poolKey), aToB, sqrtPriceLimit: limit, supplementalTickArrays: [],
+    oracle: deriveAddress(programs.clammProgramId, "oracle", poolKey), aToB, sqrtPriceLimit: limit, supplementalTickArrays: [],
   };
-  return { pool, starts, addresses, resolved };
+  return { pool, starts, addresses, resolved, programs };
 }
 
 export function prepareClammQuote(state: ReturnType<typeof loadClamm>, accounts: AccountMap) {
-  const { pool, starts, addresses, resolved } = state;
+  const { pool, starts, addresses, resolved, programs } = state;
   const ticks = addresses.flatMap((address, i) => {
     const info = accounts.get(address);
     if (info === null) return []; // Confirmed absence is a native zeroed tick array.
-    if (info?.data.length === 0 && base58.encode(info.owner) === TESTNET.systemProgramId && !info.is_executable) return [];
-    return decodeTickArray(accountData(accounts, address, TESTNET.clammProgramId), starts[i]!, pool.tickSpacing);
+    if (info?.data.length === 0 && base58.encode(info.owner) === programs.systemProgramId && !info.is_executable) return [];
+    return decodeTickArray(accountData(accounts, address, programs.clammProgramId), starts[i]!, pool.tickSpacing, resolved.pool);
   }).sort((a, b) => resolved.aToB ? b.index - a.index : a.index - b.index);
   return { resolved, estimate(amountIn: bigint) {
     const result = simulateClamm(pool, ticks, amountIn, resolved.aToB, resolved.sqrtPriceLimit);
