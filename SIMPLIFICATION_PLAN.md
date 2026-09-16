@@ -3,7 +3,7 @@
 Agreed scope: 2026-09-16. Scaffold simplification is complete; track further work in
 [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). This plan supersedes the API
 and scope of the original handover. [HANDOVER.md](HANDOVER.md) now describes the
-compact scaffold; account reads and quote math remain pending.
+compact SDK; direct vault quotes are complete, with CLAMM/composition pending.
 
 ## Summary
 
@@ -99,9 +99,9 @@ Keep checks needed for estimates and encoding:
 - Account-response shape, decoding bounds, expected ownership, and relationships
   identifying the pool/vault/mints/reserves/ticks used in calculations. Missing
   accounts remain `null`; transport and malformed-response errors reject.
-- Native fees, management-fee accrual, rounding, overflow behavior, and positive
-  output. Capture one internal evaluation time for fee/NAV calculations; do not
-  expose it as a quote timestamp.
+- Native fees, rounding, overflow behavior, and positive output. Use observed
+  share supply: management fees accrue only during `Report`, not Mint/Redeem.
+  Capture one internal time for Mint NAV checks; do not expose a timestamp.
 - Vault pause/cap/NAV checks and immediate-redemption queue, gross-reserve
   coverage, and positive net-output requirements.
 - CLAMM's three-primary-array execution window, zero supplements, and full-input
@@ -130,13 +130,17 @@ Removing execution-only account probes reduces the planned request budget:
 
 | Selected route | Planned SDK batches |
 | --- | --- |
-| Direct Mint or Redeem | 1 |
+| Direct Mint or Redeem (implemented) | 1 batch, 4 accounts |
 | Any route containing CLAMM | At most 2 |
 
 For vaults, fetch vault state, required mint data, and the locally derived reserve
 together. Derive fee destinations from returned recipient identities and the
 redemption entry from the observed queue tail, without fetching those accounts
 solely for readiness checks. Keep mutable quote inputs in fetched account state.
+
+Native source review during checkpoint 4 corrected the original plan: Mint's
+cap counts the full deposit, management fees accrue only in `Report`, and
+Redeem/fill has no NAV freshness guard. See [source evidence](tests/fixtures/vault/README.md).
 
 For CLAMM routes, load pool/vault state and known calculation inputs together,
 then fetch the required tick arrays. Share batches across the selected route's

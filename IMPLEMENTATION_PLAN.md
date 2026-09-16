@@ -1,14 +1,14 @@
 # Router SDK implementation tracker
 
-Updated: 2026-09-16. Revised checkpoints completed: **3 / 6**.
+Updated: 2026-09-16. Revised checkpoints completed: **4 / 6**.
 
 Implement the [compact SDK plan](SIMPLIFICATION_PLAN.md): one `quoteExactIn` call
 returns one estimate and its instructions for a fixed supported pair. That plan
 supersedes the older [handover](HANDOVER.md). Current Rust source and independent
 fixtures remain authoritative for the ABI.
 
-The compact scaffold is implemented. Supported `quoteExactIn` requests still
-reject with `NOT_IMPLEMENTED`; account reading and quoting are checkpoint 4 work.
+Direct vault Mint/Redeem quotes are implemented with one four-account batch.
+CLAMM and multi-hop requests still reject with `NOT_IMPLEMENTED` before reads.
 The internal builder returns only the router instruction with its ATA/system
 trailer, without separate ATA creation, compute-budget instructions, or sizing.
 
@@ -17,12 +17,12 @@ trailer, without separate ATA creation, compute-budget instructions, or sizing.
 - [x] 1. Router codec and independent fixtures
 - [x] 2. Instruction bundles
 - [x] 3. Compact API and fixed-pair scaffold
-- [ ] 4. Request validation, account reads, and vault estimates
+- [x] 4. Request validation, account reads, and vault estimates
 - [ ] 5. CLAMM estimates and fixed-route composition
 - [ ] 6. Frontend example and package verification
 
-Next: checkpoint 4. Direct vault quotes become usable at checkpoint 4; all 12
-fixed directions receive fixture-backed quote coverage at checkpoint 5. A
+Next: checkpoint 5. All 12 fixed directions receive fixture-backed quote coverage
+there; the four direct vault directions work now. A
 completed quote returns instructions, not a guarantee of transaction execution.
 
 ## 1. Router codec and independent fixtures
@@ -110,34 +110,35 @@ or runtime compute adjustments were performed.
 
 ## 4. Request validation, account reads, and vault estimates
 
-- [ ] Validate addresses, positive `u64` input, integer slippage `0..9999`, and
+- [x] Validate addresses, positive `u64` input, integer slippage `0..9999`, and
   nonnegative safe-integer deadlines before reads. Preserve the deadline exactly;
   leave expiry decisions to the app/chain.
-- [ ] Read ordered `AccountInfoResult | null` batches with request-local
+- [x] Read ordered `AccountInfoResult | null` batches with request-local
   deduplication. Preserve missing values; reject transport failures and malformed
   responses. Each public call starts fresh; no persistent cache or new transport.
-- [ ] Capture one internal evaluation time for management fees and NAV checks.
+- [x] Capture one internal evaluation time for Mint NAV checks.
   Do not add a public quote timestamp or freshness guarantee.
-- [ ] Vendor the minimal vault decoder, APL readers, and preview dependencies
+- [x] Vendor the minimal vault decoder, APL readers, and preview dependencies
   with source revisions and contract fixtures. Use the SDK's fixed identities.
-- [ ] Fetch vault state, required mints, and the canonical reserve in one batch.
+- [x] Fetch vault state, both mints, and the canonical reserve in one batch.
   Check the shape, ownership, and relationships of calculation inputs.
-- [ ] Apply management-fee share accrual before conversion; preserve native fees,
-  virtual offsets, decimals, rounding, and overflow behavior. Enforce pauses,
-  caps, and applicable NAV freshness.
-- [ ] For immediate Redeem, require an empty observed queue, gross reserve
-  coverage, and positive net output. Follow Rust's immediate-payout freshness
-  requirement rather than the broader TypeScript redemption-preview comment.
-- [ ] Derive fee destinations from observed recipients and the redemption entry
+- [x] Use observed share supply: management fees accrue only during native
+  `Report`, not Mint/Redeem. Preserve native fees, virtual offsets, raw units
+  without decimal rescaling, rounding, and overflow behavior. Enforce pauses,
+  the full-deposit cap, and Mint NAV freshness.
+- [x] For immediate Redeem, require an empty observed queue, gross reserve
+  coverage, and positive net output. Current native Redeem/fill has no NAV
+  freshness requirement; do not introduce an additional SDK restriction.
+- [x] Derive fee destinations from observed recipients and the redemption entry
   from the same observed queue tail. Do not fetch fee/escrow/entry accounts for
   execution readiness, or read wallet balances, user ATAs, or program accounts
   solely for preflight.
-- [ ] Return one estimate/instruction bundle for both Mint and Redeem directions.
+- [x] Return one estimate/instruction bundle for both Mint and Redeem directions.
   Apply slippage once to final output and require a positive minimum.
-- [ ] Test vault math/eligibility, invalid inputs/responses, missing state,
+- [x] Test vault math/eligibility, invalid inputs/responses, missing state,
   transport errors, one-batch direct quotes, and fresh reads on subsequent calls.
   Verify construction performs no extra reads.
-- [ ] Pass the required checks.
+- [x] Pass the required checks.
 
 **Complete when:** all four directed vault pairs return fixture-backed estimates
 and instructions through `quoteExactIn` with the single-batch read budget.
@@ -146,7 +147,20 @@ and instructions through `quoteExactIn` with the single-batch read budget.
 Observed redemption eligibility can change before execution. Use the current
 ABI; do not add a flag or fall back to queued redemption.
 
-**Evidence / notes:** Pending.
+**Evidence / notes:** Completed 2026-09-16. One new production module,
+`src/vault.ts`, contains vault decoding, conversion, and resolution; shared
+account/APL, checked arithmetic, fee, and PDA helpers stay in `src/utils.ts`.
+All four direct paths return estimates and one
+router instruction with exactly one batch of four accounts. The untouched Rust
+vault layout, 12 native math vectors, and four existing direct instruction
+fixtures cover the port. See [vault provenance](tests/fixtures/vault/README.md).
+Typecheck, build, all **266 tests**, and a strict TypeScript check of the test
+files pass. No live or browser verification was performed.
+
+Native source review corrected three earlier assumptions: management fees are
+Report-only, the Mint cap counts gross deposits, and Redeem/fill has no NAV
+freshness guard. The implementation follows native Rust rather than those
+earlier plan statements or the upstream TS cap preview.
 
 ## 5. CLAMM estimates and fixed-route composition
 

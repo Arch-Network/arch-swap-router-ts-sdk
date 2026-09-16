@@ -1,14 +1,14 @@
 # Arch swap router TypeScript SDK
 
-A compact, browser-oriented scaffold for fixed-pair swap estimates and router
-instructions on Arch testnet. One `quoteExactIn` call will return one estimate
+A compact, browser-oriented SDK for fixed-pair swap estimates and router
+instructions on Arch testnet. One `quoteExactIn` call returns one estimate
 with its instructions. Supported pairs use explicit one-to-three-hop routes
 through the two vaults and the aBTC/aUSD CLAMM.
 
-**Current status:** fixed-pair lookup, router encoding, account construction, and
-PDA/ATA derivation are implemented. Account reads and quote math are next.
-Supported quote requests reject with `NOT_IMPLEMENTED`; unsupported or identical
-mint pairs reject with `UNSUPPORTED_PAIR`. Neither path performs network reads.
+**Current status:** aBTC ↔ primeBTC and aUSD ↔ primeUSD quotes and instructions
+work using one batch of four accounts (vault, both mints, reserve). CLAMM and
+multi-hop quotes remain `NOT_IMPLEMENTED`; unsupported or identical mint pairs
+reject with `UNSUPPORTED_PAIR`. Those rejected routes perform no reads.
 
 See [SIMPLIFICATION_PLAN.md](SIMPLIFICATION_PLAN.md) for the agreed scope,
 [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for progress, and
@@ -31,10 +31,9 @@ declare const walletAddress: string;
 const router = createRouterClient({ source });
 
 // SUPPORTED_PAIRS lists the 12 supported inputMint/outputMint combinations.
-// Placeholder until quote math is implemented: this rejects NOT_IMPLEMENTED.
 const swap = await router.quoteExactIn({
   inputMint: TESTNET_MINTS.aUSD,
-  outputMint: TESTNET_MINTS.primeBTC,
+  outputMint: TESTNET_MINTS.primeUSD,
   amountIn: 1_000_000n,
   slippageBps: 50,
   user: walletAddress,
@@ -42,9 +41,20 @@ const swap = await router.quoteExactIn({
 });
 ```
 
-The planned `SwapQuote` contains `inputMint`, `outputMint`, `amountIn`,
+The `SwapQuote` contains `inputMint`, `outputMint`, `amountIn`,
 `estimatedAmountOut`, `minAmountOut`, `instructions`, and `deadlineMs`.
 Amounts use raw `bigint` units and addresses use base58 strings.
+
+The reader returns ordered `AccountInfoResult | null` values with `owner` and
+`data` normalized to `Uint8Array`; malformed responses and transport failures
+reject. Each quote reads fresh state, and building adds no fetches. One SDK batch
+is one HTTP request only if the application's reader/provider supports it.
+
+Mint checks pause, NAV freshness, fees and the full-deposit cap. Redeem requires
+an empty observed queue and enough reserve for the gross claim. Both use the
+observed share supply; management fees accrue in native `Report`. Estimates use
+raw units, native rounding and one final slippage floor. Concurrent state can
+change before execution; native immediate-fill-or-abort support is still pending.
 
 The internal builder returns just the router instruction. Its ATA/system trailer
 enables the router to create missing user ATAs. There is no separate ATA-creation

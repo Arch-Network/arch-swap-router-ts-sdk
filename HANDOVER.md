@@ -6,30 +6,32 @@ The older graph/ranking design has been replaced by explicit fixed routes.
 
 ## Current state
 
-Checkpoint 3 is complete. The public surface is
+Checkpoint 4 is complete. The public surface is
 `createRouterClient({ source }).quoteExactIn(request)`, plus mint constants,
 `SUPPORTED_PAIRS`, errors, and the small request/result/reader types.
 The fixed testnet registry contains all 12 directed pairs among aBTC, aUSD,
 primeBTC, and primeUSD.
 
-Supported quote calls still throw `NOT_IMPLEMENTED`; unsupported/identical pairs
-throw `UNSUPPORTED_PAIR`. No account reads or quote calculations happen yet.
-The next task is checkpoint 4: validation, batched account reads, and direct vault
-Mint/Redeem estimates.
+All four direct vault directions return estimates and instructions with one
+four-account batch. CLAMM/multi-hop calls still throw `NOT_IMPLEMENTED` before
+reads; unsupported/identical pairs throw `UNSUPPORTED_PAIR`.
+The next task is checkpoint 5: CLAMM estimates and fixed-route composition.
 
 Router encoding, result framing, PDA/ATA derivation, and instruction construction
 work against fixtures. The builder takes one set of resolved step addresses and
 constructs account order/privileges itself. Fixed-route topology is checked in
 tests. The builder and byte decoder remain internal.
 
-Shared address/PDA/ATA helpers, account-meta construction, integer bounds, and
-range validation live in [src/utils.ts](src/utils.ts). Keep protocol-specific
-encoding and venue account ordering in their codec/builder modules.
+Shared address/PDA/ATA helpers, account-meta construction, integer bounds,
+checked arithmetic, fee application, account batching, and minimal APL readers
+live in [src/utils.ts](src/utils.ts).
+[src/vault.ts](src/vault.ts) holds vault decoding, estimation, and resolution.
+Keep protocol-specific encoding and venue ordering in their codec/builder modules.
 
 ## Frontend contract
 
 Requests contain input/output mint addresses, raw `bigint` input, slippage BPS,
-wallet address, and an absolute millisecond deadline. The eventual result is one
+wallet address, and an absolute millisecond deadline. The result is one
 flat `SwapQuote`: input/output mints, input amount, estimated output, final
 minimum, instructions, and deadline. See [public types](src/types.ts).
 
@@ -60,16 +62,16 @@ batches, loading pool state before the selected tick arrays. Construction does
 not read again. Each public call starts fresh. Physical HTTP counts depend on
 the app reader/provider, and batched reads do not guarantee an atomic snapshot.
 
-For vaults, port the necessary decoder/APL readers and pure previews from
-`../arch-vaults/clients/ts/vault-rpc-client/src`; pin provenance and reuse
-`../arch-vaults/fixtures/client-contract.json`. Apply management-fee share
-accrual before conversion and capture one internal evaluation time for fee/NAV
-checks. Retain native fees, virtual offsets, decimals, rounding, caps, pauses,
-and freshness. This internal clock is not part of the returned quote.
+Vault decoding/math is ported from the minimal upstream TS helpers and checked
+against native Rust and its contract fixtures; see [provenance](tests/fixtures/vault/README.md).
+Management fees accrue only in `Report`; Mint/Redeem use observed share supply.
+Mint checks NAV at one captured internal time and applies the cap to the full
+deposit. Conversion uses raw units with native virtual offsets and rounding,
+without decimal rescaling. The clock is not part of the returned quote.
 
-Immediate Redeem needs an empty observed queue, gross reserve coverage, fresh
-NAV for the immediate payout, and positive net output. Derive the entry from the
-observed tail. Do not fetch fee/escrow/entry accounts just to check readiness.
+Immediate Redeem needs an empty observed queue, gross reserve coverage, and
+positive net output. Native Redeem/fill does not check NAV freshness. Derive the
+entry from the observed tail. Do not fetch fee/escrow/entry accounts just to check readiness.
 Concurrent state can change; native immediate-fill-or-abort support remains
 separate work. Do not invent an ABI flag or offer queued redemption as a swap.
 
@@ -95,8 +97,8 @@ pnpm build
 pnpm test
 ```
 
-All 150 current tests, typecheck, build, and a separate strict check of the test
-files passed at checkpoint 3. The 18 original transaction fixtures are intact;
+All 266 current tests, typecheck, build, and a separate strict check of the test
+files passed at checkpoint 4. The 18 original transaction fixtures are intact;
 tests now compare only their router instruction. Size expectations remain
 historical fixture metadata, not SDK policy. See [test coverage](tests/README.md)
 and [fixture provenance](tests/fixtures/transactions/README.md).

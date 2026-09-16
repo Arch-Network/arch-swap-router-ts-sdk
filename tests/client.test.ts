@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { createRouterClient, SUPPORTED_PAIRS, TESTNET_MINTS } from "../src/index.js";
 import { TESTNET } from "../src/config/testnet.js";
+import { FIXED_ROUTES } from "../src/config/routes.js";
+import type { QuoteExactInRequest } from "../src/types.js";
 
 const source = () => ({ getAccounts: vi.fn(async () => { throw new Error("Unexpected read"); }) });
 const request = {
@@ -17,10 +19,25 @@ describe("compact router client", () => {
     expect(Object.keys(createRouterClient({ source: source() }))).toEqual(["quoteExactIn"]);
   });
 
-  it.each(SUPPORTED_PAIRS)("leaves supported pair $inputMint → $outputMint explicitly unimplemented", async (pair) => {
+  it.each(FIXED_ROUTES.filter((route) => route.steps.some((step) => step.operation === "clamm")))("leaves CLAMM pair $inputMint → $outputMint explicitly unimplemented", async (pair) => {
     const reader = source();
     const client = createRouterClient({ source: reader });
     await expect(client.quoteExactIn({ ...request, ...pair })).rejects.toMatchObject({ code: "NOT_IMPLEMENTED" });
+    expect(reader.getAccounts).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { amountIn: 0n }, { amountIn: -1n }, { amountIn: 1n << 64n }, { amountIn: 1000 },
+    { slippageBps: -1 }, { slippageBps: 10_000 }, { slippageBps: 0.5 },
+    { slippageBps: NaN }, { slippageBps: Infinity }, { slippageBps: "50" },
+    { deadlineMs: -1 }, { deadlineMs: 0.1 }, { deadlineMs: Number.MAX_SAFE_INTEGER + 1 },
+    { deadlineMs: NaN }, { deadlineMs: Infinity }, { deadlineMs: 1n },
+    { inputMint: "invalid" }, { outputMint: "111" }, { user: "" }, { user: 42 },
+  ])("rejects invalid request %# before reads", async (invalid) => {
+    const reader = source();
+    await expect(createRouterClient({ source: reader }).quoteExactIn({
+      ...request, ...SUPPORTED_PAIRS[0], ...invalid,
+    } as QuoteExactInRequest)).rejects.toMatchObject({ name: "RouterSdkError" });
     expect(reader.getAccounts).not.toHaveBeenCalled();
   });
 
