@@ -1,9 +1,6 @@
 import { base58 } from "@scure/base";
 import type { AccountMeta, Instruction } from "@arch-network/arch-sdk";
-import type { StepArgs } from "../../src/codecs/types.js";
-import { TESTNET } from "../../src/config/testnet.js";
-import type { QuoteRoutesRequest, RouteStep } from "../../src/types.js";
-import type { ResolvedRouteQuote } from "../../src/venues/types.js";
+import type { BuildSwapInput, ResolvedStep } from "../../src/transactions/types.js";
 import data from "../fixtures/transactions/v1.json" with { type: "json" };
 
 export const fixtures = data.cases;
@@ -19,56 +16,53 @@ function account(meta: Fixture["instructions"][number]["accounts"][number]): Acc
   return { ...meta, pubkey: base58.decode(meta.pubkey) };
 }
 
-function stepArgs(args: Fixture["hops"][number]["args"]): StepArgs {
-  switch (args.kind) {
-    case "vaultMint":
-    case "vaultRedeem":
-      return { kind: args.kind };
-    case "clamm":
-      if (args.aToB === undefined || args.sqrtPriceLimit === undefined || args.supplementalTickArrayCount === undefined) {
-        throw new Error("Incomplete CLAMM fixture.");
-      }
-      return {
-        kind: "clamm", aToB: args.aToB, sqrtPriceLimit: BigInt(args.sqrtPriceLimit),
-        supplementalTickArrayCount: args.supplementalTickArrayCount,
-      };
-    default:
-      throw new Error(`Unknown fixture step: ${args.kind}`);
-  }
-}
-
-/** Synthetic quote metadata; the expected instructions and account keys come from Rust. */
-export function buildInputs(fixture: Fixture): { resolved: ResolvedRouteQuote; request: QuoteRoutesRequest } {
-  const amountIn = BigInt(fixture.amountIn);
-  const inputMint = fixture.mints[0]!;
-  const outputMint = fixture.mints[fixture.mints.length - 1]!;
-  const hops = fixture.hops.map((hop, index) => {
-    const args = stepArgs(hop.args);
-    const step: RouteStep = {
-      venueId: `fixture-venue-${index}`, operation: args.kind,
-      inputMint: fixture.mints[index]!, outputMint: fixture.mints[index + 1]!,
-    };
-    return {
-      quote: { step, amountIn: index === 0 ? amountIn : 100n, estimatedAmountOut: 100n, fees: [] },
-      args, accounts: hop.accounts.map(account),
-    };
+/** Resolve named inputs from Rust fixtures without synthetic quote/fee metadata. */
+export function buildInput(fixture: Fixture): BuildSwapInput {
+  const steps = fixture.hops.map((hop, index): ResolvedStep => {
+    const key = (position: number) => hop.accounts[position]!.pubkey;
+    const outputMint = fixture.mints[index + 1]!;
+    switch (hop.args.kind) {
+      case "vaultMint":
+        return {
+          kind: "vaultMint", outputMint, vault: key(1), reserve: key(2),
+          protocolFeeShares: key(3), managerFeeShares: key(4), eventAuthority: key(5),
+        };
+      case "vaultRedeem":
+        return {
+          kind: "vaultRedeem", outputMint, vault: key(1), reserve: key(2),
+          escrow: key(3), redemptionEntry: key(4),
+          protocolFeeShares: key(5), managerFeeShares: key(6), eventAuthority: key(7),
+        };
+      case "clamm":
+        if (hop.args.aToB === undefined || hop.args.sqrtPriceLimit === undefined) {
+          throw new Error("Incomplete CLAMM fixture.");
+        }
+        return {
+          kind: "clamm", outputMint, pool: key(1), tokenVaultA: key(2), tokenVaultB: key(3),
+          tickArrays: [key(4), key(5), key(6)], oracle: key(7),
+          aToB: hop.args.aToB, sqrtPriceLimit: BigInt(hop.args.sqrtPriceLimit),
+          supplementalTickArrays: hop.accounts.slice(8).map((meta) => meta.pubkey),
+        };
+      default:
+        throw new Error(`Unknown fixture step: ${hop.args.kind}`);
+    }
   });
   return {
-    resolved: {
-      quote: {
-        deployment: TESTNET,
-        route: { id: fixture.name, inputMint, outputMint, steps: hops.map((hop) => hop.quote.step) },
-        amountIn, estimatedAmountOut: 100n, minAmountOut: BigInt(fixture.minAmountOut),
-        hops: hops.map((hop) => hop.quote), fees: [],
-      },
-      hops,
-    },
-    request: { inputMint, outputMint, amountIn, slippageBps: 9_900, user: fixture.user, deadlineMs: fixture.deadlineMs },
+    inputMint: fixture.mints[0]!,
+    user: fixture.user,
+    amountIn: BigInt(fixture.amountIn),
+    minAmountOut: BigInt(fixture.minAmountOut),
+    deadlineMs: fixture.deadlineMs,
+    steps,
   };
 }
 
-export function expectedInstructions(fixture: Fixture): Instruction[] {
-  return fixture.instructions.map((ix) => ({
-    program_id: base58.decode(ix.programId), accounts: ix.accounts.map(account), data: Uint8Array.from(ix.data),
-  }));
+/** Original fixture includes input ATA setup first; compare only its router instruction. */
+export function expectedRouterInstruction(fixture: Fixture): Instruction {
+  const ix = fixture.instructions[1]!;
+  return {
+    program_id: base58.decode(ix.programId),
+    accounts: ix.accounts.map(account),
+    data: Uint8Array.from(ix.data),
+  };
 }

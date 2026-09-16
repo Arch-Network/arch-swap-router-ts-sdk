@@ -15,7 +15,7 @@ describe("Arch SDK derivation compatibility", () => {
     [TESTNET_MINTS.primeBTC, "48iL9oYHb14NazPBFN3mHjemCSLj5Tgxf9a9N3taww12"],
     [TESTNET_MINTS.primeUSD, "6fitWMWz7VYdQbhquSGwM1JPR2yCYn5iupMWUDYCfC2a"],
   ])("matches the Rust ATA fixture for %s", (mint, expected) => {
-    expect(deriveAssociatedTokenAddress(operator, mint, TESTNET)).toBe(expected);
+    expect(deriveAssociatedTokenAddress(operator, mint)).toBe(expected);
   });
 
   it.each([

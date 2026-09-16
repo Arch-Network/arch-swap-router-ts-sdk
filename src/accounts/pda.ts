@@ -1,6 +1,7 @@
 import { PubkeyUtil } from "@arch-network/arch-sdk";
 import { base58 } from "@scure/base";
-import type { Address, RouterDeployment } from "../types.js";
+import { TESTNET } from "../config/testnet.js";
+import type { Address } from "../types.js";
 import { decodeAddress } from "./address.js";
 
 export function deriveProgramAddress(
@@ -17,15 +18,14 @@ export function deriveProgramAddress(
 export function deriveAssociatedTokenAddress(
   owner: Address,
   mint: Address,
-  deployment: RouterDeployment,
 ): Address {
   return base58.encode(
     PubkeyUtil.getAssociatedTokenAddress(
       decodeAddress(mint),
       decodeAddress(owner),
       true, // Arch's 32-byte x-only keys do not pass the SDK's SEC1 curve guard.
-      decodeAddress(deployment.tokenProgramId),
-      decodeAddress(deployment.associatedTokenProgramId),
+      decodeAddress(TESTNET.tokenProgramId),
+      decodeAddress(TESTNET.associatedTokenProgramId),
     ),
   );
 }

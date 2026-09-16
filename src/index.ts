@@ -1,24 +1,13 @@
 export type { AccountInfoResult } from "@arch-network/arch-sdk";
 export { createRouterClient } from "./client.js";
-export { TESTNET, TESTNET_MINTS, TESTNET_VENUES } from "./config/testnet.js";
+export { TESTNET_MINTS } from "./config/testnet.js";
+export { SUPPORTED_PAIRS } from "./config/routes.js";
 export { NotImplementedError, RouterSdkError } from "./errors/index.js";
 export type {
   Address,
-  ClammVenue,
-  HopQuote,
-  QuoteFee,
-  QuotedSwap,
-  QuoteRoutesRequest,
-  QuoteRoutesResult,
-  RouteFailure,
-  RouteOperation,
-  RoutePlan,
-  RouteQuote,
-  RouteStep,
+  QuoteExactInRequest,
   RouterClient,
   RouterClientOptions,
   RouterDataSource,
-  RouterDeployment,
-  VaultVenue,
-  VenueConfig,
+  SwapQuote,
 } from "./types.js";

@@ -1,5 +1,4 @@
 import { SystemInstruction } from "@arch-network/arch-sdk";
-import { MAX_ROUTE_HOPS } from "../config/constants.js";
 import { RouterSdkError } from "../errors/index.js";
 import type { RouteExactInV1Args, StepArgs } from "./types.js";
 
@@ -60,10 +59,10 @@ export function encodeRouteExactInV1(args: RouteExactInV1Args): Uint8Array {
   assertIntegerRange(args.amountIn, "amountIn", 1n, U64_MAX);
   assertIntegerRange(args.minAmountOut, "minAmountOut", 1n, U64_MAX);
   assertIntegerRange(args.deadlineMs, "deadlineMs", 0n, U64_MAX);
-  if (!Array.isArray(args.steps) || args.steps.length < 1 || args.steps.length > MAX_ROUTE_HOPS) {
+  if (!Array.isArray(args.steps) || args.steps.length < 1 || args.steps.length > 3) {
     throw new RouterSdkError(
       "INVALID_INSTRUCTION",
-      `A route must contain 1..${MAX_ROUTE_HOPS} steps.`,
+      "A route must contain 1..3 steps.",
     );
   }
   const steps = Array.from(args.steps, encodeStep);
