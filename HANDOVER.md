@@ -6,8 +6,8 @@ The older graph/ranking design has been replaced by explicit fixed routes.
 
 ## Current state
 
-Checkpoint 5 is complete. The public surface is
-`createRouterClient({ source }).quoteExactIn(request)`, plus mint constants,
+Checkpoint 5 and the receive-sizing addition are complete. The public surface is
+`createRouterClient({ source })` with `quoteExactIn` and `quoteForOutput`, plus mint constants,
 `SUPPORTED_PAIRS`, errors, and the small request/result/reader types.
 The fixed testnet registry contains all 12 directed pairs among aBTC, aUSD,
 primeBTC, and primeUSD.
@@ -24,20 +24,29 @@ constructs account order/privileges itself. Fixed-route topology is checked in
 tests. The builder and byte decoder remain internal.
 
 Shared address/PDA/ATA helpers, account-meta construction, integer bounds,
-checked arithmetic, fee application, account batching, and minimal APL readers
+checked arithmetic, fee application, input search, account batching, and minimal APL readers
 live in [src/utils.ts](src/utils.ts).
 [src/vault.ts](src/vault.ts) holds vault decoding, estimation, and resolution.
 [src/clamm.ts](src/clamm.ts) holds pool/tick decoding, tick-window selection,
 exact-input math, and CLAMM resolution. The client owns both account-read stages;
-vault/CLAMM quote helpers and instruction construction are synchronous.
+vault/CLAMM helpers prepare synchronous estimators and resolved addresses once
+per call. Search probes reuse those estimators without decoding or deriving again.
 Keep protocol-specific encoding and venue ordering in their codec/builder modules.
 
 ## Frontend contract
 
-Requests contain input/output mint addresses, raw `bigint` input, slippage BPS,
+Requests contain input/output mint addresses, raw `bigint` input or target output, slippage BPS,
 wallet address, and an absolute millisecond deadline. The result is one
 flat `SwapQuote`: input/output mints, input amount, estimated output, final
 minimum, instructions, and deadline. See [public types](src/types.ts).
+
+`quoteForOutput({ amountOut, ... })` sizes the smallest valid fixed input whose
+estimate reaches the target, using at most 64 local search probes plus final
+validation. Dust/fees set a lower input boundary; capacity/overflow failures set
+an upper boundary. The selected amount must pass a normal estimate before
+building. Other errors propagate. Slippage applies to the resulting estimate,
+which can exceed the target due to integer rounding. Execution is still exact
+input; no maximum-input/exact-output router ABI is added.
 
 The SDK returns only the router instruction, retaining its ATA/system trailer.
 The router creates missing input/intermediate/output ATAs internally. There is
@@ -108,8 +117,8 @@ pnpm build
 pnpm test
 ```
 
-All 352 current tests, typecheck, build, and a separate strict check of the test
-files passed at checkpoint 5. Native CLAMM/vault fixtures cover all 12 quote
+All 389 current tests, typecheck, build, and a separate strict check of the test
+files pass after receive sizing. Native CLAMM/vault fixtures cover all 12 quote
 directions, shared read counts and multi-hop composition. The 18 original
 transaction fixtures are intact;
 tests now compare only their router instruction. Size expectations remain

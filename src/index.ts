@@ -6,6 +6,7 @@ export { RouterSdkError } from "./errors.js";
 export type {
   Address,
   QuoteExactInRequest,
+  QuoteForOutputRequest,
   RouterClient,
   RouterClientOptions,
   RouterDataSource,

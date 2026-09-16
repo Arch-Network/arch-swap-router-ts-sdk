@@ -18,6 +18,11 @@ export interface QuoteExactInRequest {
   readonly deadlineMs: number;
 }
 
+/** Sizes a fixed input for an approximate receive amount, before output slippage. */
+export interface QuoteForOutputRequest extends Omit<QuoteExactInRequest, "amountIn"> {
+  readonly amountOut: bigint;
+}
+
 export interface SwapQuote {
   readonly inputMint: Address;
   readonly outputMint: Address;
@@ -34,4 +39,6 @@ export interface RouterClientOptions {
 
 export interface RouterClient {
   quoteExactIn(request: QuoteExactInRequest): Promise<SwapQuote>;
+  /** The returned transaction still spends a fixed input; output may vary within slippage. */
+  quoteForOutput(request: QuoteForOutputRequest): Promise<SwapQuote>;
 }

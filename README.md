@@ -1,8 +1,9 @@
 # Arch swap router TypeScript SDK
 
 A compact, browser-oriented SDK for fixed-pair swap estimates and router
-instructions on Arch testnet. One `quoteExactIn` call returns one estimate
-with its instructions. Supported pairs use explicit one-to-three-hop routes
+instructions on Arch testnet. One quote call returns one estimate with its
+instructions, sized from either a fixed input or an approximate receive amount.
+Supported pairs use explicit one-to-three-hop routes
 through the two vaults and the aBTC/aUSD CLAMM.
 
 **Current status:** all 12 fixed directions have estimates and instructions,
@@ -39,11 +40,34 @@ const swap = await router.quoteExactIn({
   user: walletAddress,
   deadlineMs: Date.now() + 120_000,
 });
+
+// Receive-side entry: calculate the fixed input for a desired output estimate.
+const receive = await router.quoteForOutput({
+  inputMint: TESTNET_MINTS.aBTC,
+  outputMint: TESTNET_MINTS.aUSD,
+  amountOut: 100_000_000n, // Desired output in raw units, before slippage.
+  slippageBps: 50,
+  user: walletAddress,
+  deadlineMs: Date.now() + 120_000,
+});
 ```
 
 The `SwapQuote` contains `inputMint`, `outputMint`, `amountIn`,
 `estimatedAmountOut`, `minAmountOut`, `instructions`, and `deadlineMs`.
 Amounts use raw `bigint` units and addresses use base58 strings.
+
+`quoteForOutput` finds the smallest valid input whose estimated output reaches
+`amountOut`. Integer rounding can make the estimate larger than the requested
+amount. It returns the same `SwapQuote`, with the calculated fixed `amountIn`;
+slippage is applied once to `estimatedAmountOut`. For an estimate of 100 tokens
+and 50 BPS slippage, the minimum is 99.5 tokens, subject to raw-unit rounding.
+This is approximate receive sizing: execution spends the fixed input and may
+receive less than the target within slippage. It is not exact-output execution
+with a maximum-input allowance.
+
+Both methods support all 12 pairs. Receive sizing reuses the fetched, decoded
+state for a bounded local search; the read counts below are unchanged. Targets
+outside the vault/CLAMM limits reject instead of returning a partial quote.
 
 The reader returns ordered `AccountInfoResult | null` values with `owner` and
 `data` normalized to `Uint8Array`; malformed responses and transport failures

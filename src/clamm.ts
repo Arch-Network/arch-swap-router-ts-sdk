@@ -169,7 +169,7 @@ export function loadClamm(accounts: AccountMap, aToB: boolean) {
   return { pool, starts, addresses, resolved };
 }
 
-export function quoteClamm(state: ReturnType<typeof loadClamm>, accounts: AccountMap, amountIn: bigint) {
+export function prepareClammQuote(state: ReturnType<typeof loadClamm>, accounts: AccountMap) {
   const { pool, starts, addresses, resolved } = state;
   const ticks = addresses.flatMap((address, i) => {
     const info = accounts.get(address);
@@ -177,8 +177,10 @@ export function quoteClamm(state: ReturnType<typeof loadClamm>, accounts: Accoun
     if (info?.data.length === 0 && base58.encode(info.owner) === TESTNET.systemProgramId && !info.is_executable) return [];
     return decodeTickArray(accountData(accounts, address, TESTNET.clammProgramId), starts[i]!, pool.tickSpacing);
   }).sort((a, b) => resolved.aToB ? b.index - a.index : a.index - b.index);
-  const result = simulateClamm(pool, ticks, amountIn, resolved.aToB, resolved.sqrtPriceLimit);
-  if (result.amountIn !== amountIn) throw new RouterSdkError("INSUFFICIENT_LIQUIDITY", "CLAMM window cannot consume the full input.");
-  if (result.amountOut === 0n) throw new RouterSdkError("ZERO_OUTPUT", "CLAMM output rounds to zero.");
-  return { amountOut: result.amountOut, resolved };
+  return { resolved, estimate(amountIn: bigint) {
+    const result = simulateClamm(pool, ticks, amountIn, resolved.aToB, resolved.sqrtPriceLimit);
+    if (result.amountIn !== amountIn) throw new RouterSdkError("INSUFFICIENT_LIQUIDITY", "CLAMM window cannot consume the full input.");
+    if (result.amountOut === 0n) throw new RouterSdkError("ZERO_OUTPUT", "CLAMM output rounds to zero.");
+    return result.amountOut;
+  } };
 }

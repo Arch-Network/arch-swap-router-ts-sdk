@@ -91,9 +91,9 @@ export function estimateVault(
   return amountOut;
 }
 
-export function quoteVault(
-  accounts: AccountMap, venue: VaultVenue, operation: Operation, amountIn: bigint, now: bigint,
-): { amountOut: bigint; resolved: ResolvedStep } {
+export function prepareVaultQuote(
+  accounts: AccountMap, venue: VaultVenue, operation: Operation, now: bigint,
+): { estimate: (amountIn: bigint) => bigint; resolved: ResolvedStep } {
   const shareKey = decodeAddress(venue.shareMint);
   const reserveAddress = deriveVaultAddress("reserve", shareKey);
   const vault = decodeVault(accountData(accounts, venue.address, TESTNET.vaultProgramId));
@@ -107,7 +107,7 @@ export function quoteVault(
     throw new RouterSdkError("INVALID_ACCOUNT", "Vault or reserve does not match the selected pair.");
   }
   // Management fees accrue only in Report, never speculatively during Mint/Redeem.
-  const amountOut = estimateVault(vault, reserve.amount, shares.supply, operation, amountIn, now);
+  const estimate = (amountIn: bigint) => estimateVault(vault, reserve.amount, shares.supply, operation, amountIn, now);
   const common = {
     vault: venue.address, reserve: reserveAddress,
     protocolFeeShares: deriveAssociatedTokenAddress(vault.protocolFeeRecipient, venue.shareMint),
@@ -115,12 +115,12 @@ export function quoteVault(
     eventAuthority: deriveVaultAddress("__event_authority"),
   };
   if (operation === "vaultMint") {
-    return { amountOut, resolved: { ...common, kind: operation, outputMint: venue.shareMint } };
+    return { estimate, resolved: { ...common, kind: operation, outputMint: venue.shareMint } };
   }
   const tail = new Uint8Array(8);
   new DataView(tail.buffer).setBigUint64(0, vault.queueTail, true);
   return {
-    amountOut,
+    estimate,
     resolved: {
       ...common, kind: operation, outputMint: venue.assetMint, escrow,
       redemptionEntry: deriveVaultAddress("redeem", decodeAddress(venue.address), tail),

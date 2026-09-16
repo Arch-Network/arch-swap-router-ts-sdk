@@ -2,7 +2,7 @@
 
 Updated: 2026-09-16. Revised checkpoints completed: **5 / 6**.
 
-Implement the [compact SDK plan](SIMPLIFICATION_PLAN.md): one `quoteExactIn` call
+Implement the [compact SDK plan](SIMPLIFICATION_PLAN.md): one quote call
 returns one estimate and its instructions for a fixed supported pair. That plan
 supersedes the older [handover](HANDOVER.md). Current Rust source and independent
 fixtures remain authoritative for the ABI.
@@ -219,6 +219,21 @@ Typecheck, build, all **352 tests**, and a separate strict TypeScript check of
 test files pass. The original transaction fixtures are unchanged. No live
 transactions or browser verification were performed; native immediate-fill-or-abort
 support and runtime compute provisioning remain external work.
+
+### Receive-side sizing addition
+
+Completed 2026-09-16. `quoteForOutput` accepts a desired raw output amount and
+returns the existing `SwapQuote` with a calculated fixed input. The shared flow
+prepares decoded state and addresses once, uses at most 64 local binary-search
+probes plus final validation, and applies output slippage once after sizing.
+Integer rounding can overshoot the requested estimate. The transaction remains
+exact input; no router ABI, new dependency, or additional account fetch is needed.
+
+All 12 native route outputs are reachable through the new method; tests verify
+minimal input, forward-quote/instruction parity, unchanged read counts, tick
+crossings, u64 precision, rounding, and capacity/state failures. Typecheck, build,
+all **389 tests**, and strict test-file typechecking pass. Frontend integration
+and live execution remain separate work; checkpoint 6 is still pending.
 
 ## 6. Frontend example and package verification
 

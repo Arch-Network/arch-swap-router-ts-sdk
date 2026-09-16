@@ -11,6 +11,8 @@ vault/reserve/escrow derivation against Rust account-validation fixtures. Intege
 range and account-meta helpers remain covered through codec and builder tests.
 It also covers ordered/deduplicated batches, null preservation, malformed
 responses, and APL decoding bounds and initialization/option tags.
+Receive-sizing tests bound local work, preserve u64 precision, and reject
+unreachable targets or unrelated calculation errors.
 
 `vault.test.ts` covers the native account layout, 12 Rust math vectors, fees,
 virtual offsets, caps, Mint NAV boundaries, immediate-redemption eligibility,
@@ -31,6 +33,12 @@ Rust instruction account lists; encoded input/minimum/deadline and window
 limits are verified. Direct vault quotes read once; CLAMM routes share two
 batches total, with no repeated keys or construction reads. See
 [CLAMM provenance and regeneration](fixtures/clamm/README.md).
+
+`quoteForOutput` is tested against all 12 native composed outputs. Each result
+matches a forward quote at the calculated input, while one raw input unit less
+falls short. Tests retain the one-/two-batch budget and cover fixed fees, vault
+caps and redemption coverage, unavailable state, tick crossings, u64-scale
+inputs, rounding overshoot, final slippage, and fresh reads on subsequent calls.
 
 `codecs/instruction.test.ts` and `codecs/result.test.ts` cover wire framing,
 integer widths/ranges, step counts, both CLAMM directions, result lengths and

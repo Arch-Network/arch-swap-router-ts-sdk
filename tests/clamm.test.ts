@@ -4,7 +4,7 @@ import type { AccountInfoResult } from "@arch-network/arch-sdk";
 import { createRouterClient, TESTNET_MINTS } from "../src/index.js";
 import { TESTNET, TESTNET_VENUES } from "../src/config/testnet.js";
 import { FIXED_ROUTES } from "../src/config/routes.js";
-import { decodePool, decodeTickArray, loadClamm, quoteClamm, simulateClamm, tickSqrtPrice, tickWindow } from "../src/clamm.js";
+import { decodePool, decodeTickArray, loadClamm, prepareClammQuote, simulateClamm, tickSqrtPrice, tickWindow } from "../src/clamm.js";
 import { decodeAddress, deriveClammAddress, U64_MAX } from "../src/utils.js";
 import { buildInput, expectedRouterInstruction, fixtures, namedFixture } from "./transactions/fixtures.js";
 import native from "./fixtures/clamm/native.json" with { type: "json" };
@@ -185,6 +185,66 @@ describe("fixed route quotes", () => {
     expect(quote.instructions[0]).toEqual({ ...nativeInstruction, data });
   });
 
+  it.each(native.routes)("sizes input for native $input → $output output with the same read budget", async (expected) => {
+    const { source, request, client } = setup();
+    const pair = {
+      inputMint: TESTNET_MINTS[expected.input as keyof typeof TESTNET_MINTS],
+      outputMint: TESTNET_MINTS[expected.output as keyof typeof TESTNET_MINTS],
+    };
+    const route = FIXED_ROUTES.find((r) => r.inputMint === pair.inputMint && r.outputMint === pair.outputMint)!;
+    const quote = await client.quoteForOutput({ ...request, ...pair, amountOut: BigInt(expected.amountOut) });
+    expect(quote.estimatedAmountOut).toBe(BigInt(expected.amountOut));
+    expect(quote.minAmountOut).toBe(BigInt(expected.minAmountOut));
+    expect(quote.amountIn).toBeLessThanOrEqual(BigInt(expected.amountIn));
+    expect(source.getAccounts).toHaveBeenCalledTimes(route.steps.some((s) => s.venue === "clamm") ? 2 : 1);
+    const allKeys = source.getAccounts.mock.calls.flatMap(([keys]) => keys);
+    expect(new Set(allKeys).size).toBe(allKeys.length);
+    expect(Date.now).toHaveBeenCalledTimes(1);
+    // The selected input and instruction must agree with the existing forward quote.
+    expect(await client.quoteExactIn({ ...request, ...pair, amountIn: quote.amountIn })).toEqual(quote);
+    const previous = await client.quoteExactIn({ ...request, ...pair, amountIn: quote.amountIn - 1n, slippageBps: 0 });
+    expect(previous.estimatedAmountOut).toBeLessThan(BigInt(expected.amountOut));
+  });
+
+  it("keeps granularity overshoot visible and applies slippage to the actual estimate", async () => {
+    const { client, source, request } = setup();
+    const quote = await client.quoteForOutput({ ...request, outputMint: TESTNET_MINTS.primeBTC, amountOut: 1001n });
+    expect(quote).toMatchObject({ amountIn: 3n, estimatedAmountOut: 2000n, minAmountOut: 1990n });
+    expect(source.getAccounts).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes receive estimates on each call without adding reads during the search", async () => {
+    const { accounts, source, request, client } = setup();
+    const first = await client.quoteForOutput({ ...request, amountOut: 1_000_000n });
+    const pool = accounts.get(poolAddress)!.data;
+    view(pool).setInt32(81, -129, true); setU128(pool, 65, tickSqrtPrice(-129));
+    const second = await client.quoteForOutput({ ...request, amountOut: 1_000_000n });
+    expect(second.amountIn).not.toBe(first.amountIn);
+    expect(source.getAccounts).toHaveBeenCalledTimes(4);
+  });
+
+  it("sizes u64-scale inputs without converting amounts to numbers", async () => {
+    const fixture = native.cases.find((c) => c.name === "u64-input")!;
+    const { source, request, client } = setup(bytes(fixture.pool));
+    const quote = await client.quoteForOutput({ ...request, inputMint: TESTNET_MINTS.aUSD,
+      outputMint: TESTNET_MINTS.aBTC, amountOut: BigInt(fixture.expected.amountOut!),
+    });
+    expect(quote.estimatedAmountOut).toBe(BigInt(fixture.expected.amountOut!));
+    expect(quote.amountIn).toBeGreaterThan(BigInt(Number.MAX_SAFE_INTEGER));
+    expect(source.getAccounts).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["window-exhausted", "zero-liquidity", "limit-equals-price", "u256-overflow"])(
+    "rejects an unreachable receive target: %s", async (name) => {
+      const fixture = native.cases.find((c) => c.name === name)!;
+      const { source, client, request } = setup(bytes(fixture.pool));
+      await expect(client.quoteForOutput({ ...request, amountOut: BigInt(fixture.expected.amountOut ?? "0") + 1n,
+        ...(fixture.aToB ? {} : { inputMint: TESTNET_MINTS.aUSD, outputMint: TESTNET_MINTS.aBTC }),
+      })).rejects.toMatchObject({ code: name === "u256-overflow" ? "MATH_OVERFLOW" : "INSUFFICIENT_LIQUIDITY" });
+      expect(source.getAccounts).toHaveBeenCalledTimes(2);
+    },
+  );
+
   it("refreshes both batches and changes the tick window on subsequent calls", async () => {
     const { accounts, source, request, client } = setup();
     const first = await client.quoteExactIn(request);
@@ -229,6 +289,12 @@ describe("fixed route quotes", () => {
       });
       expect(quote.estimatedAmountOut).toBe(BigInt(fixture.expected.amountOut!));
       expect(source.getAccounts).toHaveBeenCalledTimes(2);
+      const receive = await client.quoteForOutput({ ...request, amountOut: quote.estimatedAmountOut,
+        ...(fixture.aToB ? {} : { inputMint: TESTNET_MINTS.aUSD, outputMint: TESTNET_MINTS.aBTC }),
+      });
+      expect(receive.estimatedAmountOut).toBe(quote.estimatedAmountOut);
+      expect(receive.amountIn).toBeLessThanOrEqual(quote.amountIn);
+      expect(source.getAccounts).toHaveBeenCalledTimes(4);
     },
   );
 
@@ -297,7 +363,7 @@ describe("fixed route quotes", () => {
     const ticks = new Map(state.addresses.map((address) => [address, null as AccountInfoResult | null]));
     const data = emptyTickArray(state.starts[2]!); data[9956] = 0;
     ticks.set(state.addresses[2]!, info(data));
-    expect(() => quoteClamm(state, ticks, 1000n)).toThrow(expect.objectContaining({ code: "INVALID_ACCOUNT" }));
+    expect(() => prepareClammQuote(state, ticks)).toThrow(expect.objectContaining({ code: "INVALID_ACCOUNT" }));
   });
 
   it("uses the decimal PDA seed pinned by the Rust instruction fixture", () => {

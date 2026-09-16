@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createRouterClient, SUPPORTED_PAIRS, TESTNET_MINTS } from "../src/index.js";
 import { TESTNET } from "../src/config/testnet.js";
-import type { QuoteExactInRequest } from "../src/types.js";
+import type { QuoteExactInRequest, QuoteForOutputRequest } from "../src/types.js";
 
 const source = () => ({ getAccounts: vi.fn(async () => { throw new Error("Unexpected read"); }) });
 const request = {
@@ -14,8 +14,15 @@ const request = {
 };
 
 describe("compact router client", () => {
-  it("exposes only the combined quote method", () => {
-    expect(Object.keys(createRouterClient({ source: source() }))).toEqual(["quoteExactIn"]);
+  it("exposes combined quote methods for either amount entry", () => {
+    expect(Object.keys(createRouterClient({ source: source() }))).toEqual(["quoteExactIn", "quoteForOutput"]);
+  });
+
+  it.each([0n, -1n, 1n << 64n, 1000, undefined])("rejects invalid receive amount %s before reads", async (amountOut) => {
+    const reader = source();
+    await expect(createRouterClient({ source: reader }).quoteForOutput({ ...request, amountOut } as QuoteForOutputRequest))
+      .rejects.toMatchObject({ code: "INVALID_REQUEST" });
+    expect(reader.getAccounts).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -40,6 +47,8 @@ describe("compact router client", () => {
   ])("rejects unsupported pair $inputMint → $outputMint before reads", async (pair) => {
     const reader = source();
     await expect(createRouterClient({ source: reader }).quoteExactIn({ ...request, ...pair }))
+      .rejects.toMatchObject({ code: "UNSUPPORTED_PAIR" });
+    await expect(createRouterClient({ source: reader }).quoteForOutput({ ...request, ...pair, amountOut: 1000n }))
       .rejects.toMatchObject({ code: "UNSUPPORTED_PAIR" });
     expect(reader.getAccounts).not.toHaveBeenCalled();
   });

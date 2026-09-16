@@ -10,7 +10,7 @@ compact SDK; all 12 fixed quote directions and route composition are complete.
 Keep one combined quote/build call and all 12 directed pairs among aBTC, aUSD,
 primeBTC, and primeUSD. Each pair uses one explicit route. The SDK produces
 estimates and correctly encoded instructions; the application handles the final
-transaction.
+transaction. A receive-side sizing method now shares the same quote/build flow.
 
 Remove graph discovery, ranking, transaction-size verification, quote timestamps,
 execution preflight, and the separate top-level ATA-creation instruction.
@@ -31,6 +31,14 @@ const swap = await router.quoteExactIn({
   deadlineMs,     // Absolute Unix milliseconds, preserved exactly
 });
 ```
+
+Approved addition: `quoteForOutput({ inputMint, outputMint, amountOut, slippageBps,
+user, deadlineMs })` returns the same flat result. It finds a fixed input reaching
+the requested output estimate using the existing exact-input math and one loaded
+set of accounts. Apply slippage to the final estimate, allowing execution to
+receive less than the requested amount within tolerance. Integer rounding can
+produce an estimate above the target. Keep the router's exact-input ABI and the
+same one-/two-batch budgets; do not add native exact-output execution.
 
 Return one flat result:
 
@@ -181,6 +189,7 @@ is pending; do not invent a flag or offer queued redemption as a swap fallback.
   examples contain no quote timestamp, ranking, candidate-list, size-verification,
   or guaranteed-execution contract.
 
-Defaults: testnet only, exact input, wallet required for the combined call, pinned
+Defaults: testnet only, exact-input execution with either input or receive-side sizing,
+wallet required for the combined call, pinned
 Arch SDK dependencies, no new dependencies, no frontend migration, and no live
 transactions in the scaffold simplification pass.

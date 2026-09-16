@@ -42,6 +42,30 @@ export function mulDiv(a: bigint, b: bigint, divisor: bigint): bigint {
 export const applyFee = (fee: Fee, amount: bigint): bigint =>
   fee.kind === "fixed" ? fee.amount : u64((amount * BigInt(fee.bps) + 9999n) / 10_000n);
 
+/** Smallest input reaching a target on one loaded route; at most 64 search probes. */
+export function inputForOutput(estimate: (amountIn: bigint) => bigint, target: bigint) {
+  let low = 1n, high = U64_MAX;
+  while (low < high) {
+    const mid = (low + high) / 2n;
+    try {
+      if (estimate(mid) < target) low = mid + 1n;
+      else high = mid;
+    } catch (error) {
+      if (!(error instanceof RouterSdkError)) throw error;
+      // Dust/fees form the lower boundary; capacity and integer limits form the upper.
+      if (error.code === "ZERO_OUTPUT") low = mid + 1n;
+      else if (["MATH_OVERFLOW", "DEPOSIT_CAP", "REDEEM_UNAVAILABLE", "INSUFFICIENT_LIQUIDITY"].includes(error.code)) high = mid;
+      else throw error;
+    }
+  }
+  // A capacity failure is not a successful estimate. Re-evaluate and propagate it.
+  const amountOut = estimate(low);
+  if (amountOut < target) {
+    throw new RouterSdkError("OUTPUT_UNAVAILABLE", "The route cannot reach the requested output within u64 input.");
+  }
+  return { amountIn: low, amountOut };
+}
+
 export function assertIntegerRange(
   value: bigint,
   field: string,

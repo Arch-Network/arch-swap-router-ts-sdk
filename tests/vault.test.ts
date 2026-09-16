@@ -224,7 +224,43 @@ describe("direct vault quoteExactIn", () => {
     const { client, request } = setup();
     await expect(client.quoteExactIn({ ...request, slippageBps: 9999 }))
       .rejects.toMatchObject({ code: "ZERO_OUTPUT" });
+    await expect(client.quoteForOutput({ ...request, amountOut: 1099n, slippageBps: 9999 }))
+      .rejects.toMatchObject({ code: "ZERO_OUTPUT" });
   });
+
+  it("finds a receive target at the deposit cap despite fee dust and larger failing probes", async () => {
+    const { client, request, source, vault } = setup();
+    setU64(vault, 64, 100n); setU64(vault, 24, 11_000n);
+    const quote = await client.quoteForOutput({ ...request, amountOut: 989n });
+    expect(quote).toMatchObject({ amountIn: 1000n, estimatedAmountOut: 989n, minAmountOut: 984n });
+    expect(source.getAccounts).toHaveBeenCalledTimes(1);
+    await expect(client.quoteForOutput({ ...request, amountOut: 990n })).rejects.toMatchObject({ code: "DEPOSIT_CAP" });
+  });
+
+  it("does not exceed redeemable supply to reach a receive target", async () => {
+    const { client, request, source } = setup(false, true);
+    const quote = await client.quoteForOutput({ ...request, amountOut: 9063n });
+    expect(quote).toMatchObject({ amountIn: 10000n, estimatedAmountOut: 9063n });
+    expect(source.getAccounts).toHaveBeenCalledTimes(1);
+    await expect(client.quoteForOutput({ ...request, amountOut: 9064n })).rejects.toMatchObject({ code: "MATH_OVERFLOW" });
+  });
+
+  it("does not exceed gross reserve coverage to reach a receive target", async () => {
+    const { client, request, vault } = setup(false, true);
+    setU64(vault, 8, 11_000n);
+    await expect(client.quoteForOutput({ ...request, amountOut: 10_000n })).rejects.toMatchObject({ code: "REDEEM_UNAVAILABLE" });
+  });
+
+  it.each(["VAULT_PAUSED", "STALE_NAV", "REDEEM_UNAVAILABLE", "ZERO_OUTPUT"])(
+    "preserves vault failure during receive sizing: %s", async (code) => {
+      const { client, request, vault } = setup(false, code === "REDEEM_UNAVAILABLE");
+      if (code === "VAULT_PAUSED") vault[393] = 1;
+      if (code === "STALE_NAV") setU64(vault, 16, 0n);
+      if (code === "REDEEM_UNAVAILABLE") setU64(vault, 48, 43n);
+      if (code === "ZERO_OUTPUT") { vault[56] = 1; setU64(vault, 64, 10_000n); }
+      await expect(client.quoteForOutput({ ...request, amountOut: 1000n })).rejects.toMatchObject({ code });
+    },
+  );
 
   it.each([0, 1, 2, 3])("rejects missing calculation account %s", async (index) => {
     const { client, request, source, accounts } = setup();
@@ -250,7 +286,9 @@ describe("direct vault quoteExactIn", () => {
     const error = new Error("Provider unavailable");
     source.getAccounts.mockRejectedValueOnce(error);
     await expect(client.quoteExactIn(request)).rejects.toBe(error);
+    source.getAccounts.mockRejectedValueOnce(error);
+    await expect(client.quoteForOutput({ ...request, amountOut: 1000n })).rejects.toBe(error);
     expect((await client.quoteExactIn(request)).estimatedAmountOut).toBe(1099n);
-    expect(source.getAccounts).toHaveBeenCalledTimes(2);
+    expect(source.getAccounts).toHaveBeenCalledTimes(3);
   });
 });

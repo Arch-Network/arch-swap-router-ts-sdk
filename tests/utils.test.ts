@@ -7,6 +7,8 @@ import {
   decodeMint,
   decodeTokenAccount,
   readAccounts,
+  inputForOutput,
+  U64_MAX,
 } from "../src/utils.js";
 import { TESTNET, TESTNET_MINTS } from "../src/config/testnet.js";
 import { RouterSdkError } from "../src/errors.js";
@@ -14,6 +16,27 @@ import type { RouterDataSource } from "../src/types.js";
 
 // Expected keys and bumps come from arch-swap-router/tests/account_validation.rs.
 const operator = "Gezw1yUcDjFhKQoJw6zq7nRJTc1MKhcUipNsUfrVpJKF";
+
+describe("receive amount sizing", () => {
+  it.each([1n, (1n << 53n) + 1n, U64_MAX])("finds exact u64 input %s with bounded work", (target) => {
+    const estimate = vi.fn((input: bigint) => input);
+    expect(inputForOutput(estimate, target)).toEqual({ amountIn: target, amountOut: target });
+    expect(estimate.mock.calls.length).toBeLessThanOrEqual(65);
+  });
+
+  it("rejects a target that even the largest input cannot reach", () => {
+    expect(() => inputForOutput((input) => input / 2n, U64_MAX))
+      .toThrow(expect.objectContaining({ code: "OUTPUT_UNAVAILABLE" }));
+  });
+
+  it.each([new Error("unexpected"), new RouterSdkError("INVALID_ACCOUNT", "bad state")])(
+    "propagates errors that are not amount boundaries: %s", (error) => {
+      const estimate = vi.fn(() => { throw error; });
+      expect(() => inputForOutput(estimate, 100n)).toThrow(error);
+      expect(estimate).toHaveBeenCalledTimes(1);
+    },
+  );
+});
 
 describe("Arch SDK derivation compatibility", () => {
   it.each([
