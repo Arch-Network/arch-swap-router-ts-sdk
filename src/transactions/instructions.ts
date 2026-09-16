@@ -1,7 +1,7 @@
 import type { AccountMeta, Instruction } from "@arch-network/arch-sdk";
 import { encodeRouteExactInV1 } from "../codecs/instruction.js";
 import { TESTNET } from "../config/testnet.js";
-import { RouterSdkError } from "../errors/index.js";
+import { RouterSdkError } from "../errors.js";
 import type { Address } from "../types.js";
 import { account, decodeAddress, deriveAssociatedTokenAddress } from "../utils.js";
 import type { BuildSwapInput, ResolvedStep } from "./types.js";

@@ -1,5 +1,5 @@
 import { FIXED_ROUTES } from "./config/routes.js";
-import { NotImplementedError, RouterSdkError } from "./errors/index.js";
+import { NotImplementedError, RouterSdkError } from "./errors.js";
 import type { RouterClient, RouterClientOptions } from "./types.js";
 
 export function createRouterClient(_options: RouterClientOptions): RouterClient {

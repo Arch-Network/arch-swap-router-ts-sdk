@@ -5,7 +5,7 @@ import {
   deriveProgramAddress,
 } from "../src/utils.js";
 import { TESTNET, TESTNET_MINTS } from "../src/config/testnet.js";
-import { RouterSdkError } from "../src/errors/index.js";
+import { RouterSdkError } from "../src/errors.js";
 
 // Expected keys and bumps come from arch-swap-router/tests/account_validation.rs.
 const operator = "Gezw1yUcDjFhKQoJw6zq7nRJTc1MKhcUipNsUfrVpJKF";

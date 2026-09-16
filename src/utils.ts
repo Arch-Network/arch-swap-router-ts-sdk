@@ -1,7 +1,7 @@
 import { PubkeyUtil, type AccountMeta, type Pubkey } from "@arch-network/arch-sdk";
 import { base58 } from "@scure/base";
 import { TESTNET } from "./config/testnet.js";
-import { RouterSdkError } from "./errors/index.js";
+import { RouterSdkError } from "./errors.js";
 import type { Address } from "./types.js";
 
 export const U64_MAX = (1n << 64n) - 1n;

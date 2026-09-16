@@ -1,5 +1,5 @@
 import { SystemInstruction } from "@arch-network/arch-sdk";
-import { RouterSdkError } from "../errors/index.js";
+import { RouterSdkError } from "../errors.js";
 import { assertIntegerRange, U64_MAX, U128_MAX } from "../utils.js";
 import type { RouteExactInV1Args, StepArgs } from "./types.js";
 

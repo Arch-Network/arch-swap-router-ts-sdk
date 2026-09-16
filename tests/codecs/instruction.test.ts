@@ -2,7 +2,7 @@ import { hex } from "@scure/base";
 import { describe, expect, it } from "vitest";
 import { encodeRouteExactInV1 } from "../../src/codecs/instruction.js";
 import type { RouteExactInV1Args, StepArgs } from "../../src/codecs/types.js";
-import { RouterSdkError } from "../../src/errors/index.js";
+import { RouterSdkError } from "../../src/errors.js";
 import fixtures from "../fixtures/router-codec/v1.json" with { type: "json" };
 
 const validArgs: RouteExactInV1Args = {

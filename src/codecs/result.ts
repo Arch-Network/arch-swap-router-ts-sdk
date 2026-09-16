@@ -1,4 +1,4 @@
-import { RouterSdkError } from "../errors/index.js";
+import { RouterSdkError } from "../errors.js";
 import type { RouteResultV1 } from "./types.js";
 
 /** Decode framing only; the caller must verify success, rollback, and publisher. */

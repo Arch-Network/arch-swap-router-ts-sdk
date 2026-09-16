@@ -1,7 +1,7 @@
 import { hex } from "@scure/base";
 import { describe, expect, it } from "vitest";
 import { decodeRouteResultV1 } from "../../src/codecs/result.js";
-import { RouterSdkError } from "../../src/errors/index.js";
+import { RouterSdkError } from "../../src/errors.js";
 import fixtures from "../fixtures/router-codec/v1.json" with { type: "json" };
 
 // Literal byte order from tests/route_result.rs, independent of the SDK decoder.
