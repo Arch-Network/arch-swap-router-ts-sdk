@@ -6,6 +6,9 @@ Read it with [the current types](src/types.ts) and
 [the full design](../arch-swap-router/arch-swap-router-sdk-plan.md).
 Current Rust source and fixtures are authoritative for the program ABI.
 
+This handover describes the scaffold baseline. Track subsequent implementation
+status and verification evidence in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
+
 ## Goal and current state
 
 Implement a small browser-compatible SDK that discovers configured routes,

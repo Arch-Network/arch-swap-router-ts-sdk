@@ -1,7 +1,8 @@
 # Arch swap router TypeScript SDK
 
-Scaffold for `@arch-network/swap-router-sdk`. Routing, account reads, quoting,
-encoding, and instruction construction are not implemented. Calling
+Scaffold for `@arch-network/swap-router-sdk`. Router instruction encoding,
+result decoding, instruction bundles, and signed-size checks are implemented
+internally. Routing, account reads, and quoting are not implemented. Calling
 `quoteRoutesExactIn` rejects with `NotImplementedError`; it performs no RPC calls.
 
 The base dependency is [`@arch-network/arch-sdk`](https://github.com/Arch-Network/arch-typescript-sdk),
@@ -11,6 +12,8 @@ live program compatibility.
 
 Start with [HANDOVER.md](HANDOVER.md) for the implementation sequence, SDK reuse
 map, frontend integration contract, and verification checklist.
+Track individual implementation tasks and completion criteria in
+[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
 
 ## Development
 
@@ -23,8 +26,12 @@ pnpm build
 pnpm test
 ```
 
-The focused tests verify PDA/ATA derivation against the router's Rust fixtures
-and reject malformed public keys. Quote and transaction behavior remain unimplemented.
+Tests under `tests/` verify PDA/ATA derivation, address validation, router
+instruction encoding, result framing, account order/privileges, and signed
+transaction sizes against Rust-derived fixtures. They cover full-width integers,
+invalid inputs, duplicate accounts, and size limits. Quote behavior remains
+unimplemented; bundle construction currently consumes synthetic resolved quotes
+in the tests.
 
 ## Public API
 
@@ -84,11 +91,11 @@ src/
   config/                 Testnet venue registry and protocol constants
   errors/                 SDK errors and NotImplementedError
   accounts/               SDK-backed PDA/ATA helpers and account-reader placeholders
-  codecs/                 Router instruction/result types and codec placeholders
+  codecs/                 Router instruction encoder and strict result decoder
   venues/                 Mint, Redeem, CLAMM adapters and future PropAMM slot
   quotes/                 Discovery, quoting, and ranking placeholders
-  transactions/           Instruction-bundle and signed-size placeholders
-tests/                    Rust-derived PDA/ATA fixtures and address validation
+  transactions/           Instruction bundles and SDK-backed signed-size checks
+tests/                    Separate account/codec/transaction tests and Rust fixtures
 ```
 
 The testnet registry configures venues, not routes. PropAMM is not registered.

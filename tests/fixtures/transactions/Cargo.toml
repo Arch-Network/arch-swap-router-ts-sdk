@@ -1,0 +1,15 @@
+[package]
+name = "router-transaction-fixtures"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "generate"
+path = "generate.rs"
+
+[dependencies]
+arch_program = "=0.8.7"
+serde_json = "1.0"
