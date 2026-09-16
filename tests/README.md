@@ -6,8 +6,9 @@ account reads. `config/routes.test.ts` checks all 12 directed pairs against
 native fixture paths, operation/venue order, route continuity, unique mints,
 one-to-three-hop lengths, and immutable public pair metadata.
 
-`accounts/pda.test.ts` checks SDK-delegated ATA and vault/reserve/escrow derivation
-against Rust account-validation fixtures, including address decoding.
+`utils.test.ts` checks shared address helpers and SDK-delegated ATA and
+vault/reserve/escrow derivation against Rust account-validation fixtures. Integer
+range and account-meta helpers remain covered through codec and builder tests.
 
 `codecs/instruction.test.ts` and `codecs/result.test.ts` cover wire framing,
 integer widths/ranges, step counts, both CLAMM directions, result lengths and

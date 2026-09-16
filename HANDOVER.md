@@ -22,6 +22,10 @@ work against fixtures. The builder takes one set of resolved step addresses and
 constructs account order/privileges itself. Fixed-route topology is checked in
 tests. The builder and byte decoder remain internal.
 
+Shared address/PDA/ATA helpers, account-meta construction, integer bounds, and
+range validation live in [src/utils.ts](src/utils.ts). Keep protocol-specific
+encoding and venue account ordering in their codec/builder modules.
+
 ## Frontend contract
 
 Requests contain input/output mint addresses, raw `bigint` input, slippage BPS,

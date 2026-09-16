@@ -1,25 +1,9 @@
 import { SystemInstruction } from "@arch-network/arch-sdk";
 import { RouterSdkError } from "../errors/index.js";
+import { assertIntegerRange, U64_MAX, U128_MAX } from "../utils.js";
 import type { RouteExactInV1Args, StepArgs } from "./types.js";
 
-const U64_MAX = (1n << 64n) - 1n;
-const U128_MAX = (1n << 128n) - 1n;
 const ROUTE_HEADER_LEN = 26;
-
-function assertIntegerRange(
-  value: bigint,
-  field: string,
-  min: bigint,
-  max: bigint,
-): void {
-  // SDK integer writers truncate out-of-range values; reject before writing.
-  if (typeof value !== "bigint" || value < min || value > max) {
-    throw new RouterSdkError(
-      "INVALID_INSTRUCTION",
-      `${field} must be a bigint in the range ${min}..${max}.`,
-    );
-  }
-}
 
 function encodeStep(step: StepArgs): Uint8Array {
   switch (step?.kind) {

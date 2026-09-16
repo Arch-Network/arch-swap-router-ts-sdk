@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { decodeAddress } from "../../src/accounts/address.js";
 import {
+  decodeAddress,
   deriveAssociatedTokenAddress,
   deriveProgramAddress,
-} from "../../src/accounts/pda.js";
-import { TESTNET, TESTNET_MINTS } from "../../src/config/testnet.js";
-import { RouterSdkError } from "../../src/errors/index.js";
+} from "../src/utils.js";
+import { TESTNET, TESTNET_MINTS } from "../src/config/testnet.js";
+import { RouterSdkError } from "../src/errors/index.js";
 
 // Expected keys and bumps come from arch-swap-router/tests/account_validation.rs.
 const operator = "Gezw1yUcDjFhKQoJw6zq7nRJTc1MKhcUipNsUfrVpJKF";
