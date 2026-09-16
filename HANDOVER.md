@@ -15,15 +15,17 @@ call, selection of one result, and the application's existing signing flow.
 
 The project is a scaffold. The client factory, types, testnet registry, package
 configuration, and errors exist. Quoting, discovery, account reads, venue adapters,
-PDAs, codecs, and instruction construction still throw `NotImplementedError`.
+codecs, and instruction construction still throw `NotImplementedError`. Internal
+PDA/ATA helpers now delegate to the Arch SDK, with base58 conversion and
+32-byte address validation.
 Do not interpret successful builds as working quotes or verified live routes.
 
 - Package: `@arch-network/swap-router-sdk`, private until publication is requested.
 - Base dependency: `@arch-network/arch-sdk@0.0.28`; use the lockfile.
 - TypeScript 5.9.3, ESM with declarations, pnpm 10.12.4, Vitest 3.2.4.
 - Node 20.19+ in the 20.x line, or Node 22.12+.
-- Typecheck/build and a placeholder-import check passed. There are no functional
-  tests yet; `pnpm test` currently permits an empty suite.
+- Typecheck/build and PDA/ATA compatibility tests pass. The fixtures are copied
+  from the Rust router's account-validation tests; quote behavior remains untested.
 - At handover, this directory has no Git metadata. Do not assume a remote or
   publishing/deployment setup exists.
 
@@ -97,7 +99,7 @@ implementation:
 | Account metas and instructions | `AccountMeta`, `Instruction`, and `Pubkey` from the Arch SDK. |
 | Message and transaction representations | `SanitizedMessage`, `RuntimeTransaction`, and `ProcessedTransaction`. |
 | PDA derivation | `PubkeyUtil.findProgramAddress(seeds, programId)`. Supply the venue's seeds; do not reproduce hashing or curve checks. |
-| Canonical user ATAs | `PubkeyUtil.getAssociatedTokenAddress(mint, owner, true, tokenProgram, ataProgram)`. The explicit `true` permits Arch's 32-byte x-only keys under this helper's curve guard; verify against Rust ATA fixtures. |
+| Canonical user ATAs | `PubkeyUtil.getAssociatedTokenAddress(mint, owner, true, tokenProgram, ataProgram)`. The explicit `true` permits Arch's 32-byte x-only keys under this helper's curve guard; covered by Rust ATA fixtures. |
 | Message compilation | `SanitizedMessageUtil.createSanitizedMessage`. It returns a compile-error string on failure; handle it. |
 | Full transaction size | `TransactionUtil.serializedSize` and `checkTxSizeLimit`; use `RUNTIME_TX_VERSION` and `RUNTIME_TX_SIZE_LIMIT`. |
 | RPC array representation | `TransactionUtil.toNumberArray` in the application transaction flow. |
@@ -106,9 +108,11 @@ implementation:
 
 The public deployment registry keeps readable base58 strings. Decode at the
 boundary and use SDK `Pubkey` bytes internally. SDK 0.0.28 does not export a
-base58 codec. When needed, declare a direct compatible `@scure/base` dependency
-and use its base58 codec; the Arch SDK already depends on it. Do not copy the
+base58 codec. The direct `@scure/base@1.2.6` dependency supplies that codec,
+reusing the version already in the Arch SDK's dependency tree. Do not copy the
 frontend's handwritten base58 algorithm or rely on an undeclared transitive import.
+`src/accounts/address.ts` validates decoded keys; `src/accounts/pda.ts` delegates
+PDA and ATA derivation. These are internal helpers, not new public API methods.
 
 The SDK's PDA/hex helpers use `Buffer` internally. Exercise the actual PDA path in
 a browser build before claiming frontend readiness. If necessary, provide a
@@ -158,8 +162,9 @@ Use only a request-local read map if it avoids repeated pool/vault fetches.
 
 ## Minimal implementation sequence
 
-1. **Thin SDK integration and router codec.** Connect byte conversion and SDK
-   PDA helpers. Encode the existing router instruction, resolve account order,
+1. **Thin SDK integration and router codec.** Byte conversion and SDK PDA/ATA
+   delegation are implemented and checked against fixtures. Encode the existing
+   router instruction, resolve account order,
    build ATA/router instructions, and measure size using SDK utilities. Add
    independent Rust-derived fixtures before expanding the quote engine.
 2. **Direct vault routes.** Reuse vault decoding and pure preview functions.

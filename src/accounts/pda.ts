@@ -1,10 +1,31 @@
-import { NotImplementedError } from "../errors/index.js";
+import { PubkeyUtil } from "@arch-network/arch-sdk";
+import { base58 } from "@scure/base";
 import type { Address, RouterDeployment } from "../types.js";
+import { decodeAddress } from "./address.js";
+
+export function deriveProgramAddress(
+  seeds: readonly Uint8Array[],
+  programId: Address,
+): readonly [Address, number] {
+  const [address, bump] = PubkeyUtil.findProgramAddress(
+    [...seeds],
+    decodeAddress(programId),
+  );
+  return [base58.encode(address), bump];
+}
 
 export function deriveAssociatedTokenAddress(
-  _owner: Address,
-  _mint: Address,
-  _deployment: RouterDeployment,
+  owner: Address,
+  mint: Address,
+  deployment: RouterDeployment,
 ): Address {
-  throw new NotImplementedError("deriveAssociatedTokenAddress");
+  return base58.encode(
+    PubkeyUtil.getAssociatedTokenAddress(
+      decodeAddress(mint),
+      decodeAddress(owner),
+      true, // Arch's 32-byte x-only keys do not pass the SDK's SEC1 curve guard.
+      decodeAddress(deployment.tokenProgramId),
+      decodeAddress(deployment.associatedTokenProgramId),
+    ),
+  );
 }

@@ -1,7 +1,8 @@
 # Tests
 
-No functional SDK tests exist yet. The test command permits an empty suite while
-the package contains only placeholders.
+`accounts/pda.test.ts` verifies SDK-delegated ATA and vault/reserve/escrow PDA
+derivation against the Rust router's `tests/account_validation.rs` fixtures.
+It also checks malformed public keys and leading zero bytes in base58 decoding.
 
 Add tests as behavior is implemented:
 

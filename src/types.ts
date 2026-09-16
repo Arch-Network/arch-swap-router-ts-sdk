@@ -1,6 +1,6 @@
 import type { AccountInfoResult, Instruction } from "@arch-network/arch-sdk";
 
-/** Base58 public key. Runtime validation is not implemented in this scaffold. */
+/** Base58 public key; decoded and length-checked at the byte-conversion boundary. */
 export type Address = string;
 
 export interface RouterDataSource {

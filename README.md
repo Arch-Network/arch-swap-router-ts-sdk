@@ -5,7 +5,9 @@ encoding, and instruction construction are not implemented. Calling
 `quoteRoutesExactIn` rejects with `NotImplementedError`; it performs no RPC calls.
 
 The base dependency is [`@arch-network/arch-sdk`](https://github.com/Arch-Network/arch-typescript-sdk),
-pinned to `0.0.28`. This scaffold has not established live program compatibility.
+pinned to `0.0.28`. Internal PDA/ATA helpers delegate to its `PubkeyUtil`;
+`@scure/base@1.2.6` handles base58 conversion. This scaffold has not established
+live program compatibility.
 
 Start with [HANDOVER.md](HANDOVER.md) for the implementation sequence, SDK reuse
 map, frontend integration contract, and verification checklist.
@@ -21,7 +23,8 @@ pnpm build
 pnpm test
 ```
 
-The test suite is intentionally empty until SDK behavior is implemented.
+The focused tests verify PDA/ATA derivation against the router's Rust fixtures
+and reject malformed public keys. Quote and transaction behavior remain unimplemented.
 
 ## Public API
 
@@ -60,8 +63,9 @@ const result = await router.quoteRoutesExactIn({
 });
 ```
 
-Amounts are raw `bigint` units. Addresses are base58 strings; validation remains a
-placeholder. The response timestamp uses Unix seconds; `deadlineMs` uses Unix
+Amounts are raw `bigint` units. Addresses are base58 strings; conversion helpers
+validate that they decode to 32 bytes. Quote-request validation remains a placeholder.
+The response timestamp uses Unix seconds; `deadlineMs` uses Unix
 milliseconds. The injected reader returns the Arch SDK's `AccountInfoResult` directly, with
 `owner` and `data` as bytes and the existing `is_executable` field. The caller
 manages quote refresh, blockhashes, transaction assembly,
@@ -79,12 +83,12 @@ src/
   types.ts                Public requests, results, configuration, and transport
   config/                 Testnet venue registry and protocol constants
   errors/                 SDK errors and NotImplementedError
-  accounts/               Account-reader and ATA-address placeholders
+  accounts/               SDK-backed PDA/ATA helpers and account-reader placeholders
   codecs/                 Router instruction/result types and codec placeholders
   venues/                 Mint, Redeem, CLAMM adapters and future PropAMM slot
   quotes/                 Discovery, quoting, and ranking placeholders
   transactions/           Instruction-bundle and signed-size placeholders
-tests/                    Future contract and integration fixtures
+tests/                    Rust-derived PDA/ATA fixtures and address validation
 ```
 
 The testnet registry configures venues, not routes. PropAMM is not registered.
