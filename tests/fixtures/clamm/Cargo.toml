@@ -1,0 +1,18 @@
+[package]
+name = "router-clamm-fixtures"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "generate"
+path = "generate.rs"
+
+[dependencies]
+whirlpool = { path = "../../../../CLAMM/programs/whirlpool", features = ["no-entrypoint"] }
+vault-core = { path = "../../../../arch-vaults/crates/core" }
+arch-satellite-lang = "=0.31.5"
+bytemuck = "1.16.3"
+serde_json = "1.0"

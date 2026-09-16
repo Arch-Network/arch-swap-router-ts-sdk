@@ -6,16 +6,17 @@ The older graph/ranking design has been replaced by explicit fixed routes.
 
 ## Current state
 
-Checkpoint 4 is complete. The public surface is
+Checkpoint 5 is complete. The public surface is
 `createRouterClient({ source }).quoteExactIn(request)`, plus mint constants,
 `SUPPORTED_PAIRS`, errors, and the small request/result/reader types.
 The fixed testnet registry contains all 12 directed pairs among aBTC, aUSD,
 primeBTC, and primeUSD.
 
-All four direct vault directions return estimates and instructions with one
-four-account batch. CLAMM/multi-hop calls still throw `NOT_IMPLEMENTED` before
-reads; unsupported/identical pairs throw `UNSUPPORTED_PAIR`.
-The next task is checkpoint 5: CLAMM estimates and fixed-route composition.
+All 12 directions return estimates and instructions when observed state permits.
+Direct vault quotes use one four-account batch; CLAMM/multi-hop quotes use two
+shared batches total. Unsupported/identical pairs throw `UNSUPPORTED_PAIR`
+before reads. The unused `NotImplementedError` was removed.
+The next task is checkpoint 6: frontend example and package/browser verification.
 
 Router encoding, result framing, PDA/ATA derivation, and instruction construction
 work against fixtures. The builder takes one set of resolved step addresses and
@@ -26,6 +27,9 @@ Shared address/PDA/ATA helpers, account-meta construction, integer bounds,
 checked arithmetic, fee application, account batching, and minimal APL readers
 live in [src/utils.ts](src/utils.ts).
 [src/vault.ts](src/vault.ts) holds vault decoding, estimation, and resolution.
+[src/clamm.ts](src/clamm.ts) holds pool/tick decoding, tick-window selection,
+exact-input math, and CLAMM resolution. The client owns both account-read stages;
+vault/CLAMM quote helpers and instruction construction are synchronous.
 Keep protocol-specific encoding and venue ordering in their codec/builder modules.
 
 ## Frontend contract
@@ -47,7 +51,7 @@ signing, deadline checks around signing, submission, confirmation, and retries.
 There are no quote timestamps, candidate lists, configurable venues, or execution
 preflight. Preserve the current native ABI and independent fixture expectations.
 
-## Next implementation details
+## Quote implementation details
 
 Use the existing injected `RouterDataSource.getAccounts(addresses)`. Results
 preserve input order and use `AccountInfoResult` directly: `data` and `owner`
@@ -57,9 +61,10 @@ absence becomes `null`; an indexer miss or transport error is not proof of
 absence. Reject malformed responses and transport failures.
 
 Fetch calculation inputs only, deduplicating within each request. Direct vault
-quotes target one batch; CLAMM-containing routes target at most two shared
-batches, loading pool state before the selected tick arrays. Construction does
-not read again. Each public call starts fresh. Physical HTTP counts depend on
+quotes use one batch of 4 accounts. CLAMM-containing routes use two shared
+batches: first 3 accounts for direct CLAMM, 6 for two hops, or 9 for three hops;
+then up to 3 unique tick arrays. Construction does not read again. Each public
+call starts fresh. Physical HTTP counts depend on
 the app reader/provider, and batched reads do not guarantee an atomic snapshot.
 
 Vault decoding/math is ported from the minimal upstream TS helpers and checked
@@ -75,12 +80,18 @@ entry from the observed tail. Do not fetch fee/escrow/entry accounts just to che
 Concurrent state can change; native immediate-fill-or-abort support remains
 separate work. Do not invent an ABI flag or offer queued redemption as a swap.
 
-Later, port only CLAMM readers, tick selection, and exact-input math from
-`../arch-swap/src/lib/clamm`. Use three primary positions, zero supplements,
-native boundary repetition/absent-tick handling, and the quote-window price
-limit. Require full input consumption. Feed each estimated net output through
-the selected fixed route, with zero per-hop slippage. Apply slippage once to the
-final output and require a positive minimum.
+CLAMM uses a minimal exact-input port from `../arch-swap/src/lib/clamm`, checked
+against native Rust. It uses three primary positions, zero supplements, native
+boundary repetition/absent-tick handling, and an explicit quote-window price
+limit. Only null or empty system-owned accounts represent absent ticks; malformed
+or wrongly owned arrays reject. Signed tick liquidity, u64/u128/u256 arithmetic
+bounds, and the minimum-price crossing sentinel follow native behavior.
+See [CLAMM provenance](tests/fixtures/clamm/README.md).
+
+Require full input consumption. Feed each estimated net output through the
+selected fixed route, with zero per-hop slippage. Apply slippage once to the
+final output and require a positive minimum. A failure rejects the quote without
+selecting another route or expanding the tick window.
 
 ## Dependencies and verification
 
@@ -97,8 +108,10 @@ pnpm build
 pnpm test
 ```
 
-All 266 current tests, typecheck, build, and a separate strict check of the test
-files passed at checkpoint 4. The 18 original transaction fixtures are intact;
+All 352 current tests, typecheck, build, and a separate strict check of the test
+files passed at checkpoint 5. Native CLAMM/vault fixtures cover all 12 quote
+directions, shared read counts and multi-hop composition. The 18 original
+transaction fixtures are intact;
 tests now compare only their router instruction. Size expectations remain
 historical fixture metadata, not SDK policy. See [test coverage](tests/README.md)
 and [fixture provenance](tests/fixtures/transactions/README.md).

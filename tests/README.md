@@ -1,7 +1,7 @@
 # Tests
 
-`client.test.ts` verifies request validation, unsupported/identical pairs, and
-explicit CLAMM/multi-hop placeholders, all before reads.
+`client.test.ts` verifies request validation and unsupported/identical pairs,
+all before reads.
 `config/routes.test.ts` checks all 12 directed pairs against
 native fixture paths, operation/venue order, route continuity, unique mints,
 one-to-three-hop lengths, and immutable public pair metadata.
@@ -19,6 +19,18 @@ lists and encode the quoted amounts, final minimum and exact deadline. Tests
 verify one four-account batch, fresh subsequent reads, changed fee recipients
 and queue tails, missing state, wrong owners/relationships, and transport errors.
 See [vault provenance and native behavior corrections](fixtures/vault/README.md).
+
+`clamm.test.ts` checks native serialized pool/tick layouts, 11 native tick prices,
+and 21 native swap cases. It covers both directions, negative ticks, fees and
+rounding, signed liquidity crossings, empty liquidity gaps, width overflow,
+three-array windows, boundary repetition and minimum-price recovery. Public
+quotes cover initialized/absent arrays, malformed state and transport failures,
+insufficient windows, fresh subsequent reads, and intermediate-hop failures.
+All 12 fixed directions match independently composed Rust outputs and existing
+Rust instruction account lists; encoded input/minimum/deadline and window
+limits are verified. Direct vault quotes read once; CLAMM routes share two
+batches total, with no repeated keys or construction reads. See
+[CLAMM provenance and regeneration](fixtures/clamm/README.md).
 
 `codecs/instruction.test.ts` and `codecs/result.test.ts` cover wire framing,
 integer widths/ranges, step counts, both CLAMM directions, result lengths and
@@ -38,6 +50,5 @@ were removed under the simplification plan. Original fixture JSON, generators,
 and provenance remain intact; recorded full-bundle sizes are historical metadata.
 See [transaction fixture provenance](fixtures/transactions/README.md).
 
-Next coverage: CLAMM math, shared route batches, fixed-route amount
-composition, and package/browser verification. No current fixture proves live
+Next coverage: package/browser verification. No current fixture proves live
 executability or adequate compute provisioning.

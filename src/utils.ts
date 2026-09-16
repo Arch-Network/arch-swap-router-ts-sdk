@@ -6,12 +6,31 @@ import type { Address, RouterDataSource } from "./types.js";
 
 export const U64_MAX = (1n << 64n) - 1n;
 export const U128_MAX = (1n << 128n) - 1n;
+export const U256_MAX = (1n << 256n) - 1n;
+export type AccountMap = ReadonlyMap<Address, AccountInfoResult | null>;
 
 export type Fee = { kind: "fixed"; amount: bigint } | { kind: "percentage"; bps: number };
 
 export function u64(value: bigint): bigint {
-  if (value < 0n || value > U64_MAX) throw new RouterSdkError("MATH_OVERFLOW", "Vault amount exceeds u64.");
+  if (value < 0n || value > U64_MAX) throw new RouterSdkError("MATH_OVERFLOW", "Amount exceeds u64.");
   return value;
+}
+
+export function u128(value: bigint): bigint {
+  if (value < 0n || value > U128_MAX) throw new RouterSdkError("MATH_OVERFLOW", "Value exceeds u128.");
+  return value;
+}
+
+export function u256(value: bigint): bigint {
+  if (value < 0n || value > U256_MAX) throw new RouterSdkError("MATH_OVERFLOW", "Value exceeds u256.");
+  return value;
+}
+
+export const divRoundUp = (value: bigint, divisor: bigint): bigint => (value + divisor - 1n) / divisor;
+
+export function readU128(view: DataView, offset: number, signed = false): bigint {
+  const high = signed ? view.getBigInt64(offset + 8, true) : view.getBigUint64(offset + 8, true);
+  return (high << 64n) + view.getBigUint64(offset, true);
 }
 
 export function mulDiv(a: bigint, b: bigint, divisor: bigint): bigint {
@@ -77,6 +96,10 @@ export function deriveVaultAddress(seed: string, ...seeds: Uint8Array[]): Addres
   return deriveProgramAddress([new TextEncoder().encode(seed), ...seeds], TESTNET.vaultProgramId)[0];
 }
 
+export function deriveClammAddress(seed: string, ...seeds: Uint8Array[]): Address {
+  return deriveProgramAddress([new TextEncoder().encode(seed), ...seeds], TESTNET.clammProgramId)[0];
+}
+
 export function deriveAssociatedTokenAddress(owner: Address, mint: Address): Address {
   return base58.encode(
     PubkeyUtil.getAssociatedTokenAddress(
@@ -112,7 +135,7 @@ export async function readAccounts(source: RouterDataSource, addresses: readonly
 }
 
 export function accountData(
-  accounts: ReadonlyMap<Address, AccountInfoResult | null>,
+  accounts: AccountMap,
   address: Address,
   owner: Address,
 ): Uint8Array {

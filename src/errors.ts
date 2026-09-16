@@ -7,10 +7,3 @@ export class RouterSdkError extends Error {
     this.code = code;
   }
 }
-
-export class NotImplementedError extends RouterSdkError {
-  constructor(operation: string) {
-    super("NOT_IMPLEMENTED", operation + " is not implemented.");
-    this.name = "NotImplementedError";
-  }
-}

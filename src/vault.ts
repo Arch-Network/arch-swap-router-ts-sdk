@@ -4,10 +4,10 @@ import { base58 } from "@scure/base";
 import { TESTNET } from "./config/testnet.js";
 import { RouterSdkError } from "./errors.js";
 import type { ResolvedStep } from "./transactions/types.js";
-import type { Address, RouterDataSource } from "./types.js";
+import type { Address } from "./types.js";
 import {
   accountData, applyFee, decodeAddress, decodeMint, decodeTokenAccount,
-  deriveAssociatedTokenAddress, deriveVaultAddress, mulDiv, readAccounts, u64, type Fee,
+  deriveAssociatedTokenAddress, deriveVaultAddress, mulDiv, u64, type AccountMap, type Fee,
 } from "./utils.js";
 
 type Operation = "vaultMint" | "vaultRedeem";
@@ -91,12 +91,11 @@ export function estimateVault(
   return amountOut;
 }
 
-export async function quoteVault(
-  source: RouterDataSource, venue: VaultVenue, operation: Operation, amountIn: bigint, now: bigint,
-): Promise<{ amountOut: bigint; resolved: ResolvedStep }> {
+export function quoteVault(
+  accounts: AccountMap, venue: VaultVenue, operation: Operation, amountIn: bigint, now: bigint,
+): { amountOut: bigint; resolved: ResolvedStep } {
   const shareKey = decodeAddress(venue.shareMint);
   const reserveAddress = deriveVaultAddress("reserve", shareKey);
-  const accounts = await readAccounts(source, [venue.address, venue.assetMint, venue.shareMint, reserveAddress]);
   const vault = decodeVault(accountData(accounts, venue.address, TESTNET.vaultProgramId));
   const reserve = decodeTokenAccount(accountData(accounts, reserveAddress, TESTNET.tokenProgramId));
   decodeMint(accountData(accounts, venue.assetMint, TESTNET.tokenProgramId));

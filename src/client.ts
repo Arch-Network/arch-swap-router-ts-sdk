@@ -1,9 +1,11 @@
 import { FIXED_ROUTES } from "./config/routes.js";
 import { TESTNET_VENUES } from "./config/testnet.js";
-import { NotImplementedError, RouterSdkError } from "./errors.js";
+import { RouterSdkError } from "./errors.js";
+import { loadClamm, quoteClamm } from "./clamm.js";
 import { buildRouterInstruction } from "./transactions/instructions.js";
+import type { ResolvedStep } from "./transactions/types.js";
 import type { RouterClient, RouterClientOptions } from "./types.js";
-import { decodeAddress, U64_MAX } from "./utils.js";
+import { decodeAddress, deriveVaultAddress, readAccounts, U64_MAX } from "./utils.js";
 import { quoteVault } from "./vault.js";
 
 export function createRouterClient({ source }: RouterClientOptions): RouterClient {
@@ -26,14 +28,27 @@ export function createRouterClient({ source }: RouterClientOptions): RouterClien
       if (!route) {
         throw new RouterSdkError("UNSUPPORTED_PAIR", "The requested mint pair is not supported.");
       }
-      const step = route.steps[0]!;
-      if (route.steps.length !== 1 || step.venue === "clamm") {
-        throw new NotImplementedError("CLAMM and multi-hop quotes");
-      }
       const now = BigInt(Math.floor(Date.now() / 1000));
-      const { amountOut, resolved } = await quoteVault(
-        source, TESTNET_VENUES[step.venue], step.operation, amountIn, now,
-      );
+      const accounts = await readAccounts(source, route.steps.flatMap((step) => {
+        if (step.venue === "clamm") {
+          const pool = TESTNET_VENUES.clamm;
+          return [pool.address, pool.tokenMintA, pool.tokenMintB];
+        }
+        const vault = TESTNET_VENUES[step.venue];
+        return [vault.address, vault.assetMint, vault.shareMint, deriveVaultAddress("reserve", decodeAddress(vault.shareMint))];
+      }));
+      const clammStep = route.steps.find((step) => step.venue === "clamm");
+      const clamm = clammStep && loadClamm(accounts, clammStep.inputMint === TESTNET_VENUES.clamm.tokenMintA);
+      const ticks = clamm && await readAccounts(source, clamm.addresses);
+      let amountOut = amountIn;
+      const steps: ResolvedStep[] = [];
+      for (const step of route.steps) {
+        const quote = step.venue === "clamm"
+          ? quoteClamm(clamm!, ticks!, amountOut)
+          : quoteVault(accounts, TESTNET_VENUES[step.venue], step.operation, amountOut, now);
+        amountOut = quote.amountOut;
+        steps.push(quote.resolved);
+      }
       const minAmountOut = amountOut * BigInt(10_000 - slippageBps) / 10_000n;
       if (minAmountOut === 0n) {
         throw new RouterSdkError("ZERO_OUTPUT", "Slippage leaves a zero minimum output.");
@@ -41,7 +56,7 @@ export function createRouterClient({ source }: RouterClientOptions): RouterClien
       return {
         inputMint, outputMint, amountIn, estimatedAmountOut: amountOut, minAmountOut, deadlineMs,
         instructions: [buildRouterInstruction({
-          user, inputMint, amountIn, minAmountOut, deadlineMs, steps: [resolved],
+          user, inputMint, amountIn, minAmountOut, deadlineMs, steps,
         })],
       };
     },

@@ -5,10 +5,10 @@ instructions on Arch testnet. One `quoteExactIn` call returns one estimate
 with its instructions. Supported pairs use explicit one-to-three-hop routes
 through the two vaults and the aBTC/aUSD CLAMM.
 
-**Current status:** aBTC ↔ primeBTC and aUSD ↔ primeUSD quotes and instructions
-work using one batch of four accounts (vault, both mints, reserve). CLAMM and
-multi-hop quotes remain `NOT_IMPLEMENTED`; unsupported or identical mint pairs
-reject with `UNSUPPORTED_PAIR`. Those rejected routes perform no reads.
+**Current status:** all 12 fixed directions have estimates and instructions,
+including direct CLAMM and two-/three-hop routes. Unsupported or identical mint
+pairs reject with `UNSUPPORTED_PAIR` before reads. Frontend/package verification
+is the remaining implementation checkpoint.
 
 See [SIMPLIFICATION_PLAN.md](SIMPLIFICATION_PLAN.md) for the agreed scope,
 [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for progress, and
@@ -50,11 +50,27 @@ The reader returns ordered `AccountInfoResult | null` values with `owner` and
 reject. Each quote reads fresh state, and building adds no fetches. One SDK batch
 is one HTTP request only if the application's reader/provider supports it.
 
+| Route | First batch | Second batch | Reader calls |
+| --- | --- | --- | --- |
+| Direct vault Mint/Redeem | 4 accounts | None | 1 |
+| Direct CLAMM | 3 accounts | Up to 3 tick arrays | 2 |
+| Vault + CLAMM, either order | 6 accounts | Up to 3 tick arrays | 2 |
+| Redeem + CLAMM + Mint | 9 accounts | Up to 3 tick arrays | 2 |
+
+Only confirmed account absence should return `null`; resolve indexer cache misses
+in the application reader. CLAMM treats absent or empty system-owned tick accounts
+as uninitialized arrays, matching the native program.
+
 Mint checks pause, NAV freshness, fees and the full-deposit cap. Redeem requires
 an empty observed queue and enough reserve for the gross claim. Both use the
 observed share supply; management fees accrue in native `Report`. Estimates use
 raw units, native rounding and one final slippage floor. Concurrent state can
 change before execution; native immediate-fill-or-abort support is still pending.
+
+CLAMM estimates stay within three primary tick arrays, with zero supplements
+and an explicit window price limit. Quotes reject if that window cannot consume
+the full input. Each hop receives the preceding estimated output; slippage is
+applied only to the final result.
 
 The internal builder returns just the router instruction. Its ATA/system trailer
 enables the router to create missing user ATAs. There is no separate ATA-creation
@@ -78,8 +94,9 @@ pnpm build
 pnpm test
 ```
 
-Tests verify the fixed registry, client behavior, native instruction bytes,
-account positions/privileges, PDA/ATA derivation, and result framing. They do not
+Tests verify all 12 quote paths against native Rust math, shared read budgets,
+native instruction bytes, account positions/privileges, PDA/ATA derivation, and
+result framing. They do not
 establish live compatibility. Fixtures retain their original Rust provenance;
 the SDK compares the router instruction within the original two-instruction
 fixtures and no longer checks transaction size.

@@ -3,7 +3,7 @@
 Agreed scope: 2026-09-16. Scaffold simplification is complete; track further work in
 [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). This plan supersedes the API
 and scope of the original handover. [HANDOVER.md](HANDOVER.md) now describes the
-compact SDK; direct vault quotes are complete, with CLAMM/composition pending.
+compact SDK; all 12 fixed quote directions and route composition are complete.
 
 ## Summary
 
@@ -14,8 +14,8 @@ transaction.
 
 Remove graph discovery, ranking, transaction-size verification, quote timestamps,
 execution preflight, and the separate top-level ATA-creation instruction.
-The first implementation pass simplifies the scaffold
-and documentation. Account reads and quote math are subsequent work.
+The scaffold simplification, account reads, and quote math are complete.
+Frontend examples and package/browser verification remain next.
 
 ## Public API and fixed routes
 
@@ -71,9 +71,9 @@ Explicitly configure both directions of these six pairs:
 
 Lookup uses mint addresses, with ordered venue operations specified for each
 direction. There is no traversal, candidate enumeration, or fallback route.
-Unsupported or identical mint pairs reject with `UNSUPPORTED_PAIR`. During the
-scaffold pass, supported calls continue to reject with `NOT_IMPLEMENTED` and
-perform no reads. Do not introduce fabricated estimates.
+Unsupported or identical mint pairs reject with `UNSUPPORTED_PAIR` before reads.
+Supported calls calculate estimates from observed state and reject if the fixed
+route is unavailable; there are no remaining quote placeholders.
 
 ## Validation ownership and cleanup
 
@@ -126,12 +126,14 @@ signing, deadline checks around signing, submission, and confirmation.
 
 ## Account loading and implementation sequence
 
-Removing execution-only account probes reduces the planned request budget:
+The implemented request budget excludes execution-only account probes:
 
-| Selected route | Planned SDK batches |
+| Selected route | SDK batches |
 | --- | --- |
-| Direct Mint or Redeem (implemented) | 1 batch, 4 accounts |
-| Any route containing CLAMM | At most 2 |
+| Direct Mint or Redeem | 1 batch, 4 accounts |
+| Direct CLAMM | 2 batches: 3 accounts, then up to 3 tick arrays |
+| Vault + CLAMM, either order | 2 batches: 6 accounts, then up to 3 tick arrays |
+| Redeem + CLAMM + Mint | 2 batches: 9 accounts, then up to 3 tick arrays |
 
 For vaults, fetch vault state, required mint data, and the locally derived reserve
 together. Derive fee destinations from returned recipient identities and the
@@ -149,11 +151,12 @@ additional reads. Each new quote call reads state again. Physical HTTP counts
 depend on application-reader batching, provider limits, and fallback behavior;
 batching does not establish an atomic chain snapshot.
 
-After simplifying the scaffold, implement:
+Implementation sequence after simplifying the scaffold:
 
-1. Validation, account loading, and vault estimates.
-2. CLAMM estimates and fixed-route composition.
-3. Frontend example, package/browser verification, and optional live smoke tests.
+1. Validation, account loading, and vault estimates — complete.
+2. CLAMM estimates and fixed-route composition — complete.
+3. Frontend example and package/browser verification — next. Live smoke tests
+   remain separate optional work.
 
 Retain fixture provenance and completed codec/builder evidence. Size verification
 and the extra ATA instruction were deliberately removed in checkpoint 3. Defer
@@ -167,8 +170,8 @@ is pending; do not invent a flag or offer queued redemption as a swap fallback.
 ## Verification and defaults
 
 - Test all 12 directed registry entries and their expected ordered operations.
-- Verify unsupported pairs reject before reads and supported scaffold calls
-  remain explicitly unimplemented.
+- Verify unsupported pairs reject before reads and all 12 supported directions
+  match native estimates, instruction construction, and shared read budgets.
 - Preserve Rust-derived instruction-byte, account-order, privilege,
   duplicate-position, PDA, and codec coverage. Compare the router instruction
   inside the original two-instruction fixtures and retain the ATA/system trailer.

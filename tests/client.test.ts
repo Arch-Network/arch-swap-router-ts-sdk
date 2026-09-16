@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createRouterClient, SUPPORTED_PAIRS, TESTNET_MINTS } from "../src/index.js";
 import { TESTNET } from "../src/config/testnet.js";
-import { FIXED_ROUTES } from "../src/config/routes.js";
 import type { QuoteExactInRequest } from "../src/types.js";
 
 const source = () => ({ getAccounts: vi.fn(async () => { throw new Error("Unexpected read"); }) });
@@ -17,13 +16,6 @@ const request = {
 describe("compact router client", () => {
   it("exposes only the combined quote method", () => {
     expect(Object.keys(createRouterClient({ source: source() }))).toEqual(["quoteExactIn"]);
-  });
-
-  it.each(FIXED_ROUTES.filter((route) => route.steps.some((step) => step.operation === "clamm")))("leaves CLAMM pair $inputMint → $outputMint explicitly unimplemented", async (pair) => {
-    const reader = source();
-    const client = createRouterClient({ source: reader });
-    await expect(client.quoteExactIn({ ...request, ...pair })).rejects.toMatchObject({ code: "NOT_IMPLEMENTED" });
-    expect(reader.getAccounts).not.toHaveBeenCalled();
   });
 
   it.each([

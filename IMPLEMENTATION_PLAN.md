@@ -1,14 +1,14 @@
 # Router SDK implementation tracker
 
-Updated: 2026-09-16. Revised checkpoints completed: **4 / 6**.
+Updated: 2026-09-16. Revised checkpoints completed: **5 / 6**.
 
 Implement the [compact SDK plan](SIMPLIFICATION_PLAN.md): one `quoteExactIn` call
 returns one estimate and its instructions for a fixed supported pair. That plan
 supersedes the older [handover](HANDOVER.md). Current Rust source and independent
 fixtures remain authoritative for the ABI.
 
-Direct vault Mint/Redeem quotes are implemented with one four-account batch.
-CLAMM and multi-hop requests still reject with `NOT_IMPLEMENTED` before reads.
+All 12 fixed directions have estimates and instructions. Direct vault Mint/Redeem
+quotes use one four-account batch; CLAMM routes use two shared batches total.
 The internal builder returns only the router instruction with its ATA/system
 trailer, without separate ATA creation, compute-budget instructions, or sizing.
 
@@ -18,12 +18,12 @@ trailer, without separate ATA creation, compute-budget instructions, or sizing.
 - [x] 2. Instruction bundles
 - [x] 3. Compact API and fixed-pair scaffold
 - [x] 4. Request validation, account reads, and vault estimates
-- [ ] 5. CLAMM estimates and fixed-route composition
+- [x] 5. CLAMM estimates and fixed-route composition
 - [ ] 6. Frontend example and package verification
 
-Next: checkpoint 5. All 12 fixed directions receive fixture-backed quote coverage
-there; the four direct vault directions work now. A
-completed quote returns instructions, not a guarantee of transaction execution.
+Next: checkpoint 6, the frontend example and package/browser verification.
+All 12 fixed directions have fixture-backed quote coverage. A completed quote
+returns instructions, not a guarantee of transaction execution.
 
 ## 1. Router codec and independent fixtures
 
@@ -164,29 +164,61 @@ earlier plan statements or the upstream TS cap preview.
 
 ## 5. CLAMM estimates and fixed-route composition
 
-- [ ] Vendor only required pool/tick readers, tick selection, and exact-input math
+- [x] Vendor only required pool/tick readers, tick selection, and exact-input math
   with provenance and source vectors; replace frontend aliases/Saturn imports.
-- [ ] Load calculation state for the selected fixed route in one batch, then its
+- [x] Load calculation state for the selected fixed route in one batch, then its
   required tick arrays in a second batch. Share and deduplicate across hops.
-- [ ] Validate pool direction and decoded calculation inputs. Use three primary
+- [x] Validate pool direction and decoded calculation inputs. Use three primary
   tick positions, zero supplements, and the quote-window price limit. Preserve
   repeated boundary arrays and native handling of genuinely absent/empty ticks.
-- [ ] Require full input consumption, use zero per-hop slippage, and feed each
+- [x] Require full input consumption, use zero per-hop slippage, and feed each
   estimated net output into the next fixed hop. Apply final slippage once.
-- [ ] Build from resolved state without more reads, candidate selection, ranking,
+- [x] Build from resolved state without more reads, candidate selection, ranking,
   transaction sizing, or execution-only account probes. A failure rejects the
   one quote call; there is no alternative-route fallback.
-- [ ] Verify both CLAMM directions, fees/rounding, negative ticks, crossings,
+- [x] Verify both CLAMM directions, fees/rounding, negative ticks, crossings,
   boundary repetition, and insufficient windows against source vectors.
-- [ ] Verify all 12 fixed directions, including two-/three-hop composition and
+- [x] Verify all 12 fixed directions, including two-/three-hop composition and
   exact input/minimum/deadline encoding. Require at most two upstream reader
   calls for routes containing CLAMM and fresh reads on the next quote call.
-- [ ] Pass the required checks.
+- [x] Pass the required checks.
 
 **Complete when:** all fixed pairs return fixture-backed estimates and correct
 instructions. These checks do not establish live executability.
 
-**Evidence / notes:** Pending.
+**Evidence / notes:** Completed 2026-09-16. One new production module,
+`src/clamm.ts`, contains minimal pool/tick decoding, native tick-window selection,
+and exact-input math. Shared PDA, binary and arithmetic helpers stay in
+`src/utils.ts`. The client reads the selected route's inputs once, loads its
+CLAMM arrays once, then composes synchronous vault/CLAMM estimates and builds one
+router instruction. The unused `NotImplementedError` and quote placeholders are
+removed; no runtime dependencies were added.
+
+Verified reader budget per successful quote:
+
+| Route | First batch | Second batch | Total SDK reader calls |
+| --- | --- | --- | --- |
+| Direct vault Mint/Redeem | 4 accounts | None | 1 |
+| Direct CLAMM | Pool + 2 mints (3) | Up to 3 tick arrays | 2 |
+| Vault + CLAMM, either order | 6 accounts | Up to 3 tick arrays | 2 |
+| Redeem + CLAMM + Mint | 9 accounts | Up to 3 tick arrays | 2 |
+
+Shared mints and repeated boundary arrays are deduplicated. Fee destinations,
+redemption entries, the oracle and user ATAs are derived without fetches.
+Physical HTTP counts depend on the application's batched reader.
+
+An independent Rust generator calls native CLAMM math and vault plans: 21 swap
+cases, 11 tick prices, native serialized layouts, and all 12 composed route
+outputs. Tests cover signed liquidity, tick crossings and gaps, fee rounding,
+overflow, exhausted windows, and recovery after a minimum-price crossing. All
+12 public routes also match the existing Rust instruction account lists and
+encode the estimate, final minimum, deadline, and native window limit. See
+[CLAMM fixture provenance](tests/fixtures/clamm/README.md).
+
+Typecheck, build, all **352 tests**, and a separate strict TypeScript check of
+test files pass. The original transaction fixtures are unchanged. No live
+transactions or browser verification were performed; native immediate-fill-or-abort
+support and runtime compute provisioning remain external work.
 
 ## 6. Frontend example and package verification
 
