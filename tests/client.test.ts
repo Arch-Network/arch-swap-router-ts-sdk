@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createRouterClient, SUPPORTED_PAIRS, TESTNET_MINTS } from "../src/index.js";
-import { TESTNET } from "../src/config/networks.js";
+import { MAINNET, MAINNET_MINTS, MAINNET_VENUES, TESTNET } from "../src/config/networks.js";
+import { decodeAddress } from "../src/utils.js";
 import type { Network } from "../src/index.js";
 import type { QuoteExactInRequest, QuoteForOutputRequest } from "../src/types.js";
 
@@ -26,17 +27,31 @@ describe("compact router client", () => {
     expect(router.supportedPairs.every(Object.isFrozen)).toBe(true);
   });
 
-  it("allows mainnet selection but rejects both quote methods before reads", async () => {
+  it("uses editable mainnet placeholders and propagates account failures", async () => {
     const reader = source();
     const router = createRouterClient({ source: reader, network: "mainnet" });
     expect(router.network).toBe("mainnet");
-    expect(router.mints).toBeNull();
-    expect(router.supportedPairs).toEqual([]);
-    await expect(router.quoteExactIn(request)).rejects.toMatchObject({ code: "NETWORK_NOT_CONFIGURED" });
-    await expect(router.quoteForOutput({ ...request, amountOut: 1000n }))
-      .rejects.toMatchObject({ code: "NETWORK_NOT_CONFIGURED" });
-    expect(reader.getAccounts).not.toHaveBeenCalled();
+    expect(router.mints).toEqual(MAINNET_MINTS);
+    expect(router.supportedPairs).toHaveLength(12);
+    expect(router.supportedPairs).toContainEqual({ inputMint: MAINNET_MINTS.aBTC, outputMint: MAINNET_MINTS.aUSD });
+    const input = { ...request, inputMint: MAINNET_MINTS.aBTC, outputMint: MAINNET_MINTS.aUSD };
+    await expect(router.quoteExactIn(input)).rejects.toThrow("Unexpected read");
+    await expect(router.quoteForOutput({ ...input, amountOut: 1000n })).rejects.toThrow("Unexpected read");
+    expect(reader.getAccounts.mock.calls).toEqual([
+      [[MAINNET_VENUES.clamm.address, MAINNET_MINTS.aBTC, MAINNET_MINTS.aUSD]],
+      [[MAINNET_VENUES.clamm.address, MAINNET_MINTS.aBTC, MAINNET_MINTS.aUSD]],
+    ]);
     expect(createRouterClient({ source: reader }).supportedPairs).toEqual(SUPPORTED_PAIRS);
+  });
+
+  it("keeps mainnet placeholder addresses valid, distinct and internally consistent", () => {
+    const addresses = [...Object.values(MAINNET), ...Object.values(MAINNET_MINTS), ...Object.values(MAINNET_VENUES).map(venue => venue.address)];
+    for (const address of addresses) expect(decodeAddress(address)).toHaveLength(32);
+    expect(new Set(addresses).size).toBe(addresses.length);
+    expect(MAINNET_VENUES.btcVault).toMatchObject({ assetMint: MAINNET_MINTS.aBTC, shareMint: MAINNET_MINTS.primeBTC });
+    expect(MAINNET_VENUES.usdVault).toMatchObject({ assetMint: MAINNET_MINTS.aUSD, shareMint: MAINNET_MINTS.primeUSD });
+    expect(MAINNET_VENUES.clamm).toMatchObject({ tokenMintA: MAINNET_MINTS.aBTC, tokenMintB: MAINNET_MINTS.aUSD });
+    for (const mint of Object.values(MAINNET_MINTS)) expect(Object.values(TESTNET_MINTS)).not.toContain(mint);
   });
 
   it.each(["devnet", "toString", "", null])("rejects unknown network %s without falling back", (network) => {

@@ -198,7 +198,7 @@ describe("fixed route quotes", () => {
     const expected = await client[method](input);
     const [actual, unavailable] = await Promise.allSettled([testnet[method](input), mainnet[method](input)]);
     expect(actual).toEqual({ status: "fulfilled", value: expected });
-    expect(unavailable).toMatchObject({ status: "rejected", reason: { code: "NETWORK_NOT_CONFIGURED" } });
+    expect(unavailable).toMatchObject({ status: "rejected", reason: { code: "UNSUPPORTED_PAIR" } });
     expect(source.getAccounts).toHaveBeenCalledTimes(4);
     expect(mainnetSource.getAccounts).not.toHaveBeenCalled();
   });

@@ -35,6 +35,42 @@ export const TESTNET_VENUES = Object.freeze({
   }),
 });
 
+// TODO(mainnet): replace the dummy program, mint and venue addresses below.
+// They are distinct valid public keys, not a deployed network configuration.
+export const MAINNET = Object.freeze({
+  routerProgramId: "9iY8Tr5KHUKDzgGUGY5XXvZQVV8xtCZn5dyeX2nHNycC",
+  vaultProgramId: "9nTRc9YKsmcT8mWyhqQSpoLAjeMAZGFbe3eJaQpt8Jvu",
+  clammProgramId: "9rNikT1LU4ugGrmV98jN7g6vyoZNEKwRCTJxdnsUseFc",
+  tokenProgramId: "TokenT4em53UrV4gSvZ3nCS2mZeHaqTLapwt6iZt6Mk",
+  associatedTokenProgramId: "ATok9pxLsNzM5zJJ3UQpXBrMriHpZiY5Yio3GKYU4we3",
+  systemProgramId: "11111111111111111111111111111111",
+} as const);
+
+export const MAINNET_MINTS = Object.freeze({
+  aBTC: "9vJ1tkUM4NCuQx1zaS4HQYshDxmZuPdEkrychAv5cyaK",
+  aUSD: "9zDK33wMefW8Z3GW1jPChReTU7ymaTK4KGeGkYxgNJu2",
+  primeBTC: "A48cBMQNExoMh8X1T2i7zJRDiHByFWzssgJvow1H7eDj",
+  primeUSD: "A83uKesNqG6aqDmWtL33HBByxSQAvaghS5yasK3sryYS",
+} as const);
+
+export const MAINNET_VENUES = Object.freeze({
+  btcVault: Object.freeze({
+    address: "AByCTxLPRZPoyK22KdMxa3xkCbcNbeNWzVeEvh6UcJs9",
+    assetMint: MAINNET_MINTS.aBTC,
+    shareMint: MAINNET_MINTS.primeBTC,
+  }),
+  usdVault: Object.freeze({
+    address: "AFtVcFoQ1rh37QGXkvgsrvjWSkpaGi4LYuJtz595MeBr",
+    assetMint: MAINNET_MINTS.aUSD,
+    shareMint: MAINNET_MINTS.primeUSD,
+  }),
+  clamm: Object.freeze({
+    address: "AKonkZGQc9zGFVX3CE1o9oWGgv2mwmkA7JyZ3TBg6yWZ",
+    tokenMintA: MAINNET_MINTS.aBTC,
+    tokenMintB: MAINNET_MINTS.aUSD,
+  }),
+});
+
 export type Network = "testnet" | "mainnet";
 export type NetworkMints = Readonly<Record<keyof typeof TESTNET_MINTS, Address>>;
 export type ProgramIds = Readonly<Record<keyof typeof TESTNET, Address>>;
@@ -59,6 +95,5 @@ export interface NetworkConfig {
 
 export const NETWORKS = Object.freeze({
   testnet: Object.freeze({ programs: TESTNET, mints: TESTNET_MINTS, venues: TESTNET_VENUES }),
-  // Replace with the mainnet deployment when its program, mint and venue addresses are known.
-  mainnet: null,
+  mainnet: Object.freeze({ programs: MAINNET, mints: MAINNET_MINTS, venues: MAINNET_VENUES }),
 } satisfies Record<Network, NetworkConfig | null>);

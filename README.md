@@ -60,13 +60,13 @@ Use readonly `router.network`, `router.mints`, and `router.supportedPairs` for
 frontend metadata. Existing `TESTNET_MINTS` and `SUPPORTED_PAIRS` exports remain
 testnet-only aliases.
 
-`createRouterClient({ network: "mainnet", source })` succeeds today, with
-`mints: null` and `supportedPairs: []`. Both quote methods throw
-`RouterSdkError` with code `NETWORK_NOT_CONFIGURED` before any account reads.
-There is no testnet fallback. Fill the `mainnet` entry in
-[src/config/networks.ts](src/config/networks.ts) with its program IDs, mints and
-venues when available. Routes use the selected mints; account validation,
-PDA/ATA derivation and instructions use the selected program IDs.
+Mainnet has a complete **dummy configuration** in
+[src/config/networks.ts](src/config/networks.ts). Replace the TODO-marked
+`MAINNET`, `MAINNET_MINTS` and `MAINNET_VENUES` addresses before expecting
+mainnet swaps to work. The client exposes these mints and all 12 fixed pairs;
+quote calls use the supplied mainnet reader and fail normally on missing or
+invalid account state. There is no disabled-network gate or testnet fallback.
+Account validation, PDA/ATA derivation and instructions use the selected deployment.
 
 The `SwapQuote` contains `inputMint`, `outputMint`, `amountIn`,
 `estimatedAmountOut`, `minAmountOut`, `instructions`, and `deadlineMs`.

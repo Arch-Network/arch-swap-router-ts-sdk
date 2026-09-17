@@ -2,7 +2,8 @@
 
 `client.test.ts` verifies request validation and unsupported/identical pairs,
 all before reads. It also covers default/explicit testnet metadata, immutable
-selection, unknown networks, and both mainnet quote methods rejecting before reads.
+selection, unknown networks, valid mainnet placeholders, and both mainnet quote
+methods using their own reader and propagating failures.
 `config/routes.test.ts` checks all 12 directed pairs against
 native fixture paths, operation/venue order, route continuity, unique mints,
 one-to-three-hop lengths, and immutable public pair metadata.
