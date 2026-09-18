@@ -1,5 +1,5 @@
-import { PubkeyUtil, type AccountInfoResult, type AccountMeta, type Pubkey } from "@arch-network/arch-sdk";
-import { base58 } from "@scure/base";
+import { PubkeyUtil, SanitizedMessageUtil, type AccountInfoResult, type AccountMeta, type Instruction, type Pubkey } from "@arch-network/arch-sdk";
+import { base58, hex } from "@scure/base";
 import type { ProgramIds } from "./config/networks.js";
 import { RouterSdkError } from "./errors.js";
 import type { Address, RouterDataSource } from "./types.js";
@@ -103,6 +103,28 @@ export function decodeAddress(address: Address): Pubkey {
 
 export function account(pubkey: Address, is_writable = false, is_signer = false): AccountMeta {
   return { pubkey: decodeAddress(pubkey), is_writable, is_signer };
+}
+
+/** Compile with Rust's key ordering, required by the RFQ signing server. No reads. */
+export function compileRouterMessage(instructions: readonly Instruction[], user: Address, recentBlockhash: Uint8Array) {
+  const message = SanitizedMessageUtil.createSanitizedMessage([...instructions], decodeAddress(user), recentBlockhash);
+  if (typeof message === "string") throw new RouterSdkError("INVALID_TRANSACTION", message);
+  const { num_required_signatures: signers, num_readonly_signed_accounts: readonlySigners,
+    num_readonly_unsigned_accounts: readonlyOthers } = message.header;
+  const group = (i: number) => i === 0 ? 0 : i < signers - readonlySigners ? 1 : i < signers ? 2
+    : i < message.account_keys.length - readonlyOthers ? 3 : 4;
+  // arch-sdk 0.0.28 uses insertion order; Rust uses a BTreeMap within each group.
+  const keys = message.account_keys.map((key, i) => ({ key, i, hex: hex.encode(key) }))
+    .sort((a, b) => group(a.i) - group(b.i) || (a.hex < b.hex ? -1 : a.hex > b.hex ? 1 : 0));
+  const indices: number[] = [];
+  keys.forEach(({ i }, index) => { indices[i] = index; });
+  return {
+    ...message,
+    account_keys: keys.map(({ key }) => key),
+    instructions: message.instructions.map((ix) => ({
+      ...ix, program_id_index: indices[ix.program_id_index]!, accounts: ix.accounts.map((i) => indices[i]!),
+    })),
+  };
 }
 
 export function deriveProgramAddress(

@@ -24,6 +24,23 @@ export interface QuoteForOutputRequest extends Omit<QuoteExactInRequest, "amount
   readonly amountOut: bigint;
 }
 
+/** Original maker terms and the execution estimate (including inventory skew). */
+export interface PropAmmQuote {
+  readonly quoteId: string;
+  readonly terms: {
+    readonly side: "buy" | "sell";
+    readonly baseAmount: bigint;
+    readonly quoteAmount: bigint;
+    readonly expiryMs: bigint;
+    readonly nonce: bigint;
+  };
+  readonly estimatedAmountOut: bigint;
+}
+
+export interface PropAmmQuoteProvider {
+  quoteExactIn(request: Pick<QuoteExactInRequest, "inputMint" | "outputMint" | "amountIn" | "user">): Promise<PropAmmQuote>;
+}
+
 export interface SwapQuote {
   readonly inputMint: Address;
   readonly outputMint: Address;
@@ -32,12 +49,16 @@ export interface SwapQuote {
   readonly minAmountOut: bigint;
   readonly instructions: readonly Instruction[];
   readonly deadlineMs: number;
+  /** Present only when submission needs the RFQ server's maker signature. */
+  readonly rfq?: { readonly quoteId: string };
 }
 
 export interface RouterClientOptions {
   /** Defaults to testnet. The supplied reader must use the same network. */
   readonly network?: Network;
   readonly source: RouterDataSource;
+  /** Optional testnet exact-input alternative to CLAMM; each RFQ waits at most 2s. */
+  readonly propAmmQuoteProvider?: PropAmmQuoteProvider;
 }
 
 export interface RouterClient {

@@ -11,6 +11,21 @@ function encodeStep(step: StepArgs): Uint8Array {
       return Uint8Array.of(0);
     case "vaultRedeem":
       return Uint8Array.of(1);
+    case "propamm": {
+      const terms = step.terms;
+      if (terms?.side !== "buy" && terms?.side !== "sell") {
+        throw new RouterSdkError("INVALID_INSTRUCTION", "PropAMM side must be buy or sell.");
+      }
+      const data = new Uint8Array(34);
+      data[0] = 3;
+      data[1] = terms.side === "buy" ? 0 : 1;
+      const view = new DataView(data.buffer);
+      for (const [index, field] of (["baseAmount", "quoteAmount", "expiryMs", "nonce"] as const).entries()) {
+        assertIntegerRange(terms[field], `PropAMM ${field}`, field === "nonce" ? 0n : 1n, U64_MAX);
+        view.setBigUint64(2 + index * 8, terms[field], true);
+      }
+      return data;
+    }
     case "clamm": {
       if (typeof step.aToB !== "boolean") {
         throw new RouterSdkError("INVALID_INSTRUCTION", "CLAMM aToB must be a boolean.");
@@ -50,6 +65,9 @@ export function encodeRouteExactInV1(args: RouteExactInV1Args): Uint8Array {
     );
   }
   const steps = Array.from(args.steps, encodeStep);
+  if (args.steps.filter((step) => step.kind === "propamm").length > 1) {
+    throw new RouterSdkError("INVALID_INSTRUCTION", "A route may contain only one PropAMM step.");
+  }
   const data = new Uint8Array(
     ROUTE_HEADER_LEN + steps.reduce((length, step) => length + step.length, 0),
   );

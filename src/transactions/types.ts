@@ -1,4 +1,4 @@
-import type { Address } from "../types.js";
+import type { Address, PropAmmQuote } from "../types.js";
 
 interface VaultAccounts {
   readonly vault: Address;
@@ -16,6 +16,16 @@ export type ResolvedStep = { readonly outputMint: Address } & (
       readonly escrow: Address;
       readonly redemptionEntry: Address;
     } & VaultAccounts)
+  | {
+      readonly kind: "propamm";
+      readonly terms: PropAmmQuote["terms"];
+      readonly programId: Address;
+      readonly config: Address;
+      readonly maker: Address;
+      readonly userNonce: Address;
+      readonly baseVault: Address;
+      readonly quoteVault: Address;
+    }
   | {
       readonly kind: "clamm";
       readonly pool: Address;

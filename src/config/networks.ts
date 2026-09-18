@@ -79,9 +79,17 @@ export interface VaultVenue {
   readonly assetMint: Address;
   readonly shareMint: Address;
 }
+export interface PropAmmDeployment {
+  readonly programId: Address;
+  readonly maker: Address;
+  readonly config: Address;
+  readonly baseMint: Address;
+  readonly quoteMint: Address;
+}
 export interface NetworkConfig {
   readonly programs: ProgramIds;
   readonly mints: NetworkMints;
+  readonly propamm?: PropAmmDeployment;
   readonly venues: {
     readonly btcVault: VaultVenue;
     readonly usdVault: VaultVenue;
@@ -94,6 +102,14 @@ export interface NetworkConfig {
 }
 
 export const NETWORKS = Object.freeze({
-  testnet: Object.freeze({ programs: TESTNET, mints: TESTNET_MINTS, venues: TESTNET_VENUES }),
+  testnet: Object.freeze({
+    programs: TESTNET, mints: TESTNET_MINTS, venues: TESTNET_VENUES,
+    propamm: Object.freeze({
+      programId: "9EqAsENtgBA4Uo4wbS8LVdaQJjMKPpagMxgDVhxEWtKq",
+      maker: "FosDeThFmSTGcaQxgyhaPWhBrnEovCJ7jHzTcwp1dmYi",
+      config: "3ak4e8ZxNVYfKw8hapDvRGPKtPBSrqBYomKSQ3XMWGxM",
+      baseMint: TESTNET_MINTS.aBTC, quoteMint: TESTNET_MINTS.aUSD,
+    }),
+  }),
   mainnet: Object.freeze({ programs: MAINNET, mints: MAINNET_MINTS, venues: MAINNET_VENUES }),
 } satisfies Record<Network, NetworkConfig | null>);

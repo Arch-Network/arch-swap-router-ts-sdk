@@ -1,12 +1,19 @@
-import type { AccountMeta, Instruction } from "@arch-network/arch-sdk";
+import { RUNTIME_TX_SIZE_LIMIT, TransactionUtil, type AccountMeta, type Instruction } from "@arch-network/arch-sdk";
 import { encodeRouteExactInV1 } from "../codecs/instruction.js";
 import type { ProgramIds } from "../config/networks.js";
 import { RouterSdkError } from "../errors.js";
 import type { Address } from "../types.js";
-import { account, decodeAddress, deriveAssociatedTokenAddress } from "../utils.js";
+import { account, compileRouterMessage, decodeAddress, deriveAssociatedTokenAddress } from "../utils.js";
 import type { BuildSwapInput, ResolvedStep } from "./types.js";
 
 function venueAccounts(step: ResolvedStep, programs: ProgramIds): AccountMeta[] {
+  if (step.kind === "propamm") {
+    return [
+      account(step.programId), account(step.config), account(step.maker, false, true),
+      account(step.userNonce, true), account(step.baseVault, true), account(step.quoteVault, true),
+      account(programs.systemProgramId),
+    ];
+  }
   if (step.kind === "clamm") {
     return [
       account(programs.clammProgramId),
@@ -45,7 +52,7 @@ export function buildRouterInstruction(input: BuildSwapInput, programs: ProgramI
       aToB: step.aToB,
       sqrtPriceLimit: step.sqrtPriceLimit,
       supplementalTickArrayCount: step.supplementalTickArrays.length,
-    } : { kind: step.kind }),
+    } : step.kind === "propamm" ? { kind: step.kind, terms: step.terms } : { kind: step.kind }),
   });
   const mints = [input.inputMint, ...input.steps.map((step) => step.outputMint)];
   const writableMints = new Set<Address>();
@@ -64,4 +71,36 @@ export function buildRouterInstruction(input: BuildSwapInput, programs: ProgramI
   // This trailer enables router-owned creation of every missing user ATA.
   accounts.push(account(programs.associatedTokenProgramId), account(programs.systemProgramId));
   return { program_id: decodeAddress(programs.routerProgramId), accounts, data };
+}
+
+/** Native RFQ layout: input ATA + router, measured with both required signatures. */
+export function buildPropAmmInstructions(input: BuildSwapInput, programs: ProgramIds): Instruction[] {
+  const router = buildRouterInstruction(input, programs);
+  const step = input.steps.find((step) => step.kind === "propamm");
+  if (!step) throw new RouterSdkError("INVALID_RFQ", "Missing PropAMM step.");
+  const maker = decodeAddress(step.maker);
+  if (router.accounts.filter((meta) => meta.pubkey.every((b, i) => b === maker[i])).length !== 1) {
+    throw new RouterSdkError("INVALID_RFQ", "Maker must appear only in the PropAMM account group.");
+  }
+  const instructions = [{
+    program_id: decodeAddress(programs.associatedTokenProgramId),
+    accounts: [
+      account(input.user, true, true),
+      account(deriveAssociatedTokenAddress(input.user, input.inputMint, programs), true),
+      account(input.user), account(input.inputMint),
+      account(programs.systemProgramId), account(programs.tokenProgramId),
+    ],
+    data: Uint8Array.of(1),
+  }, router];
+  // Placeholders are for measurement only; callers compile with a fresh blockhash.
+  const message = compileRouterMessage(instructions, input.user, new Uint8Array(32));
+  if (message.header.num_required_signatures !== 2
+    || message.header.num_readonly_signed_accounts !== 1) {
+    throw new RouterSdkError("INVALID_RFQ", "RFQ requires a writable user and a read-only maker signer.");
+  }
+  const size = TransactionUtil.serializedSize({ version: 0, message, signatures: [new Uint8Array(64), new Uint8Array(64)] });
+  if (size > RUNTIME_TX_SIZE_LIMIT) {
+    throw new RouterSdkError("TRANSACTION_TOO_LARGE", `PropAMM transaction is ${size} bytes; limit is ${RUNTIME_TX_SIZE_LIMIT}.`);
+  }
+  return instructions;
 }

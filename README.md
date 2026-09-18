@@ -5,7 +5,8 @@ instructions on Arch. Testnet is configured; mainnet is a selectable placeholder
 One quote call returns one estimate with its
 instructions, sized from either a fixed input or an approximate receive amount.
 Supported pairs use explicit one-to-three-hop routes
-through the two vaults and the aBTC/aUSD CLAMM.
+through the two vaults and the aBTC/aUSD CLAMM, with optional PropAMM RFQs for
+testnet exact-input swaps.
 
 **Current status:** all 12 fixed directions have estimates and instructions,
 including direct CLAMM and two-/three-hop routes. Unsupported or identical mint
@@ -14,7 +15,8 @@ is the remaining implementation checkpoint.
 
 See [SIMPLIFICATION_PLAN.md](SIMPLIFICATION_PLAN.md) for the agreed scope,
 [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for progress, and
-[HANDOVER.md](HANDOVER.md) for implementation references.
+[HANDOVER.md](HANDOVER.md) for implementation references. The narrower PropAMM
+extension is specified in [PROPAMM_ROUTER_SDK_HANDOVER.md](PROPAMM_ROUTER_SDK_HANDOVER.md).
 
 ## Frontend API
 
@@ -69,7 +71,8 @@ invalid account state. There is no disabled-network gate or testnet fallback.
 Account validation, PDA/ATA derivation and instructions use the selected deployment.
 
 The `SwapQuote` contains `inputMint`, `outputMint`, `amountIn`,
-`estimatedAmountOut`, `minAmountOut`, `instructions`, and `deadlineMs`.
+`estimatedAmountOut`, `minAmountOut`, `instructions`, and `deadlineMs`, plus
+`rfq: { quoteId }` only when PropAMM wins.
 Amounts use raw `bigint` units and addresses use base58 strings.
 
 `quoteForOutput` finds the smallest valid input whose estimated output reaches
@@ -97,6 +100,12 @@ is one HTTP request only if the application's reader/provider supports it.
 | Vault + CLAMM, either order | 6 accounts | Up to 3 tick arrays | 2 |
 | Redeem + CLAMM + Mint | 9 accounts | Up to 3 tick arrays | 2 |
 
+These budgets apply without an RFQ provider and to every `quoteForOutput` call.
+With PropAMM enabled, a swap quote adds one RFQ call. Direct swaps still use two
+reader calls. Routes with vaults use three: shared vault state, remaining CLAMM
+pool/mints, then ticks. Each account is fetched only once. Separating the shared
+vault batch lets a CLAMM read/validation failure leave PropAMM available.
+
 Only confirmed account absence should return `null`; resolve indexer cache misses
 in the application reader. CLAMM treats absent or empty system-owned tick accounts
 as uninitialized arrays, matching the native program.
@@ -112,15 +121,86 @@ and an explicit window price limit. Quotes reject if that window cannot consume
 the full input. Each hop receives the preceding estimated output; slippage is
 applied only to the final result.
 
-The internal builder returns just the router instruction. Its ATA/system trailer
-enables the router to create missing user ATAs. There is no separate ATA-creation
-or compute-budget instruction. Compute provisioning is separate router/runtime
-integration work; removing the extra instruction does not raise the runtime's
-default allowance.
+CLAMM/vault quotes return just the router instruction, whose ATA/system trailer
+enables missing user ATA creation. PropAMM quotes use the native tested layout:
+an idempotent input-ATA instruction followed by the router. This supplies the
+two-instruction compute allowance needed by the tested three-hop execution.
+Do not replace it with a compute-budget instruction; the signing server accepts
+only the canonical input-ATA/router bundle.
 
 The application owns quote refresh, final transaction sizing and compilation,
 blockhashes, signing, submission, deadline handling, and confirmation. The SDK
 provides estimates and instruction encoding, not execution preflight.
+
+## Optional PropAMM quotes
+
+Inject an application-owned provider returning `PropAmmQuote`: a nonempty
+`quoteId`, original `terms` (`side`, `baseAmount`, `quoteAmount`, `expiryMs`,
+`nonce`), and `estimatedAmountOut` after inventory skew. All amounts, expiry and
+nonce are `bigint`; side is `"buy" | "sell"`. The provider receives the swap-leg
+`inputMint`, `outputMint`, `amountIn`, and `user`, including net redemption output
+when a vault precedes the swap.
+
+```ts
+import {
+  createRouterClient, compileRouterMessage,
+  type PropAmmQuoteProvider, type QuoteExactInRequest, type RouterDataSource,
+} from "@arch-network/swap-router-sdk";
+
+declare const source: RouterDataSource;
+declare const propAmmQuoteProvider: PropAmmQuoteProvider;
+declare const request: QuoteExactInRequest;
+declare const recentBlockhash: Uint8Array; // Fetched by the application.
+
+const router = createRouterClient({ source, propAmmQuoteProvider });
+const quote = await router.quoteExactIn(request);
+const message = compileRouterMessage(quote.instructions, request.user, recentBlockhash);
+// Sign this message with the user's wallet. quote.rfq selects RFQ server submission.
+```
+
+`quoteExactIn` compares at most two candidates along the existing fixed path.
+Higher final output, including vault fees and rounding, wins; CLAMM wins ties.
+Each RFQ waits at most **2 seconds**, without retries. A declined, invalid,
+expired or oversized RFQ leaves CLAMM available; a CLAMM-specific failure leaves
+PropAMM available. Required shared-vault failures invalidate both. Direct vault
+quotes, mainnet and `quoteForOutput` never call the provider.
+
+The PropAMM deadline is `min(request.deadlineMs, terms.expiryMs)`, rechecked at
+selection. Original compact terms are preserved. The SDK checks the compiled
+PropAMM bundle against 1,232 bytes, including two 64-byte signatures; callers
+must recheck if they alter it. The native three-hop fixture is 1,225 bytes with
+shared fee destinations; other fee accounts can make it too large.
+
+The application provider maps requests to `POST /rfq/quote`: deployment aBTC
+`base_mint` and aUSD `quote_mint` in hex, `side` (`sell` for aBTC → aUSD, `buy`
+for the reverse), raw input `amount`, and hex `user_pubkey`. Verify the returned
+native instruction's program, user and mint identities against the request and
+deployment. Decode its original compact terms with `DataView.getBigUint64`, and
+use `estimated_quote.base_amount` for Buy or `estimated_quote.quote_amount` for
+Sell as the adjusted output. The HTTP API uses numeric JSON u64s: use lossless
+decoding or reject unsafe values; ordinary `response.json()` and arbitrary
+`bigint` → `number` casts can lose precision. Transport/proxy setup stays in the
+application; the SDK never calls the server directly.
+
+For an RFQ winner, compile with **`compileRouterMessage`**, which corrects
+arch-sdk 0.0.28's insertion ordering to the Rust account ordering required by the
+signing server. Sign the resulting router message with the user, then send
+`POST /rfq/swap` with `{ quote_id: quote.rfq.quoteId, version: 0,
+signatures: [userSignature], message }` in the server's JSON transaction format
+(Arch SDK's `TransactionUtil.toNumberArray` provides that representation).
+The server validates it, adds the read-only maker's signature and broadcasts,
+returning `{ transaction_hash }`. Do not reuse the standalone RFQ message.
+Once submission binds the quote, retries must use the identical message; a new
+blockhash or route requires a fresh quote. The SDK does not sign or submit.
+
+After redemption, PropAMM accepts measured input only within
+`ceil(quotedInput * 9950 / 10000) .. quotedInput`. Execution outside that range
+fails atomically; the SDK does not pad/cap the input or consume existing
+intermediate balances. There is no post-signing venue fallback.
+
+This integration is verified offline. Live use requires compatible testnet
+router and RFQ signing-server deployments; source availability does not confirm
+deployment. Mainnet's dummy configuration remains unchanged and has no PropAMM.
 
 ## Development
 
@@ -136,10 +216,10 @@ pnpm test
 
 Tests verify all 12 quote paths against native Rust math, shared read budgets,
 native instruction bytes, account positions/privileges, PDA/ATA derivation, and
-result framing. They do not
-establish live compatibility. Fixtures retain their original Rust provenance;
-the SDK compares the router instruction within the original two-instruction
-fixtures and no longer checks transaction size.
+result framing. PropAMM tests additionally compare all eight complete signed
+Rust transaction fixtures, signer permissions and compiled size, plus candidate
+selection and failure isolation. Fixtures retain their original Rust provenance;
+tests do not establish live compatibility.
 
 Package/browser verification and live smoke coverage remain later work. The
 package stays private, exports only its root entry point, and has no wallet,

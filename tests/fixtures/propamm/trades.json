@@ -1,0 +1,28 @@
+{
+  "native_arch_program_version": "0.10.0",
+  "source_revision": "734a9066d6f9fddce321cd9c2ade8c8a38e41ac6",
+  "trades": [
+    {
+      "amount_in": 199500,
+      "data_hex": "0200a086010000000000400d03000000000010775c18a301000000505c18a30100004c0b0300000000000000000000000000",
+      "expiry_ms": 1800000010000,
+      "network": "testnet",
+      "nonce": 1800000000000,
+      "program_id": "9EqAsENtgBA4Uo4wbS8LVdaQJjMKPpagMxgDVhxEWtKq",
+      "quoted_base_amount": 100000,
+      "quoted_quote_amount": 200000,
+      "side": "Buy"
+    },
+    {
+      "amount_in": 99750,
+      "data_hex": "0201a086010000000000400d03000000000010775c18a301000000505c18a3010000a6850100000000000000000000000000",
+      "expiry_ms": 1800000010000,
+      "network": "testnet",
+      "nonce": 1800000000000,
+      "program_id": "9EqAsENtgBA4Uo4wbS8LVdaQJjMKPpagMxgDVhxEWtKq",
+      "quoted_base_amount": 100000,
+      "quoted_quote_amount": 200000,
+      "side": "Sell"
+    }
+  ]
+}
