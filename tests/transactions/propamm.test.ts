@@ -40,7 +40,7 @@ function nativeInput(tx: RuntimeTransaction): BuildSwapInput {
     if (tag === 3) {
       const side = instruction.data[offset++] === 0 ? "buy" : "sell";
       const values = Array.from({ length: 4 }, () => { const value = view.getBigUint64(offset, true); offset += 8; return value; });
-      const step = {
+      const step: ResolvedStep = {
         kind: "propamm" as const, outputMint,
         terms: { side, baseAmount: values[0]!, quoteAmount: values[1]!, expiryMs: values[2]!, nonce: values[3]! },
         programId: key(group), config: key(group + 1), maker: key(group + 2),

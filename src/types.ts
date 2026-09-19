@@ -41,12 +41,23 @@ export interface PropAmmQuoteProvider {
   quoteExactIn(request: Pick<QuoteExactInRequest, "inputMint" | "outputMint" | "amountIn" | "user">): Promise<PropAmmQuote>;
 }
 
+/** One hop of the selected route, with amounts in raw token units. */
+export interface SwapHop {
+  readonly kind: "vaultMint" | "vaultRedeem" | "clamm" | "propamm";
+  readonly inputMint: Address;
+  readonly outputMint: Address;
+  /** Fixed for the first hop; the preceding hop's estimated output thereafter. */
+  readonly amountIn: bigint;
+  readonly estimatedAmountOut: bigint;
+}
+
 export interface SwapQuote {
   readonly inputMint: Address;
   readonly outputMint: Address;
   readonly amountIn: bigint;
   readonly estimatedAmountOut: bigint;
   readonly minAmountOut: bigint;
+  readonly hops: readonly SwapHop[];
   readonly instructions: readonly Instruction[];
   readonly deadlineMs: number;
   /** Present only when submission needs the RFQ server's maker signature. */

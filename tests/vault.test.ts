@@ -192,6 +192,10 @@ describe("direct vault quoteExactIn", () => {
       expect(quote).toEqual({
         inputMint: request.inputMint, outputMint: request.outputMint, amountIn: 1000n,
         estimatedAmountOut: redeem ? 906n : 1099n, minAmountOut: redeem ? 901n : 1093n,
+        hops: [{
+          kind: redeem ? "vaultRedeem" : "vaultMint", inputMint: request.inputMint, outputMint: request.outputMint,
+          amountIn: 1000n, estimatedAmountOut: redeem ? 906n : 1099n,
+        }],
         deadlineMs: fixture.deadlineMs, instructions: [expect.any(Object)],
       });
       const instruction = quote.instructions[0]!;

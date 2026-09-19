@@ -54,12 +54,17 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
       ? undefined
       : prepareVaultQuote(accounts, venues[step.venue], step.operation, now, programs));
     const swapInput = propamm && swapIndex > 0 ? vaults[0]!.estimate(amount) : amount;
-    const buildQuote = (amountIn: bigint, amountOut: bigint, steps: readonly ResolvedStep[], effectiveDeadline = deadlineMs, quoteId?: string): SwapQuote => {
+    const buildQuote = (amountIn: bigint, amountsOut: readonly bigint[], steps: readonly ResolvedStep[], effectiveDeadline = deadlineMs, quoteId?: string): SwapQuote => {
+      const amountOut = amountsOut[amountsOut.length - 1]!;
       const minAmountOut = amountOut * BigInt(10_000 - slippageBps) / 10_000n;
       if (minAmountOut === 0n) throw new RouterSdkError("ZERO_OUTPUT", "Slippage leaves a zero minimum output.");
       const input = { user, inputMint, amountIn, minAmountOut, deadlineMs: effectiveDeadline, steps };
       return {
         inputMint, outputMint, amountIn, estimatedAmountOut: amountOut, minAmountOut, deadlineMs: effectiveDeadline,
+        hops: steps.map((step, i) => ({
+          kind: step.kind, inputMint: i === 0 ? inputMint : steps[i - 1]!.outputMint, outputMint: step.outputMint,
+          amountIn: i === 0 ? amountIn : amountsOut[i - 1]!, estimatedAmountOut: amountsOut[i]!,
+        })),
         instructions: quoteId === undefined ? [buildRouterInstruction(input, programs)] : buildPropAmmInstructions(input, programs),
         ...(quoteId === undefined ? {} : { rfq: { quoteId } }),
       };
@@ -74,11 +79,11 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
         swap = prepareClammQuote(clamm, await readAccounts(source, clamm.addresses));
       }
       const hops = vaults.map((vault) => vault ?? swap!);
-      const estimate = (input: bigint) => (propamm ? hops.slice(swapIndex) : hops).reduce((value, hop) => hop.estimate(value), input);
-      const { amountIn, amountOut } = forOutput
-        ? inputForOutput(estimate, amount)
-        : { amountIn: amount, amountOut: estimate(swapInput) };
-      return buildQuote(amountIn, amountOut, hops.map((hop) => hop.resolved));
+      const estimate = (input: bigint) => hops.reduce((value, hop) => hop.estimate(value), input);
+      const amountIn = forOutput ? inputForOutput(estimate, amount).amountIn : amount;
+      let value = amountIn;
+      const amountsOut = hops.map((hop, i) => value = propamm && i < swapIndex ? swapInput : hop.estimate(value));
+      return buildQuote(amountIn, amountsOut, hops.map((hop) => hop.resolved));
     };
     if (!propamm) return quoteClamm();
 
@@ -86,8 +91,9 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
       const rfq = await quotePropAmm(propAmmQuoteProvider!, {
         inputMint: clammStep!.inputMint, outputMint: clammStep!.outputMint, amountIn: swapInput, user, deadlineMs,
       }, propamm);
-      const amountOut = vaults[swapIndex + 1]?.estimate(rfq.estimatedAmountOut) ?? rfq.estimatedAmountOut;
-      return buildQuote(amount, amountOut, vaults.map((vault) => vault?.resolved ?? rfq.resolved), rfq.deadlineMs, rfq.quoteId);
+      const amountsOut = vaults.map((vault, i) => i < swapIndex ? swapInput
+        : vault ? vault.estimate(rfq.estimatedAmountOut) : rfq.estimatedAmountOut);
+      return buildQuote(amount, amountsOut, vaults.map((vault) => vault?.resolved ?? rfq.resolved), rfq.deadlineMs, rfq.quoteId);
     };
     const [clamm, rfq] = await Promise.allSettled([quoteClamm(), quoteRfq()]);
     // Pool/tick reads may have outlasted a valid RFQ: check freshness at selection.

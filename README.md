@@ -71,9 +71,16 @@ invalid account state. There is no disabled-network gate or testnet fallback.
 Account validation, PDA/ATA derivation and instructions use the selected deployment.
 
 The `SwapQuote` contains `inputMint`, `outputMint`, `amountIn`,
-`estimatedAmountOut`, `minAmountOut`, `instructions`, and `deadlineMs`, plus
+`estimatedAmountOut`, `minAmountOut`, `hops`, `instructions`, and `deadlineMs`, plus
 `rfq: { quoteId }` only when PropAMM wins.
 Amounts use raw `bigint` units and addresses use base58 strings.
+
+`hops` is an ordered `SwapHop[]` for the selected route. Each hop contains `kind`
+(`vaultMint`, `vaultRedeem`, `clamm`, or `propamm`), `inputMint`, `outputMint`,
+`amountIn`, and `estimatedAmountOut`. Only the first input is fixed; later inputs
+are the preceding hop's estimated output. The last hop's output matches the
+overall estimate, with slippage applied only to the final `minAmountOut`.
+Both quote methods include hops without extra account or RFQ requests.
 
 `quoteForOutput` finds the smallest valid input whose estimated output reaches
 `amountOut`. Integer rounding can make the estimate larger than the requested
