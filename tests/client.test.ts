@@ -27,7 +27,7 @@ describe("compact router client", () => {
     expect(router.supportedPairs.every(Object.isFrozen)).toBe(true);
   });
 
-  it("uses editable mainnet placeholders and propagates account failures", async () => {
+  it("uses mainnet deployments and propagates account failures", async () => {
     const reader = source();
     const router = createRouterClient({ source: reader, network: "mainnet" });
     expect(router.network).toBe("mainnet");
@@ -38,19 +38,19 @@ describe("compact router client", () => {
     await expect(router.quoteExactIn(input)).rejects.toThrow("Unexpected read");
     await expect(router.quoteForOutput({ ...input, amountOut: 1000n })).rejects.toThrow("Unexpected read");
     expect(reader.getAccounts.mock.calls).toEqual([
-      [[MAINNET_VENUES.clamm.address, MAINNET_MINTS.aBTC, MAINNET_MINTS.aUSD]],
-      [[MAINNET_VENUES.clamm.address, MAINNET_MINTS.aBTC, MAINNET_MINTS.aUSD]],
+      [[MAINNET_VENUES.clamm.address, MAINNET_MINTS.aUSD, MAINNET_MINTS.aBTC]],
+      [[MAINNET_VENUES.clamm.address, MAINNET_MINTS.aUSD, MAINNET_MINTS.aBTC]],
     ]);
     expect(createRouterClient({ source: reader }).supportedPairs).toEqual(SUPPORTED_PAIRS);
   });
 
-  it("keeps mainnet placeholder addresses valid, distinct and internally consistent", () => {
+  it("keeps mainnet addresses valid, distinct and internally consistent", () => {
     const addresses = [...Object.values(MAINNET), ...Object.values(MAINNET_MINTS), ...Object.values(MAINNET_VENUES).map(venue => venue.address)];
     for (const address of addresses) expect(decodeAddress(address)).toHaveLength(32);
     expect(new Set(addresses).size).toBe(addresses.length);
     expect(MAINNET_VENUES.btcVault).toMatchObject({ assetMint: MAINNET_MINTS.aBTC, shareMint: MAINNET_MINTS.primeBTC });
     expect(MAINNET_VENUES.usdVault).toMatchObject({ assetMint: MAINNET_MINTS.aUSD, shareMint: MAINNET_MINTS.primeUSD });
-    expect(MAINNET_VENUES.clamm).toMatchObject({ tokenMintA: MAINNET_MINTS.aBTC, tokenMintB: MAINNET_MINTS.aUSD });
+    expect(MAINNET_VENUES.clamm).toMatchObject({ tokenMintA: MAINNET_MINTS.aUSD, tokenMintB: MAINNET_MINTS.aBTC });
     for (const mint of Object.values(MAINNET_MINTS)) expect(Object.values(TESTNET_MINTS)).not.toContain(mint);
   });
 

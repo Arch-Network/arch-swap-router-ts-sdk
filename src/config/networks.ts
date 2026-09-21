@@ -35,20 +35,20 @@ export const TESTNET_VENUES = Object.freeze({
   }),
 });
 
-// TODO(mainnet): replace the dummy program, mint and venue addresses below.
-// They are distinct valid public keys, not a deployed network configuration.
+// Mainnet router: arch-swap-router/src/lib.rs; venues/mints: arch-swap/src/constants.
+// TODO(mainnet): replace the vault program, vault accounts and prime-token placeholders.
 export const MAINNET = Object.freeze({
-  routerProgramId: "9iY8Tr5KHUKDzgGUGY5XXvZQVV8xtCZn5dyeX2nHNycC",
+  routerProgramId: "F6YfVndxkgWQmjUmw6RGSxRqEDnMrf4iDBVZEjj9XbXq",
   vaultProgramId: "9nTRc9YKsmcT8mWyhqQSpoLAjeMAZGFbe3eJaQpt8Jvu",
-  clammProgramId: "9rNikT1LU4ugGrmV98jN7g6vyoZNEKwRCTJxdnsUseFc",
+  clammProgramId: "BARRjgWSp8Gv8gTntfrGB74HwhsTCV32BAd3sjxESzK8",
   tokenProgramId: "TokenT4em53UrV4gSvZ3nCS2mZeHaqTLapwt6iZt6Mk",
   associatedTokenProgramId: "ATok9pxLsNzM5zJJ3UQpXBrMriHpZiY5Yio3GKYU4we3",
   systemProgramId: "11111111111111111111111111111111",
 } as const);
 
 export const MAINNET_MINTS = Object.freeze({
-  aBTC: "9vJ1tkUM4NCuQx1zaS4HQYshDxmZuPdEkrychAv5cyaK",
-  aUSD: "9zDK33wMefW8Z3GW1jPChReTU7ymaTK4KGeGkYxgNJu2",
+  aBTC: "AQigE59FdX7GigaFfQxeQP9ne3tVGBqMB5brL2aDFqPf",
+  aUSD: "92Vu6DVnoeqgwexfVwDMseaZAe4PQzUQBBU2Rae1aDeS",
   primeBTC: "A48cBMQNExoMh8X1T2i7zJRDiHByFWzssgJvow1H7eDj",
   primeUSD: "A83uKesNqG6aqDmWtL33HBByxSQAvaghS5yasK3sryYS",
 } as const);
@@ -65,9 +65,10 @@ export const MAINNET_VENUES = Object.freeze({
     shareMint: MAINNET_MINTS.primeUSD,
   }),
   clamm: Object.freeze({
-    address: "AKonkZGQc9zGFVX3CE1o9oWGgv2mwmkA7JyZ3TBg6yWZ",
-    tokenMintA: MAINNET_MINTS.aBTC,
-    tokenMintB: MAINNET_MINTS.aUSD,
+    address: "FUt4zGu6edj6TfZUkWAWNAvd6oSM3omWviNKwh8qvkZi",
+    // Mainnet's pool order is the reverse of testnet's.
+    tokenMintA: MAINNET_MINTS.aUSD,
+    tokenMintB: MAINNET_MINTS.aBTC,
   }),
 });
 
@@ -81,7 +82,6 @@ export interface VaultVenue {
 }
 export interface PropAmmDeployment {
   readonly programId: Address;
-  readonly maker: Address;
   readonly config: Address;
   readonly baseMint: Address;
   readonly quoteMint: Address;
@@ -106,10 +106,16 @@ export const NETWORKS = Object.freeze({
     programs: TESTNET, mints: TESTNET_MINTS, venues: TESTNET_VENUES,
     propamm: Object.freeze({
       programId: "9EqAsENtgBA4Uo4wbS8LVdaQJjMKPpagMxgDVhxEWtKq",
-      maker: "FosDeThFmSTGcaQxgyhaPWhBrnEovCJ7jHzTcwp1dmYi",
-      config: "3ak4e8ZxNVYfKw8hapDvRGPKtPBSrqBYomKSQ3XMWGxM",
+      config: "7X7QM1eEQwgE9b6tA4HMGxWGdzuTvcU9ip9FeZS338yn",
       baseMint: TESTNET_MINTS.aBTC, quoteMint: TESTNET_MINTS.aUSD,
     }),
   }),
-  mainnet: Object.freeze({ programs: MAINNET, mints: MAINNET_MINTS, venues: MAINNET_VENUES }),
+  mainnet: Object.freeze({
+    programs: MAINNET, mints: MAINNET_MINTS, venues: MAINNET_VENUES,
+    propamm: Object.freeze({
+      programId: "FD4NxsLrf1fmp4dmDLvNsdHG6hXNiDrRqAtqTBu1CsKR",
+      config: "2J1NMyykgaiuL6zU4akynjtGGYyqgKQpvdpH8QB6q7ZL",
+      baseMint: MAINNET_MINTS.aBTC, quoteMint: MAINNET_MINTS.aUSD,
+    }),
+  }),
 } satisfies Record<Network, NetworkConfig | null>);

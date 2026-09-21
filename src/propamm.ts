@@ -45,13 +45,14 @@ export async function quotePropAmm(
   // request.deadlineMs was validated as a safe integer; the minimum also fits.
   const deadlineMs = Number(terms.expiryMs < BigInt(request.deadlineMs) ? terms.expiryMs : BigInt(request.deadlineMs));
   if (deadlineMs <= Date.now()) throw new RouterSdkError("RFQ_EXPIRED", "PropAMM quote deadline has expired.");
-  const maker = decodeAddress(deployment.maker);
+  decodeAddress(quote.quoteSigner);
+  const config = decodeAddress(deployment.config);
   const resolved: ResolvedStep = {
     kind: "propamm", outputMint, terms: { ...terms },
-    programId: deployment.programId, config: deployment.config, maker: deployment.maker,
-    userNonce: deriveAddress(deployment.programId, "user_nonce", decodeAddress(deployment.config), decodeAddress(user)),
-    baseVault: deriveAddress(deployment.programId, "vault", decodeAddress(deployment.baseMint), maker),
-    quoteVault: deriveAddress(deployment.programId, "vault", decodeAddress(deployment.quoteMint), maker),
+    programId: deployment.programId, config: deployment.config, maker: quote.quoteSigner,
+    userNonce: deriveAddress(deployment.programId, "user_nonce", config, decodeAddress(user)),
+    baseVault: deriveAddress(deployment.programId, "vault", config, decodeAddress(deployment.baseMint)),
+    quoteVault: deriveAddress(deployment.programId, "vault", config, decodeAddress(deployment.quoteMint)),
   };
   return { quoteId: quote.quoteId, estimatedAmountOut: quote.estimatedAmountOut, deadlineMs, resolved };
 }

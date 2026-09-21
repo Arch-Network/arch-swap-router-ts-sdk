@@ -113,7 +113,7 @@ describe("native PropAMM contract", () => {
     vi.spyOn(Date, "now").mockReturnValue(1_800_000_000_000);
     const native = accounts.deployments[0]!;
     const deployment = {
-      programId: native.program_id, maker: accounts.maker, config: native.config.address,
+      programId: native.program_id, config: native.config.address,
       baseMint: accounts.base_mint, quoteMint: accounts.quote_mint,
     };
     const data = hex.decode(trade.data_hex), view = new DataView(data.buffer);
@@ -123,7 +123,7 @@ describe("native PropAMM contract", () => {
       expiryMs: view.getBigUint64(18, true), nonce: view.getBigUint64(26, true),
     };
     const buy = terms.side === "buy";
-    const quote = await quotePropAmm({ quoteExactIn: async () => ({ quoteId: "native", terms, estimatedAmountOut: 99n }) }, {
+    const quote = await quotePropAmm({ quoteExactIn: async () => ({ quoteId: "native", quoteSigner: accounts.maker, terms, estimatedAmountOut: 99n }) }, {
       inputMint: buy ? accounts.quote_mint : accounts.base_mint,
       outputMint: buy ? accounts.base_mint : accounts.quote_mint,
       amountIn: buy ? terms.quoteAmount : terms.baseAmount, user: accounts.user, deadlineMs: Number(terms.expiryMs),
@@ -132,15 +132,19 @@ describe("native PropAMM contract", () => {
       config: native.config.address, userNonce: native.user_nonce.address,
       baseVault: native.base_vault.address, quoteVault: native.quote_vault.address, terms,
     });
-    expect(deriveAddress(native.program_id, "config", decodeAddress(accounts.maker))).toBe(native.config.address);
+    expect(deriveAddress(native.program_id, "config_v2", decodeAddress(accounts.config_id))).toBe(native.config.address);
     const encoded = encodeRouteExactInV1({ amountIn: 1n, minAmountOut: 1n, deadlineMs: 0n, steps: [{ kind: "propamm", terms }] });
     expect(encoded.slice(26)).toEqual(Uint8Array.of(3, ...data.slice(1, 34)));
     expect(encoded).toHaveLength(60); // Native CPI's measured input/minimum are absent.
   });
 
-  it("derives the configured testnet maker's config", () => {
-    const deployment = NETWORKS.testnet.propamm;
-    expect(deriveAddress(deployment.programId, "config", decodeAddress(deployment.maker))).toBe(deployment.config);
+  it.each([
+    ["testnet", "FosDeThFmSTGcaQxgyhaPWhBrnEovCJ7jHzTcwp1dmYi"],
+    ["mainnet", "9evqkMyLFGPCgvg15bJgEiwp5Y95ZQkQYtpfhetxcibQ"],
+  ] as const)("pins the %s v2 config to the migration signer", (network, configId) => {
+    const deployment = NETWORKS[network].propamm;
+    expect(deriveAddress(deployment.programId, "config_v2", decodeAddress(configId))).toBe(deployment.config);
+    expect(deployment).not.toHaveProperty("maker");
   });
 
   it("encodes u64 precision without rounding and disallows two RFQs", () => {

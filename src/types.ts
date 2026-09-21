@@ -27,6 +27,8 @@ export interface QuoteForOutputRequest extends Omit<QuoteExactInRequest, "amount
 /** Original maker terms and the execution estimate (including inventory skew). */
 export interface PropAmmQuote {
   readonly quoteId: string;
+  /** Quote signer from this RFQ's native instruction; may change after rotation. */
+  readonly quoteSigner: Address;
   readonly terms: {
     readonly side: "buy" | "sell";
     readonly baseAmount: bigint;
@@ -57,7 +59,7 @@ export interface RouterClientOptions {
   /** Defaults to testnet. The supplied reader must use the same network. */
   readonly network?: Network;
   readonly source: RouterDataSource;
-  /** Optional testnet exact-input alternative to CLAMM; each RFQ waits at most 2s. */
+  /** Optional exact-input alternative to CLAMM; must use the selected network. Each RFQ waits at most 2s. */
   readonly propAmmQuoteProvider?: PropAmmQuoteProvider;
 }
 

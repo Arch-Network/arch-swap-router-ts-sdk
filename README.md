@@ -1,12 +1,13 @@
 # Arch swap router TypeScript SDK
 
 A compact, browser-oriented SDK for fixed-pair swap estimates and router
-instructions on Arch. Testnet is configured; mainnet is a selectable placeholder.
+instructions on Arch. Testnet and mainnet swaps are configured; mainnet vaults
+and prime tokens remain placeholders.
 One quote call returns one estimate with its
 instructions, sized from either a fixed input or an approximate receive amount.
 Supported pairs use explicit one-to-three-hop routes
 through the two vaults and the aBTC/aUSD CLAMM, with optional PropAMM RFQs for
-testnet exact-input swaps.
+exact-input swaps on either network.
 
 **Current status:** all 12 fixed directions have estimates and instructions,
 including direct CLAMM and two-/three-hop routes. Unsupported or identical mint
@@ -62,12 +63,13 @@ Use readonly `router.network`, `router.mints`, and `router.supportedPairs` for
 frontend metadata. Existing `TESTNET_MINTS` and `SUPPORTED_PAIRS` exports remain
 testnet-only aliases.
 
-Mainnet has a complete **dummy configuration** in
-[src/config/networks.ts](src/config/networks.ts). Replace the TODO-marked
-`MAINNET`, `MAINNET_MINTS` and `MAINNET_VENUES` addresses before expecting
-mainnet swaps to work. The client exposes these mints and all 12 fixed pairs;
-quote calls use the supplied mainnet reader and fail normally on missing or
-invalid account state. There is no disabled-network gate or testnet fallback.
+Mainnet's router, CLAMM pool/program, PropAMM deployment and aBTC/aUSD mints are
+configured in [src/config/networks.ts](src/config/networks.ts). Its CLAMM pool
+orders aUSD as token A and aBTC as token B, the reverse of testnet.
+The vault program, vault accounts and prime-token mints remain **placeholders**;
+replace those before using mainnet vault routes. The client still exposes all
+12 fixed pairs. Supply a reader and optional RFQ provider for the selected
+network; there is no testnet fallback.
 Account validation, PDA/ATA derivation and instructions use the selected deployment.
 
 The `SwapQuote` contains `inputMint`, `outputMint`, `amountIn`,
@@ -135,7 +137,7 @@ provides estimates and instruction encoding, not execution preflight.
 ## Optional PropAMM quotes
 
 Inject an application-owned provider returning `PropAmmQuote`: a nonempty
-`quoteId`, original `terms` (`side`, `baseAmount`, `quoteAmount`, `expiryMs`,
+`quoteId`, Base58 `quoteSigner`, original `terms` (`side`, `baseAmount`, `quoteAmount`, `expiryMs`,
 `nonce`), and `estimatedAmountOut` after inventory skew. All amounts, expiry and
 nonce are `bigint`; side is `"buy" | "sell"`. The provider receives the swap-leg
 `inputMint`, `outputMint`, `amountIn`, and `user`, including net redemption output
@@ -163,7 +165,7 @@ Higher final output, including vault fees and rounding, wins; CLAMM wins ties.
 Each RFQ waits at most **2 seconds**, without retries. A declined, invalid,
 expired or oversized RFQ leaves CLAMM available; a CLAMM-specific failure leaves
 PropAMM available. Required shared-vault failures invalidate both. Direct vault
-quotes, mainnet and `quoteForOutput` never call the provider.
+quotes and `quoteForOutput` never call the provider.
 
 The PropAMM deadline is `min(request.deadlineMs, terms.expiryMs)`, rechecked at
 selection. Original compact terms are preserved. The SDK checks the compiled
@@ -174,13 +176,24 @@ shared fee destinations; other fee accounts can make it too large.
 The application provider maps requests to `POST /rfq/quote`: deployment aBTC
 `base_mint` and aUSD `quote_mint` in hex, `side` (`sell` for aBTC → aUSD, `buy`
 for the reverse), raw input `amount`, and hex `user_pubkey`. Verify the returned
-native instruction's program, user and mint identities against the request and
-deployment. Decode its original compact terms with `DataView.getBigUint64`, and
+native instruction's program, config, user and mint identities against the request and
+deployment. Resolve its quote-signer account (instruction account position 1)
+through the message account-key indices and return it as `quoteSigner`. The
+router checks this signer against the live on-chain config; do not cache a signer
+globally or replace the signer in a previously built quote.
+Decode its original compact terms with `DataView.getBigUint64`, and
 use `estimated_quote.base_amount` for Buy or `estimated_quote.quote_amount` for
 Sell as the adjusted output. The HTTP API uses numeric JSON u64s: use lossless
 decoding or reject unsafe values; ordinary `response.json()` and arbitrary
 `bigint` → `number` casts can lose precision. Transport/proxy setup stays in the
 application; the SDK never calls the server directly.
+
+PropAMM uses the v2 config (`PROPAMM2`, version 2) and config-owned vaults.
+The configured config addresses assume migration with each deployment's current
+signer. Migrate and fund the v2 vaults and deploy a compatible router before using
+this SDK version. Vault seeds are `["vault", config, mint]`; config and nonce
+addresses stay fixed during subsequent signer rotations. Only `quoteSigner`
+changes between quotes, so rotation needs no SDK release or additional RPC read.
 
 For an RFQ winner, compile with **`compileRouterMessage`**, which corrects
 arch-sdk 0.0.28's insertion ordering to the Rust account ordering required by the
@@ -198,9 +211,9 @@ After redemption, PropAMM accepts measured input only within
 fails atomically; the SDK does not pad/cap the input or consume existing
 intermediate balances. There is no post-signing venue fallback.
 
-This integration is verified offline. Live use requires compatible testnet
+This integration is verified offline. Live use requires compatible
 router and RFQ signing-server deployments; source availability does not confirm
-deployment. Mainnet's dummy configuration remains unchanged and has no PropAMM.
+deployment.
 
 ## Development
 
