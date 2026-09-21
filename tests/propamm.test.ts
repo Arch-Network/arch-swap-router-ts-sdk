@@ -64,6 +64,12 @@ describe("PropAMM route selection", () => {
     });
     const rfq = response(provider.quoteExactIn.mock.calls[0]![0]);
     const expectedOut = rfq.estimatedAmountOut * (route.steps.at(-1)!.operation === "vaultMint" ? 990n : 1n);
+    expect(quote.hops).toEqual(route.steps.map((step, i) => ({
+      kind: step.venue === "clamm" ? "propamm" : step.operation,
+      inputMint: step.inputMint, outputMint: step.outputMint,
+      amountIn: i === 0 ? request.amountIn : i === swapIndex ? 997_000n : rfq.estimatedAmountOut,
+      estimatedAmountOut: i < swapIndex ? 997_000n : i === swapIndex ? rfq.estimatedAmountOut : expectedOut,
+    })));
     expect(quote).toMatchObject({
       amountIn: request.amountIn, estimatedAmountOut: expectedOut,
       minAmountOut: expectedOut * 9950n / 10_000n, deadlineMs: nowMs + 20_000, rfq: { quoteId: "rfq-1" },
@@ -88,6 +94,7 @@ describe("PropAMM route selection", () => {
     provider.quoteExactIn.mockImplementation(async (r) => response(r, expected.estimatedAmountOut + delta));
     const quote = await client.quoteExactIn(request);
     expect(quote.rfq).toEqual(delta > 0 ? { quoteId: "rfq-1" } : undefined);
+    expect(quote.hops[0]!.kind).toBe(delta > 0 ? "propamm" : "clamm");
     if (delta <= 0) expect(quote).toEqual(expected);
   });
 

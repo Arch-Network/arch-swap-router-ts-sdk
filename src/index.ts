@@ -13,5 +13,6 @@ export type {
   RouterClient,
   RouterClientOptions,
   RouterDataSource,
+  SwapHop,
   SwapQuote,
 } from "./types.js";

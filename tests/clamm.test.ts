@@ -203,6 +203,11 @@ describe("fixed route quotes", () => {
     expect(quote.estimatedAmountOut).toBe(BigInt(expected.amountOut));
     expect(quote.minAmountOut).toBe(BigInt(expected.minAmountOut));
     expect(quote.amountIn).toBe(BigInt(expected.amountIn));
+    expect(quote.hops).toEqual(route.steps.map((step, i) => ({
+      kind: step.operation, inputMint: step.inputMint, outputMint: step.outputMint,
+      amountIn: BigInt(i === 0 ? expected.amountIn : expected.hops[i - 1]!),
+      estimatedAmountOut: BigInt(expected.hops[i]!),
+    })));
     expect(quote.instructions).toHaveLength(1);
     expect(source.getAccounts).toHaveBeenCalledTimes(containsClamm ? 2 : 1);
     const allKeys = source.getAccounts.mock.calls.flatMap(([keys]) => keys);
@@ -238,11 +243,13 @@ describe("fixed route quotes", () => {
     expect(quote.estimatedAmountOut).toBe(BigInt(expected.amountOut));
     expect(quote.minAmountOut).toBe(BigInt(expected.minAmountOut));
     expect(quote.amountIn).toBeLessThanOrEqual(BigInt(expected.amountIn));
+    expect(quote.hops[0]!.amountIn).toBe(quote.amountIn);
+    expect(quote.hops.at(-1)!.estimatedAmountOut).toBe(quote.estimatedAmountOut);
     expect(source.getAccounts).toHaveBeenCalledTimes(route.steps.some((s) => s.venue === "clamm") ? 2 : 1);
     const allKeys = source.getAccounts.mock.calls.flatMap(([keys]) => keys);
     expect(new Set(allKeys).size).toBe(allKeys.length);
     expect(Date.now).toHaveBeenCalledTimes(1);
-    // The selected input and instruction must agree with the existing forward quote.
+    // The selected input, every hop and instruction must agree with the forward quote.
     expect(await client.quoteExactIn({ ...request, ...pair, amountIn: quote.amountIn })).toEqual(quote);
     const previous = await client.quoteExactIn({ ...request, ...pair, amountIn: quote.amountIn - 1n, slippageBps: 0 });
     expect(previous.estimatedAmountOut).toBeLessThan(BigInt(expected.amountOut));
