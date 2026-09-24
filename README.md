@@ -1,8 +1,8 @@
 # Arch swap router TypeScript SDK
 
 A compact, browser-oriented SDK for fixed-pair swap estimates and router
-instructions on Arch. Testnet and mainnet swaps are configured; mainnet vaults
-and prime tokens remain placeholders.
+instructions on Arch. Testnet is configured normally; `mainnet` currently
+targets the demo router, mock tokens and staging vault program.
 One quote call returns one estimate with its
 instructions, sized from either a fixed input or an approximate receive amount.
 Supported pairs use explicit one-to-three-hop routes
@@ -63,13 +63,27 @@ Use readonly `router.network`, `router.mints`, and `router.supportedPairs` for
 frontend metadata. Existing `TESTNET_MINTS` and `SUPPORTED_PAIRS` exports remain
 testnet-only aliases.
 
-Mainnet's router, CLAMM pool/program, PropAMM deployment and aBTC/aUSD mints are
-configured in [src/config/networks.ts](src/config/networks.ts). Its CLAMM pool
-orders aUSD as token A and aBTC as token B, the reverse of testnet.
-The vault program, vault accounts and prime-token mints remain **placeholders**;
-replace those before using mainnet vault routes. The client still exposes all
-12 fixed pairs. Supply a reader and optional RFQ provider for the selected
-network; there is no testnet fallback.
+The mainnet **demo** configuration in [src/config/networks.ts](src/config/networks.ts)
+uses router `7PM5F8Hxkgws7wnXbpNL6VbXbzKJv2cowDWznNYgr62c` and vault program
+`oTYPbygytAwGa7F4SG8gDAXigFF4zyuUKGqfdXEdyL5`, matching the router repository's
+`deployments/mainnet-mock.json`. Supply an account reader for
+`https://rpc.mainnet.arch.network` and a mainnet RFQ provider for the mock market.
+PropAMM keeps its existing mainnet program/config; **no CLAMM pool is configured**.
+All 12 fixed pairs remain exposed. Swaps require `propAmmQuoteProvider`; direct
+vault operations work without it. There is no fallback to production tokens or testnet.
+
+The existing `router.mints` keys now refer to these demo tokens on mainnet:
+
+| Key | Token | Decimals | Mint |
+| --- | --- | --- | --- |
+| `aBTC` | aBTCmock | 8 | `34hfkQLEgde9PnXsZsvLF2C3dHfAMk6W37T38pouGfWt` |
+| `primeBTC` | primeBTCmock | 8 | `DxPxKTwCmbo9cSB7PURCEz7XtC9ujNmBpZ2A9vKeUzjb` |
+| `aUSD` | aUSDmock | 6 | `6zNA6ZSagjn4ti3Vwu1ep3d5aMEFWsXecn4Biy1H9JYr` |
+| `primeUSD` | primeUSDmock | 6 | `AB362tcseFQ5prM14MUid3q8w5KwyJ13ToS2174BD95P` |
+
+For frontend vendoring, rebuild this package and use `network: "mainnet"` and
+`router.mints`; display the mock symbols and decimals above. The SDK takes raw
+units and does not rescale amounts by decimals.
 Account validation, PDA/ATA derivation and instructions use the selected deployment.
 
 The `SwapQuote` contains `inputMint`, `outputMint`, `amountIn`,
@@ -93,9 +107,12 @@ This is approximate receive sizing: execution spends the fixed input and may
 receive less than the target within slippage. It is not exact-output execution
 with a maximum-input allowance.
 
-Both methods support all 12 pairs. Receive sizing reuses the fetched, decoded
-state for a bounded local search; the read counts below are unchanged. Targets
-outside the vault/CLAMM limits reject instead of returning a partial quote.
+On testnet, both methods support all 12 pairs. Mainnet demo `quoteForOutput`
+supports the four direct vault directions; swap routes reject with `NO_ROUTE`
+before any reads or RFQs because receive sizing requires CLAMM. Exact-input
+quotes support all 12 demo pairs with an RFQ provider. Receive sizing reuses
+fetched state for a bounded local search. Targets outside the vault/CLAMM limits
+reject instead of returning a partial quote.
 
 The reader returns ordered `AccountInfoResult | null` values with `owner` and
 `data` normalized to `Uint8Array`; malformed responses and transport failures
@@ -109,11 +126,16 @@ is one HTTP request only if the application's reader/provider supports it.
 | Vault + CLAMM, either order | 6 accounts | Up to 3 tick arrays | 2 |
 | Redeem + CLAMM + Mint | 9 accounts | Up to 3 tick arrays | 2 |
 
-These budgets apply without an RFQ provider and to every `quoteForOutput` call.
-With PropAMM enabled, a swap quote adds one RFQ call. Direct swaps still use two
-reader calls. Routes with vaults use three: shared vault state, remaining CLAMM
-pool/mints, then ticks. Each account is fetched only once. Separating the shared
-vault batch lets a CLAMM read/validation failure leave PropAMM available.
+These are the CLAMM-enabled testnet budgets without an RFQ provider, also used
+by testnet `quoteForOutput`. With PropAMM enabled, testnet swap quotes add one
+RFQ call; direct swaps use two reader calls and routes with vaults use three
+(shared vault state, remaining CLAMM pool/mints, then ticks). Each account is
+fetched only once. Separating the shared batch isolates CLAMM read failures.
+
+On the mainnet demo, direct swaps use **one RFQ and zero account-reader calls**.
+Routes with a vault prefix/suffix use **one RFQ and one shared account batch**
+(four accounts per vault). Direct vault operations use **one account batch**
+and no RFQ. Building adds no reads; CLAMM is never queried.
 
 Only confirmed account absence should return `null`; resolve indexer cache misses
 in the application reader. CLAMM treats absent or empty system-owned tick accounts
@@ -221,6 +243,18 @@ intermediate balances. There is no post-signing venue fallback.
 This integration is verified offline. Live use requires compatible
 router and RFQ signing-server deployments; source availability does not confirm
 deployment.
+
+The demo RFQ signing server must accept the mock router and vault program:
+
+```toml
+[server.router]
+program_id = "7PM5F8Hxkgws7wnXbpNL6VbXbzKJv2cowDWznNYgr62c"
+vault_program_id = "oTYPbygytAwGa7F4SG8gDAXigFF4zyuUKGqfdXEdyL5"
+```
+
+The inspected `prop-amm/deployment-configs/mainnet.toml` still names the production
+router and omits `vault_program_id`; the demo service needs the values above.
+This SDK update does not change or deploy that service.
 
 ## Development
 

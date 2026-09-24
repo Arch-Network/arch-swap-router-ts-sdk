@@ -40,7 +40,12 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
     const clammStep = route.steps[swapIndex];
     const propamm = !forOutput && clammStep && propAmmQuoteProvider ? config.propamm : undefined;
     const pool = venues.clamm;
-    const clammKeys = [pool.address, pool.tokenMintA, pool.tokenMintB];
+    if (clammStep && !pool && !propamm) {
+      throw new RouterSdkError("NO_ROUTE", forOutput
+        ? "Receive sizing for swap routes requires a configured CLAMM pool."
+        : "Swap routes on this network require a PropAMM quote provider.");
+    }
+    const clammKeys = pool ? [pool.address, pool.tokenMintA, pool.tokenMintB] : [];
     const keys = route.steps.flatMap((step) => {
       if (step.venue === "clamm") {
         // With RFQ enabled, isolate pool reads so their failure cannot hide PropAMM.
@@ -75,7 +80,7 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
         const poolAccounts = propamm
           ? new Map([...accounts, ...await readAccounts(source, clammKeys.filter((key) => !accounts.has(key)))])
           : accounts;
-        const clamm = loadClamm(poolAccounts, clammStep.inputMint === pool.tokenMintA, config);
+        const clamm = loadClamm(poolAccounts, clammStep.inputMint === pool!.tokenMintA, config);
         swap = prepareClammQuote(clamm, await readAccounts(source, clamm.addresses));
       }
       const hops = vaults.map((vault) => vault ?? swap!);
@@ -95,13 +100,17 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
         : vault ? vault.estimate(rfq.estimatedAmountOut) : rfq.estimatedAmountOut);
       return buildQuote(amount, amountsOut, vaults.map((vault) => vault?.resolved ?? rfq.resolved), rfq.deadlineMs, rfq.quoteId);
     };
-    const [clamm, rfq] = await Promise.allSettled([quoteClamm(), quoteRfq()]);
+    const [clamm, rfq] = await Promise.allSettled([pool ? quoteClamm() : undefined, quoteRfq()]);
+    const clammQuote = clamm.status === "fulfilled" ? clamm.value : undefined;
     // Pool/tick reads may have outlasted a valid RFQ: check freshness at selection.
     if (rfq.status === "fulfilled" && rfq.value.deadlineMs > Date.now()
-      && (clamm.status === "rejected" || rfq.value.estimatedAmountOut > clamm.value.estimatedAmountOut)) return rfq.value;
-    if (clamm.status === "fulfilled") return clamm.value;
-    throw new RouterSdkError("NO_ROUTE", "Neither CLAMM nor PropAMM produced a usable quote.", {
-      cause: new AggregateError([clamm.reason, rfq.status === "rejected" ? rfq.reason : new RouterSdkError("RFQ_EXPIRED", "PropAMM quote expired during selection.")]),
+      && (!clammQuote || rfq.value.estimatedAmountOut > clammQuote.estimatedAmountOut)) return rfq.value;
+    if (clammQuote) return clammQuote;
+    throw new RouterSdkError("NO_ROUTE", "No configured venue produced a usable quote.", {
+      cause: new AggregateError([
+        ...(clamm.status === "rejected" ? [clamm.reason] : []),
+        rfq.status === "rejected" ? rfq.reason : new RouterSdkError("RFQ_EXPIRED", "PropAMM quote expired during selection."),
+      ]),
     });
   }
   return Object.freeze<RouterClient>({

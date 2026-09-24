@@ -153,32 +153,6 @@ describe("fixed route quotes", () => {
   beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(Number(now) * 1000); });
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it.each([true, false])("uses mainnet's reversed CLAMM order for aToB=%s", async (aToB) => {
-    const { accounts, source, request } = setup();
-    const { programs, mints, venues } = NETWORKS.mainnet;
-    const pool = accounts.get(poolAddress)!;
-    pool.owner = decodeAddress(programs.clammProgramId);
-    pool.data.set(decodeAddress(mints.aUSD), 101);
-    pool.data.set(decodeAddress(mints.aBTC), 181);
-    accounts.delete(poolAddress);
-    accounts.set(venues.clamm.address, pool);
-    for (const symbol of ["aUSD", "aBTC"] as const) {
-      accounts.set(mints[symbol], accounts.get(TESTNET_MINTS[symbol])!);
-      accounts.delete(TESTNET_MINTS[symbol]);
-    }
-    const quote = await createRouterClient({ source, network: "mainnet" }).quoteExactIn({
-      ...request, inputMint: aToB ? mints.aUSD : mints.aBTC, outputMint: aToB ? mints.aBTC : mints.aUSD,
-    });
-    const instruction = quote.instructions[0]!;
-    expect(base58.encode(instruction.program_id)).toBe(programs.routerProgramId);
-    expect(instruction.data[27]).toBe(aToB ? 1 : 0);
-    expect(quote.estimatedAmountOut).toBe(aToB ? 685687466535n : 1412189n);
-    expect(instruction.accounts.slice(6, 8).map((meta) => base58.encode(meta.pubkey)))
-      .toEqual([programs.clammProgramId, venues.clamm.address]);
-    expect(source.getAccounts.mock.calls[0]![0]).toEqual([venues.clamm.address, mints.aUSD, mints.aBTC]);
-    expect(source.getAccounts).toHaveBeenCalledTimes(2);
-  });
-
   it.each(["quoteExactIn", "quoteForOutput"] as const)("keeps explicit testnet %s identical while a mainnet client coexists", async (method) => {
     const { source, request, client } = setup();
     const mainnetSource = { getAccounts: vi.fn(async () => { throw new Error("Unexpected mainnet read"); }) };

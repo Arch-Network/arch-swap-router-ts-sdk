@@ -1,8 +1,8 @@
 import { base58 } from "@scure/base";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRouterClient, RouterSdkError, type PropAmmQuote, type PropAmmQuoteProvider } from "../src/index.js";
-import { MAINNET_MINTS, NETWORKS, TESTNET_MINTS as mints, TESTNET_VENUES } from "../src/config/networks.js";
-import { FIXED_ROUTES } from "../src/config/routes.js";
+import { MAINNET_MINTS, NETWORKS, TESTNET_MINTS as mints, TESTNET_VENUES, type Network } from "../src/config/networks.js";
+import { fixedRoutes, FIXED_ROUTES } from "../src/config/routes.js";
 import { loadClamm } from "../src/clamm.js";
 import { quotePropAmm } from "../src/propamm.js";
 import { decodeAddress, deriveAddress, U64_MAX } from "../src/utils.js";
@@ -13,8 +13,9 @@ const nowMs = Number(now) * 1000;
 const quoteSigner = base58.encode(new Uint8Array(32).fill(0x22));
 const setU64 = (data: Uint8Array, offset: number, value: bigint) => new DataView(data.buffer).setBigUint64(offset, value, true);
 
-function response(request: RfqRequest, estimatedAmountOut = request.inputMint === mints.aBTC ? 1_000_000_000_000n : 5_000_000n): PropAmmQuote {
-  const sell = request.inputMint === mints.aBTC;
+function response(request: RfqRequest, estimatedAmountOut?: bigint): PropAmmQuote {
+  const sell = request.inputMint === mints.aBTC || request.inputMint === MAINNET_MINTS.aBTC;
+  estimatedAmountOut ??= sell ? 1_000_000_000_000n : 5_000_000n;
   return {
     quoteId: "rfq-1", quoteSigner, estimatedAmountOut,
     terms: {
@@ -26,18 +27,19 @@ function response(request: RfqRequest, estimatedAmountOut = request.inputMint ==
   };
 }
 
-function setupRfq() {
-  const state = setup();
+function setupRfq(network: Network = "testnet") {
+  const state = setup(undefined, network);
   const request = { ...state.request, deadlineMs: nowMs + 30_000 };
   const provider = { quoteExactIn: vi.fn(async (request: RfqRequest) => response(request)) };
-  return { ...state, request, provider, client: createRouterClient({ source: state.source, propAmmQuoteProvider: provider }) };
+  return { ...state, request, provider, client: createRouterClient({ source: state.source, network, propAmmQuoteProvider: provider }) };
 }
 
 beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(nowMs); });
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe("PropAMM route selection", () => {
-  const routes = FIXED_ROUTES.filter((r) => r.steps.some((s) => s.venue === "clamm"));
+  const routes = (["testnet", "mainnet"] as const).flatMap((network) => fixedRoutes(NETWORKS[network].mints)
+    .filter((r) => r.steps.some((s) => s.venue === "clamm")).map((route) => ({ ...route, network })));
   it("uses each quote's signer without changing custody addresses or cached quotes", async () => {
     const { client, provider, request } = setupRfq();
     const before = await client.quoteExactIn(request);
@@ -54,8 +56,8 @@ describe("PropAMM route selection", () => {
     expect(after.instructions[1]!.data).toEqual(before.instructions[1]!.data);
   });
 
-  it.each(routes)("quotes $inputMint → $outputMint with shared vaults and final slippage", async (route) => {
-    const { client, provider, source, request } = setupRfq();
+  it.each(routes)("quotes $network $inputMint → $outputMint with shared vaults and final slippage", async (route) => {
+    const { client, provider, source, request } = setupRfq(route.network);
     const quote = await client.quoteExactIn({ ...request, inputMint: route.inputMint, outputMint: route.outputMint });
     const swapIndex = route.steps.findIndex((s) => s.venue === "clamm"), swap = route.steps[swapIndex]!;
     expect(provider.quoteExactIn).toHaveBeenCalledExactlyOnceWith({
@@ -81,10 +83,12 @@ describe("PropAMM route selection", () => {
     expect(view.getBigUint64(offset + 10, true)).toBe(rfq.terms.quoteAmount);
     expect(view.getBigUint64(9, true)).toBe(quote.minAmountOut);
     expect(view.getBigUint64(17, true)).toBe(BigInt(quote.deadlineMs));
-    expect(source.getAccounts).toHaveBeenCalledTimes(route.steps.length === 1 ? 2 : 3);
+    const vaultReads = route.steps.length === 1 ? 0 : 1;
+    expect(source.getAccounts).toHaveBeenCalledTimes(vaultReads + (route.network === "testnet" ? 2 : 0));
     const keys = source.getAccounts.mock.calls.flatMap(([keys]) => keys);
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).not.toContain(NETWORKS.testnet.propamm.config);
+    expect(keys).not.toContain(NETWORKS[route.network].propamm.config);
+    if (route.network === "mainnet") expect(quote.hops.every((hop) => hop.kind !== "clamm")).toBe(true);
     expect(client.supportedPairs).toHaveLength(12);
   });
 
@@ -146,16 +150,31 @@ describe("PropAMM route selection", () => {
     await expect(client.quoteExactIn({ ...request, inputMint: mints.primeBTC })).rejects.toBeInstanceOf(RouterSdkError);
   });
 
-  it("settles a provider timeout after two seconds and clears its timer", async () => {
+  it.each(["testnet", "mainnet"] as const)("settles a %s provider timeout after two seconds and clears its timer", async (network) => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    const { client, provider, request } = setupRfq();
+    const { client, provider, source, request } = setupRfq(network);
     provider.quoteExactIn.mockImplementation(() => new Promise(() => {}));
-    const pending = client.quoteExactIn(request);
+    const pending = client.quoteExactIn(request).catch((error: unknown) => error);
     await vi.advanceTimersByTimeAsync(2000);
     const quote = await pending;
-    expect(quote.rfq).toBeUndefined();
-    expect(quote.estimatedAmountOut).toBe(685687466535n);
+    if (network === "mainnet") {
+      expect(quote).toMatchObject({ code: "NO_ROUTE", cause: expect.any(AggregateError) });
+      expect(source.getAccounts).not.toHaveBeenCalled();
+    } else expect(quote).toMatchObject({ estimatedAmountOut: 685687466535n });
+    expect(quote).not.toHaveProperty("rfq");
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each(["declined", "expired", "invalid"])("rejects a %s mainnet RFQ without CLAMM reads", async (failure) => {
+    const { client, provider, source, request } = setupRfq("mainnet");
+    const quote = response(request);
+    if (failure === "declined") provider.quoteExactIn.mockRejectedValue(new Error("declined"));
+    else provider.quoteExactIn.mockResolvedValue(failure === "expired"
+      ? { ...quote, terms: { ...quote.terms, expiryMs: BigInt(nowMs) } }
+      : { ...quote, estimatedAmountOut: 0n });
+    await expect(client.quoteExactIn(request)).rejects.toMatchObject({ code: "NO_ROUTE" });
+    expect(source.getAccounts).not.toHaveBeenCalled();
+    expect(provider.quoteExactIn).toHaveBeenCalledOnce();
   });
 
   it.each([false, true])("rechecks expiry after slower CLAMM reads, CLAMM fails=%s", async (failClamm) => {
@@ -256,6 +275,7 @@ describe("RFQ validation and excluded paths", () => {
     });
     const mainnet = createRouterClient({ source, network: "mainnet", propAmmQuoteProvider: provider });
     const quote = await mainnet.quoteExactIn(input);
+    expect(source.getAccounts).not.toHaveBeenCalled();
     expect(quote.rfq).toEqual({ quoteId: "rfq-1" });
     expect(provider.quoteExactIn).toHaveBeenCalledExactlyOnceWith({
       inputMint: input.inputMint, outputMint: input.outputMint, amountIn: input.amountIn, user: input.user,
@@ -270,7 +290,8 @@ describe("RFQ validation and excluded paths", () => {
       deriveAddress(deployment.programId, "vault", config, decodeAddress(MAINNET_MINTS.aUSD)),
     ]);
     provider.quoteExactIn.mockClear();
-    await expect(mainnet.quoteForOutput({ ...input, amountOut: 1000n })).rejects.toThrow();
+    await expect(mainnet.quoteForOutput({ ...input, amountOut: 1000n })).rejects.toMatchObject({ code: "NO_ROUTE" });
+    expect(source.getAccounts).not.toHaveBeenCalled();
     expect(provider.quoteExactIn).not.toHaveBeenCalled();
   });
 

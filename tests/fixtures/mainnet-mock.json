@@ -1,0 +1,41 @@
+{
+  "network": "mainnet",
+  "rpc_url": "https://rpc.mainnet.arch.network",
+  "vault_program": "oTYPbygytAwGa7F4SG8gDAXigFF4zyuUKGqfdXEdyL5",
+  "propamm_program": "FD4NxsLrf1fmp4dmDLvNsdHG6hXNiDrRqAtqTBu1CsKR",
+  "clamm": null,
+  "vaults": [
+    {
+      "address": "517KVAu3DSJFHF5e1PB5nWEbcspZdYWLyYsjnhcxrdcZ",
+      "address_hex": "3b75e46e04807e31026b39dece0d84cfb4f4bb9c584d3da7a6690382b4d02296",
+      "asset": {
+        "symbol": "aBTCmock",
+        "decimals": 8,
+        "mint": "34hfkQLEgde9PnXsZsvLF2C3dHfAMk6W37T38pouGfWt",
+        "mint_hex": "1eaa198db04e7137c738228c2f4900e5908f7fd1d81ac7dda086033bff6999b5"
+      },
+      "share": {
+        "symbol": "primeBTCmock",
+        "decimals": 8,
+        "mint": "DxPxKTwCmbo9cSB7PURCEz7XtC9ujNmBpZ2A9vKeUzjb",
+        "mint_hex": "c07d243aa4a5bc3eea09a2e2f8f2f5cdd93a0afc9a94a76d4ae86754ad88bbb2"
+      }
+    },
+    {
+      "address": "C48s4JBQRLMvCUQ9GK351GRFMfc4XaCwiwUhZFnXxRWd",
+      "address_hex": "a43e307c2c5fc914f447c3d46b0ba195f39d819d33fb57eb3095233ceb3ea32e",
+      "asset": {
+        "symbol": "aUSDmock",
+        "decimals": 6,
+        "mint": "6zNA6ZSagjn4ti3Vwu1ep3d5aMEFWsXecn4Biy1H9JYr",
+        "mint_hex": "58fc767d29d154c49e08fc807105379eba52513a43e463764b19c528f0f8495b"
+      },
+      "share": {
+        "symbol": "primeUSDmock",
+        "decimals": 6,
+        "mint": "AB362tcseFQ5prM14MUid3q8w5KwyJ13ToS2174BD95P",
+        "mint_hex": "884b5995fc19235a7b2efcf1c2d0ea6f066400fe67b1cfeee6c7e43c6957dffe"
+      }
+    }
+  ]
+}

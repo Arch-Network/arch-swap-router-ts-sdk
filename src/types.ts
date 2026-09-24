@@ -70,7 +70,7 @@ export interface RouterClientOptions {
   /** Defaults to testnet. The supplied reader must use the same network. */
   readonly network?: Network;
   readonly source: RouterDataSource;
-  /** Optional exact-input alternative to CLAMM; must use the selected network. Each RFQ waits at most 2s. */
+  /** Required for swaps without CLAMM; must use the selected network. Each RFQ waits at most 2s. */
   readonly propAmmQuoteProvider?: PropAmmQuoteProvider;
 }
 
@@ -80,6 +80,6 @@ export interface RouterClient {
   readonly mints: NetworkMints | null;
   readonly supportedPairs: readonly { readonly inputMint: Address; readonly outputMint: Address }[];
   quoteExactIn(request: QuoteExactInRequest): Promise<SwapQuote>;
-  /** The returned transaction still spends a fixed input; output may vary within slippage. */
+  /** Fixed-input sizing; swap routes require CLAMM. Output may vary within slippage. */
   quoteForOutput(request: QuoteForOutputRequest): Promise<SwapQuote>;
 }

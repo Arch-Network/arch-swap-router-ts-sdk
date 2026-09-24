@@ -149,6 +149,7 @@ export function simulateClamm(pool: Pool, ticks: readonly InitializedTick[], amo
 
 export function loadClamm(accounts: AccountMap, aToB: boolean, { programs, venues }: NetworkConfig) {
   const venue = venues.clamm;
+  if (!venue) throw new RouterSdkError("NO_ROUTE", "CLAMM is not configured for this network.");
   const pool = decodePool(accountData(accounts, venue.address, programs.clammProgramId));
   if (pool.tokenMintA !== venue.tokenMintA || pool.tokenMintB !== venue.tokenMintB) {
     throw new RouterSdkError("INVALID_ACCOUNT", "CLAMM pool does not match the selected pair.");
