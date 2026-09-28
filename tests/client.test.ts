@@ -6,8 +6,8 @@ import type { Network } from "../src/index.js";
 import type { QuoteExactInRequest, QuoteForOutputRequest } from "../src/types.js";
 import { now, setup } from "./fixtures/quotes.js";
 import native from "./fixtures/clamm/native.json" with { type: "json" };
-// Copied unchanged from arch-swap-router 7083d30, deployments/mainnet-mock.json.
-import mock from "./fixtures/mainnet-mock.json" with { type: "json" };
+// Snapshot of arch-swap-router/deployments/mainnet.json, verified against RPC on 2026-09-28.
+import production from "./fixtures/mainnet.json" with { type: "json" };
 
 const source = () => ({ getAccounts: vi.fn(async () => { throw new Error("Unexpected read"); }) });
 const request = {
@@ -56,23 +56,32 @@ describe("compact router client", () => {
     expect(new Set(addresses).size).toBe(addresses.length);
     expect(MAINNET_VENUES.btcVault).toMatchObject({ assetMint: MAINNET_MINTS.aBTC, shareMint: MAINNET_MINTS.primeBTC });
     expect(MAINNET_VENUES.usdVault).toMatchObject({ assetMint: MAINNET_MINTS.aUSD, shareMint: MAINNET_MINTS.primeUSD });
-    expect(MAINNET_VENUES.clamm).toBeNull();
+    expect(MAINNET_VENUES.clamm).toMatchObject({ tokenMintA: MAINNET_MINTS.aUSD, tokenMintB: MAINNET_MINTS.aBTC });
     for (const mint of Object.values(MAINNET_MINTS)) expect(Object.values(TESTNET_MINTS)).not.toContain(mint);
   });
 
-  it("matches the native mock deployment and its canonical vault addresses", () => {
-    expect(MAINNET.routerProgramId).toBe("7PM5F8Hxkgws7wnXbpNL6VbXbzKJv2cowDWznNYgr62c");
-    expect(MAINNET.vaultProgramId).toBe(mock.vault_program);
-    expect(NETWORKS.mainnet.propamm.programId).toBe(mock.propamm_program);
-    expect(MAINNET_VENUES.clamm).toBe(mock.clamm);
+  it("matches the native production deployment and its canonical vault addresses", () => {
+    expect(MAINNET.routerProgramId).toBe(production.router_program);
+    expect(MAINNET.vaultProgramId).toBe(production.vault_program);
+    expect(NETWORKS.mainnet.propamm.programId).toBe(production.propamm_program);
+    expect(MAINNET.clammProgramId).toBe(production.clamm_program);
+    expect(NETWORKS.mainnet.propamm.config).toBe(production.propamm_config);
+    expect(MAINNET_VENUES.clamm).toEqual({ address: production.clamm.address,
+      tokenMintA: production.clamm.token_mint_a, tokenMintB: production.clamm.token_mint_b });
+    expect(Object.values(MAINNET_MINTS).sort()).toEqual(production.vaults.flatMap(v => [v.asset.mint, v.share.mint]).sort());
     for (const [i, venue] of [MAINNET_VENUES.btcVault, MAINNET_VENUES.usdVault].entries()) {
-      const vault = mock.vaults[i]!;
+      const vault = production.vaults[i]!;
       expect(venue).toEqual({ address: vault.address, assetMint: vault.asset.mint, shareMint: vault.share.mint });
       expect(deriveAddress(MAINNET.vaultProgramId, "vault", decodeAddress(venue.shareMint))).toBe(vault.address);
     }
   });
 
-  it.each(native.routes.slice(0, 4))("quotes mock vault $input → $output in either sizing mode", async (expected) => {
+  const reverseSymbols = { aBTC: "aUSD", aUSD: "aBTC", primeBTC: "primeUSD", primeUSD: "primeBTC" } as const;
+  const mainnetRoutes = native.routes.map(route => ({ ...route,
+    input: reverseSymbols[route.input as keyof typeof reverseSymbols],
+    output: reverseSymbols[route.output as keyof typeof reverseSymbols],
+  }));
+  it.each(mainnetRoutes)("quotes production $input → $output in either sizing mode", async (expected) => {
     vi.spyOn(Date, "now").mockReturnValue(Number(now) * 1000);
     const { client, source, request, accounts } = setup(undefined, "mainnet");
     const input = {
@@ -83,24 +92,46 @@ describe("compact router client", () => {
     expect(quote).toMatchObject({ estimatedAmountOut: BigInt(expected.amountOut), minAmountOut: BigInt(expected.minAmountOut) });
     expect(quote.instructions).toHaveLength(1);
     expect(quote.instructions[0]!.program_id).toEqual(decodeAddress(MAINNET.routerProgramId));
-    expect(quote.instructions[0]!.accounts[6]!.pubkey).toEqual(decodeAddress(mock.vault_program));
+    expect(quote.hops.map(hop => hop.estimatedAmountOut)).toEqual(expected.hops.map(BigInt));
+    const hasSwap = quote.hops.some(hop => hop.kind === "clamm");
+    const keys = quote.instructions[0]!.accounts.map(account => account.pubkey);
+    if (hasSwap) {
+      expect(keys).toContainEqual(decodeAddress(MAINNET.clammProgramId));
+      expect(keys).toContainEqual(decodeAddress(production.clamm.address));
+      expect(keys).toContainEqual(decodeAddress(production.clamm.token_vault_a));
+      expect(keys).toContainEqual(decodeAddress(production.clamm.token_vault_b));
+    }
+    if (quote.hops.some(hop => hop.kind.startsWith("vault"))) {
+      expect(keys).toContainEqual(decodeAddress(production.vault_program));
+    }
     expect(quote.rfq).toBeUndefined();
     const receive = await client.quoteForOutput({ ...input, amountOut: BigInt(expected.amountOut) });
     expect(receive.estimatedAmountOut).toBeGreaterThanOrEqual(BigInt(expected.amountOut));
     expect(receive.amountIn).toBeLessThanOrEqual(input.amountIn);
-    expect(source.getAccounts).toHaveBeenCalledTimes(2); // One batch per quote.
-    for (const [keys] of source.getAccounts.mock.calls) expect(keys).toHaveLength(4);
-    for (const vault of mock.vaults) for (const token of [vault.asset, vault.share]) {
+    expect(source.getAccounts).toHaveBeenCalledTimes(hasSwap ? 4 : 2); // Two quotes, shared batches.
+    const callsPerQuote = hasSwap ? 2 : 1;
+    for (let i = 0; i < source.getAccounts.mock.calls.length; i += callsPerQuote) {
+      const readKeys = source.getAccounts.mock.calls.slice(i, i + callsPerQuote).flatMap(([keys]) => keys);
+      expect(new Set(readKeys).size).toBe(readKeys.length);
+    }
+    for (const vault of production.vaults) for (const token of [vault.asset, vault.share]) {
       expect(accounts.get(token.mint)!.data[44]).toBe(token.decimals);
     }
   });
 
-  it.each(["quoteExactIn", "quoteForOutput"] as const)("rejects unavailable mainnet swap %s before reads", async (method) => {
+  it.each(["quoteExactIn", "quoteForOutput"] as const)("rejects retired mock mints and testnet mints in mainnet %s before reads", async (method) => {
     const reader = source();
     const client = createRouterClient({ source: reader, network: "mainnet" });
-    for (const inputMint of [MAINNET_MINTS.aBTC, MAINNET_MINTS.primeBTC]) {
-      await expect(client[method]({ ...request, inputMint, outputMint: MAINNET_MINTS.primeUSD, amountOut: 1000n }))
-        .rejects.toMatchObject({ code: "NO_ROUTE", message: expect.stringContaining(method === "quoteExactIn" ? "provider" : "Receive sizing") });
+    const retiredMints = [
+      "34hfkQLEgde9PnXsZsvLF2C3dHfAMk6W37T38pouGfWt", "DxPxKTwCmbo9cSB7PURCEz7XtC9ujNmBpZ2A9vKeUzjb",
+      "6zNA6ZSagjn4ti3Vwu1ep3d5aMEFWsXecn4Biy1H9JYr", "AB362tcseFQ5prM14MUid3q8w5KwyJ13ToS2174BD95P",
+    ];
+    for (const mint of [...retiredMints, ...Object.values(TESTNET_MINTS)]) {
+      for (const pair of [{ inputMint: mint, outputMint: MAINNET_MINTS.primeUSD },
+        { inputMint: MAINNET_MINTS.primeUSD, outputMint: mint }]) {
+        await expect(client[method]({ ...request, ...pair, amountOut: 1000n }))
+          .rejects.toMatchObject({ code: "UNSUPPORTED_PAIR" });
+      }
     }
     expect(reader.getAccounts).not.toHaveBeenCalled();
   });

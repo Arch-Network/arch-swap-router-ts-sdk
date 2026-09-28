@@ -2,8 +2,14 @@
 
 `client.test.ts` verifies request validation and unsupported/identical pairs,
 all before reads. It also covers default/explicit testnet metadata, immutable
-selection, unknown networks, valid mainnet placeholders, and both mainnet quote
-methods using their own reader and propagating failures.
+selection, unknown networks, production mainnet identities and mint decimals,
+and both mainnet quote methods using their own reader and propagating failures.
+`fixtures/mainnet.json` mirrors the router repository's production manifest,
+verified against mainnet RPC on 2026-09-28. All 12 mainnet paths reuse independent
+native math with production pool/mint identities and reversed aUSD/aBTC pool
+ordering. Both quote methods reject retired mock mints and testnet mints on
+mainnet before reading accounts. PropAMM tests cover production identities,
+shared account reads, RFQ selection and CLAMM fallback.
 `config/routes.test.ts` checks all 12 directed pairs against
 native fixture paths, operation/venue order, route continuity, unique mints,
 one-to-three-hop lengths, and immutable public pair metadata.

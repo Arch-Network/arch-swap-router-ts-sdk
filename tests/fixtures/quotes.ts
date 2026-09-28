@@ -5,6 +5,7 @@ import { NETWORKS, TESTNET, type Network } from "../../src/config/networks.js";
 import { decodeAddress, deriveAddress, U64_MAX } from "../../src/utils.js";
 import { namedFixture } from "../transactions/fixtures.js";
 import native from "./clamm/native.json" with { type: "json" };
+import mainnet from "./mainnet.json" with { type: "json" };
 import vaultContract from "./vault/contract.json" with { type: "json" };
 
 const bytes = (hex: string) => Uint8Array.from(hex.match(/../g)!, (b) => parseInt(b, 16));
@@ -18,6 +19,14 @@ export const now = 1_800_000_000n;
 export function setup(poolData = bytes(native.cases[0]!.pool), network: Network = "testnet") {
   const { programs, mints, venues } = NETWORKS[network];
   const accounts = new Map<string, AccountInfoResult | null>();
+  if (network === "mainnet") {
+    // Preserve independent native math vectors; replace only production pool identities.
+    poolData = poolData.slice();
+    for (const [offset, key] of [[101, mainnet.clamm.token_mint_a], [133, mainnet.clamm.token_vault_a],
+      [181, mainnet.clamm.token_mint_b], [213, mainnet.clamm.token_vault_b]] as const) {
+      poolData.set(decodeAddress(key), offset);
+    }
+  }
   if (venues.clamm) accounts.set(venues.clamm.address, info(poolData, programs.clammProgramId));
   for (const usd of [false, true]) {
     const venue = usd ? venues.usdVault : venues.btcVault;
@@ -34,7 +43,9 @@ export function setup(poolData = bytes(native.cases[0]!.pool), network: Network 
     }
     accounts.set(venue.address, info(vault, programs.vaultProgramId));
     for (const [mint, supply] of [[venue.assetMint, 1_000_000_000n], [venue.shareMint, 1_000_000_000_000n]] as const) {
-      const data = new Uint8Array(82); data[0] = 1; data[45] = 1; data[44] = network === "mainnet" && usd ? 6 : 8;
+      const data = new Uint8Array(82); data[0] = 1; data[45] = 1; data[44] = network === "mainnet"
+        ? mainnet.vaults.flatMap(vault => [vault.asset, vault.share]).find(token => token.mint === mint)!.decimals
+        : 8;
       data.set(decodeAddress(venue.address), 4); setU64(data, 36, supply);
       accounts.set(mint, info(data, programs.tokenProgramId));
     }

@@ -35,12 +35,11 @@ export const TESTNET_VENUES = Object.freeze({
   }),
 });
 
-// Demo on mainnet: arch-swap-router/deployments/mainnet-mock.json.
-// The router ID is the separately deployed mainnet-mock build; these are mock tokens.
+// Production mainnet: arch-swap-router/deployments/mainnet.json.
+// Mint decimals and vault/pool relationships verified against mainnet RPC on 2026-09-28.
 export const MAINNET = Object.freeze({
-  routerProgramId: "7PM5F8Hxkgws7wnXbpNL6VbXbzKJv2cowDWznNYgr62c",
-  vaultProgramId: "oTYPbygytAwGa7F4SG8gDAXigFF4zyuUKGqfdXEdyL5",
-  // Native router ABI ID only; no demo CLAMM pool is configured below.
+  routerProgramId: "F6YfVndxkgWQmjUmw6RGSxRqEDnMrf4iDBVZEjj9XbXq",
+  vaultProgramId: "HsqA4fgntUsFunNQZcpomqkm99yVGK5rnaiMCFewvCjk",
   clammProgramId: "BARRjgWSp8Gv8gTntfrGB74HwhsTCV32BAd3sjxESzK8",
   tokenProgramId: "TokenT4em53UrV4gSvZ3nCS2mZeHaqTLapwt6iZt6Mk",
   associatedTokenProgramId: "ATok9pxLsNzM5zJJ3UQpXBrMriHpZiY5Yio3GKYU4we3",
@@ -48,24 +47,28 @@ export const MAINNET = Object.freeze({
 } as const);
 
 export const MAINNET_MINTS = Object.freeze({
-  aBTC: "34hfkQLEgde9PnXsZsvLF2C3dHfAMk6W37T38pouGfWt", // aBTCmock, 8 decimals
-  aUSD: "6zNA6ZSagjn4ti3Vwu1ep3d5aMEFWsXecn4Biy1H9JYr", // aUSDmock, 6 decimals
-  primeBTC: "DxPxKTwCmbo9cSB7PURCEz7XtC9ujNmBpZ2A9vKeUzjb", // primeBTCmock, 8 decimals
-  primeUSD: "AB362tcseFQ5prM14MUid3q8w5KwyJ13ToS2174BD95P", // primeUSDmock, 6 decimals
+  aBTC: "AQigE59FdX7GigaFfQxeQP9ne3tVGBqMB5brL2aDFqPf", // 8 decimals
+  aUSD: "92Vu6DVnoeqgwexfVwDMseaZAe4PQzUQBBU2Rae1aDeS", // 6 decimals
+  primeBTC: "9pmws12nFPSrQCSULJEFgEPdfMQJvwYd8zHYEDeeeMUL", // 11 decimals
+  primeUSD: "6iP7qxSCdstPSvCatGj7rHNM9nEuYNHTAEkTSfeA4oWW", // 9 decimals
 } as const);
 
 export const MAINNET_VENUES = Object.freeze({
   btcVault: Object.freeze({
-    address: "517KVAu3DSJFHF5e1PB5nWEbcspZdYWLyYsjnhcxrdcZ",
+    address: "2eE2UTQ7tqjux2mn4T98eSp7wfevZEih2RyWy9syi9Ew",
     assetMint: MAINNET_MINTS.aBTC,
     shareMint: MAINNET_MINTS.primeBTC,
   }),
   usdVault: Object.freeze({
-    address: "C48s4JBQRLMvCUQ9GK351GRFMfc4XaCwiwUhZFnXxRWd",
+    address: "HTh2pWAxJs8ePThXBkFybYaZqBfrSFcRA2bVvyJpeyxc",
     assetMint: MAINNET_MINTS.aUSD,
     shareMint: MAINNET_MINTS.primeUSD,
   }),
-  clamm: null,
+  clamm: Object.freeze({
+    address: "FUt4zGu6edj6TfZUkWAWNAvd6oSM3omWviNKwh8qvkZi",
+    tokenMintA: MAINNET_MINTS.aUSD,
+    tokenMintB: MAINNET_MINTS.aBTC,
+  }),
 });
 
 export type Network = "testnet" | "mainnet";

@@ -1,0 +1,50 @@
+{
+  "network": "mainnet",
+  "rpc_url": "https://rpc.mainnet.arch.network",
+  "router_program": "F6YfVndxkgWQmjUmw6RGSxRqEDnMrf4iDBVZEjj9XbXq",
+  "vault_program": "HsqA4fgntUsFunNQZcpomqkm99yVGK5rnaiMCFewvCjk",
+  "propamm_program": "FD4NxsLrf1fmp4dmDLvNsdHG6hXNiDrRqAtqTBu1CsKR",
+  "clamm_program": "BARRjgWSp8Gv8gTntfrGB74HwhsTCV32BAd3sjxESzK8",
+  "vaults": [
+    {
+      "address": "2eE2UTQ7tqjux2mn4T98eSp7wfevZEih2RyWy9syi9Ew",
+      "address_hex": "1864e79c85629015bb5790e55e86ae11d0ddecb5814e6c483f2a2b8bc0fa2470",
+      "asset": {
+        "symbol": "aBTC",
+        "decimals": 8,
+        "mint": "AQigE59FdX7GigaFfQxeQP9ne3tVGBqMB5brL2aDFqPf",
+        "mint_hex": "8bccaa1be1b6ad6827509b9e4e18b98b709ddb8048370f62f86c16ea77596332"
+      },
+      "share": {
+        "symbol": "primeBTC",
+        "decimals": 11,
+        "mint": "9pmws12nFPSrQCSULJEFgEPdfMQJvwYd8zHYEDeeeMUL",
+        "mint_hex": "831a9d2a4315902ef5753fa78560174a2aea0bdc471d4baec9ef9c9d52cdc6b9"
+      }
+    },
+    {
+      "address": "HTh2pWAxJs8ePThXBkFybYaZqBfrSFcRA2bVvyJpeyxc",
+      "address_hex": "f4915affa4a7fb4b986bc429be697359368b0e21d21984846ba84c4e7c1e5051",
+      "asset": {
+        "symbol": "aUSD",
+        "decimals": 6,
+        "mint": "92Vu6DVnoeqgwexfVwDMseaZAe4PQzUQBBU2Rae1aDeS",
+        "mint_hex": "773fc05c4816f6c03f6ce45e78b8766addba6553df5966b3c366bf4c917016b3"
+      },
+      "share": {
+        "symbol": "primeUSD",
+        "decimals": 9,
+        "mint": "6iP7qxSCdstPSvCatGj7rHNM9nEuYNHTAEkTSfeA4oWW",
+        "mint_hex": "54e441b794139717cd96cf63d9617411705093f78d5b30ba910e3170308f6f4f"
+      }
+    }
+  ],
+  "propamm_config": "2J1NMyykgaiuL6zU4akynjtGGYyqgKQpvdpH8QB6q7ZL",
+  "clamm": {
+    "address": "FUt4zGu6edj6TfZUkWAWNAvd6oSM3omWviNKwh8qvkZi",
+    "token_mint_a": "92Vu6DVnoeqgwexfVwDMseaZAe4PQzUQBBU2Rae1aDeS",
+    "token_mint_b": "AQigE59FdX7GigaFfQxeQP9ne3tVGBqMB5brL2aDFqPf",
+    "token_vault_a": "3j9ToeLvp9QwAVtqfqsKanc1CqDnAZBvG6mK9Dmycs5w",
+    "token_vault_b": "EpFi8UuAk7TjBK4WSUD9mWeHXRMkf15mkua5ZatLS66X"
+  }
+}
