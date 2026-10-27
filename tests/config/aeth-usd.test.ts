@@ -1,26 +1,11 @@
-import { TransactionUtil, type RuntimeTransaction } from "@arch-network/arch-sdk";
+import { TransactionUtil } from "@arch-network/arch-sdk";
 import { base58, hex } from "@scure/base";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAINNET_AETH_USD as market } from "../../src/index.js";
 import { decodeAddress, deriveAddress, deriveProgramAddress } from "../../src/utils.js";
 import fixtures from "../fixtures/aeth-usd/transactions.json" with { type: "json" };
 
-function nativeTransaction(raw: string): RuntimeTransaction {
-  const data = hex.decode(raw), view = new DataView(data.buffer);
-  let offset = 0;
-  const take = (length: number) => { const result = data.slice(offset, offset + length); offset += length; return result; };
-  const u8 = () => take(1)[0]!;
-  const u32 = () => { const value = view.getUint32(offset, true); offset += 4; return value; };
-  const version = u32(), signatures = Array.from({ length: u8() }, () => take(64));
-  const header = { num_required_signatures: u8(), num_readonly_signed_accounts: u8(), num_readonly_unsigned_accounts: u8() };
-  const account_keys = Array.from({ length: u32() }, () => take(32));
-  const recent_blockhash = take(32);
-  const instructions = Array.from({ length: u32() }, () => ({
-    program_id_index: u8(), accounts: Array.from(take(u32())), data: take(u32()),
-  }));
-  expect(offset).toBe(data.length);
-  return { version, signatures, message: { header, account_keys, recent_blockhash, instructions } };
-}
+import { nativeTransaction } from "../fixtures/aeth-usd/transactions.js";
 
 const ata = (mint: string) => deriveProgramAddress([
   decodeAddress(fixtures.user), decodeAddress(market.tokenProgramId), decodeAddress(mint),
