@@ -5,7 +5,7 @@ import { loadClamm, prepareClammQuote } from "./clamm.js";
 import { quotePropAmm } from "./propamm.js";
 import { buildPropAmmInstructions, buildRouterInstruction } from "./transactions/instructions.js";
 import type { ResolvedStep } from "./transactions/types.js";
-import type { QuoteExactInRequest, QuoteForOutputRequest, RouterClient, RouterClientOptions, SwapQuote } from "./types.js";
+import type { QuoteExactInRequest, QuoteForOutputRequest, RouterClient, RouterClientOptions, RouterSwapQuote } from "./types.js";
 import { decodeAddress, deriveAddress, inputForOutput, readAccounts, U64_MAX } from "./utils.js";
 import { prepareVaultQuote } from "./vault.js";
 
@@ -15,7 +15,7 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
   }
   const config: NetworkConfig | null = NETWORKS[network];
   const routes = config ? fixedRoutes(config.mints) : [];
-  async function quote(request: QuoteExactInRequest | QuoteForOutputRequest, amount: bigint, forOutput: boolean): Promise<SwapQuote> {
+  async function quote(request: QuoteExactInRequest | QuoteForOutputRequest, amount: bigint, forOutput: boolean): Promise<RouterSwapQuote> {
     if (!config) throw new RouterSdkError("NETWORK_NOT_CONFIGURED", `${network} deployment is not configured.`);
     const { programs, venues } = config;
     const { inputMint, outputMint, slippageBps, user, deadlineMs } = request;
@@ -54,7 +54,7 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
       ? undefined
       : prepareVaultQuote(accounts, venues[step.venue], step.operation, now, programs));
     const swapInput = propamm && swapIndex > 0 ? vaults[0]!.estimate(amount) : amount;
-    const buildQuote = (amountIn: bigint, amountsOut: readonly bigint[], steps: readonly ResolvedStep[], effectiveDeadline = deadlineMs, quoteId?: string): SwapQuote => {
+    const buildQuote = (amountIn: bigint, amountsOut: readonly bigint[], steps: readonly ResolvedStep[], effectiveDeadline = deadlineMs, quoteId?: string): RouterSwapQuote => {
       const amountOut = amountsOut[amountsOut.length - 1]!;
       const minAmountOut = amountOut * BigInt(10_000 - slippageBps) / 10_000n;
       if (minAmountOut === 0n) throw new RouterSdkError("ZERO_OUTPUT", "Slippage leaves a zero minimum output.");

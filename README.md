@@ -72,13 +72,22 @@ replace those before using mainnet vault routes. The client still exposes all
 network; there is no testnet fallback.
 Account validation, PDA/ATA derivation and instructions use the selected deployment.
 
-The `SwapQuote` contains `inputMint`, `outputMint`, `amountIn`,
-`estimatedAmountOut`, `minAmountOut`, `hops`, `instructions`, and `deadlineMs`, plus
-`rfq: { quoteId }` only when PropAMM wins.
-Amounts use raw `bigint` units and addresses use base58 strings.
+`SwapQuote` is a union of `RouterSwapQuote` and `ServerTransactionSwapQuote`.
+Both contain `inputMint`, `outputMint`, `amountIn`, `estimatedAmountOut`,
+`minAmountOut`, `hops`, and `deadlineMs`. Amounts use raw `bigint` units and
+addresses use base58 strings.
+
+- `RouterSwapQuote` contains `instructions` and optional `rfq: { quoteId }` when
+  PropAMM wins. Existing quote objects omit `execution`; its optional value is `"router"`.
+- `ServerTransactionSwapQuote` has `execution: "serverTransaction"`, the original
+  unsigned `transaction`, and required `rfq: { quoteId }`. It has no `instructions`.
+
+Check `quote.execution === "serverTransaction"` before accessing router
+instructions. See [Direct RFQ transaction contracts](#direct-rfq-transaction-contracts)
+for the new provider contract and current integration status.
 
 `hops` is an ordered `SwapHop[]` for the selected route. Each hop contains `kind`
-(`vaultMint`, `vaultRedeem`, `clamm`, or `propamm`), `inputMint`, `outputMint`,
+(`vaultMint`, `vaultRedeem`, `clamm`, `propamm`, or `treasuryMint`), `inputMint`, `outputMint`,
 `amountIn`, and `estimatedAmountOut`. Only the first input is fixed; later inputs
 are the preceding hop's estimated output. The last hop's output matches the
 overall estimate, with slippage applied only to the final `minAmountOut`.
@@ -86,7 +95,7 @@ Both quote methods include hops without extra account or RFQ requests.
 
 `quoteForOutput` finds the smallest valid input whose estimated output reaches
 `amountOut`. Integer rounding can make the estimate larger than the requested
-amount. It returns the same `SwapQuote`, with the calculated fixed `amountIn`;
+amount. It returns a `RouterSwapQuote`, with the calculated fixed `amountIn`;
 slippage is applied once to `estimatedAmountOut`. For an estimate of 100 tokens
 and 50 BPS slippage, the minimum is 99.5 tokens, subject to raw-unit rounding.
 This is approximate receive sizing: execution spends the fixed input and may
@@ -137,7 +146,7 @@ two-instruction compute allowance needed by the tested three-hop execution.
 Do not replace it with a compute-budget instruction; the signing server accepts
 only the canonical input-ATA/router bundle.
 
-The application owns quote refresh, final transaction sizing and compilation,
+For instruction-based router quotes, the application owns quote refresh, final transaction sizing and compilation,
 blockhashes, signing, submission, deadline handling, and confirmation. The SDK
 provides estimates and instruction encoding, not execution preflight.
 
@@ -163,8 +172,12 @@ declare const recentBlockhash: Uint8Array; // Fetched by the application.
 
 const router = createRouterClient({ source, propAmmQuoteProvider });
 const quote = await router.quoteExactIn(request);
-const message = compileRouterMessage(quote.instructions, request.user, recentBlockhash);
-// Sign this message with the user's wallet. quote.rfq selects RFQ server submission.
+if (quote.execution === "serverTransaction") {
+  // Sign quote.transaction.message unchanged and submit under quote.rfq.quoteId.
+} else {
+  const message = compileRouterMessage(quote.instructions, request.user, recentBlockhash);
+  // Sign this message with the user's wallet. quote.rfq selects RFQ server submission.
+}
 ```
 
 `quoteExactIn` compares at most two candidates along the existing fixed path.
@@ -202,7 +215,7 @@ this SDK version. Vault seeds are `["vault", config, mint]`; config and nonce
 addresses stay fixed during subsequent signer rotations. Only `quoteSigner`
 changes between quotes, so rotation needs no SDK release or additional RPC read.
 
-For an RFQ winner, compile with **`compileRouterMessage`**, which corrects
+For a router RFQ winner, compile with **`compileRouterMessage`**, which corrects
 arch-sdk 0.0.28's insertion ordering to the Rust account ordering required by the
 signing server. Sign the resulting router message with the user, then send
 `POST /rfq/swap` with `{ quote_id: quote.rfq.quoteId, version: 0,
@@ -244,3 +257,47 @@ tests do not establish live compatibility.
 Package/browser verification and live smoke coverage remain later work. The
 package stays private, exports only its root entry point, and has no wallet,
 transport, graph-discovery, or ranking framework.
+
+## Direct RFQ transaction contracts
+
+`DirectRfqQuoteProvider` defines an application-owned provider for the fixed
+`MAINNET_AETH_USD` market. Its `quoteExactIn` receives the full
+`QuoteExactInRequest`, including `slippageBps` and `deadlineMs`, and returns:
+
+```ts
+interface DirectRfqQuote {
+  transaction: RuntimeTransaction; // Original unsigned server transaction.
+  quoteId: string;
+  expiresAtMs: bigint; // Unix milliseconds from the server.
+  estimatedAmountOut: bigint; // Raw output token units.
+}
+```
+
+The optional `RouterClientOptions.directRfqQuoteProvider` reserves this contract.
+The client does not call it or expose ETH/USD routes yet; validation and dispatch
+are implemented in subsequent tasks. Existing `propAmmQuoteProvider` behavior is
+unchanged.
+
+Consumers must narrow the quote result before deciding how to sign:
+
+```ts
+import { compileRouterMessage, type SwapQuote } from "@arch-network/swap-router-sdk";
+
+declare const quote: SwapQuote;
+declare const user: string;
+declare const recentBlockhash: Uint8Array;
+
+if (quote.execution === "serverTransaction") {
+  const { transaction, rfq } = quote;
+  // Sign transaction.message exactly as returned, then submit the user-signed
+  // transaction to /rfq/swap with quote_id: rfq.quoteId before quote.deadlineMs.
+  // Do not replace its blockhash, recompile its message or append instructions.
+} else {
+  const message = compileRouterMessage(quote.instructions, user, recentBlockhash);
+  // Existing router signing/submission path.
+}
+```
+
+`deadlineMs` on a server-transaction result is a client submission deadline;
+it must not be written into the original message. The SDK does not own HTTP
+transport, wallet signing or submission.
