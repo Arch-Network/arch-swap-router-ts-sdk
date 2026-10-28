@@ -7,7 +7,8 @@ One quote call returns one estimate with its
 instructions, sized from either a fixed input or an approximate receive amount.
 Supported pairs use explicit one-to-three-hop routes
 through the two vaults and the aBTC/aUSD CLAMM, with optional PropAMM RFQs for
-exact-input swaps on either network.
+exact-input swaps on either network. An optional mainnet direct RFQ provider adds
+aUSD ↔ aETH exact-input swaps using the original server transactions.
 
 **Current status:** all 12 fixed directions have estimates and instructions,
 including direct CLAMM and two-/three-hop routes. Unsupported or identical mint
@@ -72,13 +73,22 @@ replace those before using mainnet vault routes. The client still exposes all
 network; there is no testnet fallback.
 Account validation, PDA/ATA derivation and instructions use the selected deployment.
 
-The `SwapQuote` contains `inputMint`, `outputMint`, `amountIn`,
-`estimatedAmountOut`, `minAmountOut`, `hops`, `instructions`, and `deadlineMs`, plus
-`rfq: { quoteId }` only when PropAMM wins.
-Amounts use raw `bigint` units and addresses use base58 strings.
+`SwapQuote` is a union of `RouterSwapQuote` and `ServerTransactionSwapQuote`.
+Both contain `inputMint`, `outputMint`, `amountIn`, `estimatedAmountOut`,
+`minAmountOut`, `hops`, and `deadlineMs`. Amounts use raw `bigint` units and
+addresses use base58 strings.
+
+- `RouterSwapQuote` contains `instructions` and optional `rfq: { quoteId }` when
+  PropAMM wins. Existing quote objects omit `execution`; its optional value is `"router"`.
+- `ServerTransactionSwapQuote` has `execution: "serverTransaction"`, the original
+  unsigned `transaction`, and required `rfq: { quoteId }`. It has no `instructions`.
+
+Check `quote.execution === "serverTransaction"` before accessing router
+instructions. See [Direct RFQ transaction contracts](#direct-rfq-transaction-contracts)
+for the new provider contract and current integration status.
 
 `hops` is an ordered `SwapHop[]` for the selected route. Each hop contains `kind`
-(`vaultMint`, `vaultRedeem`, `clamm`, or `propamm`), `inputMint`, `outputMint`,
+(`vaultMint`, `vaultRedeem`, `clamm`, `propamm`, or `treasuryMint`), `inputMint`, `outputMint`,
 `amountIn`, and `estimatedAmountOut`. Only the first input is fixed; later inputs
 are the preceding hop's estimated output. The last hop's output matches the
 overall estimate, with slippage applied only to the final `minAmountOut`.
@@ -86,14 +96,15 @@ Both quote methods include hops without extra account or RFQ requests.
 
 `quoteForOutput` finds the smallest valid input whose estimated output reaches
 `amountOut`. Integer rounding can make the estimate larger than the requested
-amount. It returns the same `SwapQuote`, with the calculated fixed `amountIn`;
+amount. It returns a `RouterSwapQuote`, with the calculated fixed `amountIn`;
 slippage is applied once to `estimatedAmountOut`. For an estimate of 100 tokens
 and 50 BPS slippage, the minimum is 99.5 tokens, subject to raw-unit rounding.
 This is approximate receive sizing: execution spends the fixed input and may
 receive less than the target within slippage. It is not exact-output execution
 with a maximum-input allowance.
 
-Both methods support all 12 pairs. Receive sizing reuses the fetched, decoded
+Both methods support all 12 existing pairs. The two optional ETH/USD directions
+support `quoteExactIn` only. Receive sizing reuses the fetched, decoded
 state for a bounded local search; the read counts below are unchanged. Targets
 outside the vault/CLAMM limits reject instead of returning a partial quote.
 
@@ -137,7 +148,7 @@ two-instruction compute allowance needed by the tested three-hop execution.
 Do not replace it with a compute-budget instruction; the signing server accepts
 only the canonical input-ATA/router bundle.
 
-The application owns quote refresh, final transaction sizing and compilation,
+For instruction-based router quotes, the application owns quote refresh, final transaction sizing and compilation,
 blockhashes, signing, submission, deadline handling, and confirmation. The SDK
 provides estimates and instruction encoding, not execution preflight.
 
@@ -163,8 +174,12 @@ declare const recentBlockhash: Uint8Array; // Fetched by the application.
 
 const router = createRouterClient({ source, propAmmQuoteProvider });
 const quote = await router.quoteExactIn(request);
-const message = compileRouterMessage(quote.instructions, request.user, recentBlockhash);
-// Sign this message with the user's wallet. quote.rfq selects RFQ server submission.
+if (quote.execution === "serverTransaction") {
+  // Sign quote.transaction.message unchanged and submit under quote.rfq.quoteId.
+} else {
+  const message = compileRouterMessage(quote.instructions, request.user, recentBlockhash);
+  // Sign this message with the user's wallet. quote.rfq selects RFQ server submission.
+}
 ```
 
 `quoteExactIn` compares at most two candidates along the existing fixed path.
@@ -202,7 +217,7 @@ this SDK version. Vault seeds are `["vault", config, mint]`; config and nonce
 addresses stay fixed during subsequent signer rotations. Only `quoteSigner`
 changes between quotes, so rotation needs no SDK release or additional RPC read.
 
-For an RFQ winner, compile with **`compileRouterMessage`**, which corrects
+For a router RFQ winner, compile with **`compileRouterMessage`**, which corrects
 arch-sdk 0.0.28's insertion ordering to the Rust account ordering required by the
 signing server. Sign the resulting router message with the user, then send
 `POST /rfq/swap` with `{ quote_id: quote.rfq.quoteId, version: 0,
@@ -244,3 +259,80 @@ tests do not establish live compatibility.
 Package/browser verification and live smoke coverage remain later work. The
 package stays private, exports only its root entry point, and has no wallet,
 transport, graph-discovery, or ranking framework.
+
+## Direct RFQ transaction contracts
+
+`DirectRfqQuoteProvider` defines an application-owned provider for the fixed
+`MAINNET_AETH_USD` market. Its `quoteExactIn` receives the full
+`QuoteExactInRequest`, including `slippageBps` and `deadlineMs`, and returns:
+
+```ts
+interface DirectRfqQuote {
+  transaction: RuntimeTransaction; // Original unsigned server transaction.
+  quoteId: string;
+  expiresAtMs: bigint; // Unix milliseconds from the server.
+  estimatedAmountOut: bigint; // Raw output token units.
+}
+```
+
+Supply `directRfqQuoteProvider` with `network: "mainnet"` to add exactly two
+directions to `supportedPairs` (14 total): aUSD → aETH and aETH → aUSD.
+Use `MAINNET_AETH_USD.quoteMint` and `.baseMint` for these requests; the legacy
+`router.mints` configuration is separate. Both tokens use 6 decimal places.
+
+```ts
+import { createRouterClient, MAINNET_AETH_USD, type DirectRfqQuoteProvider,
+  type RouterDataSource } from "@arch-network/swap-router-sdk";
+
+declare const source: RouterDataSource;
+declare const directRfqQuoteProvider: DirectRfqQuoteProvider;
+declare const user: string;
+
+const router = createRouterClient({ network: "mainnet", source, directRfqQuoteProvider });
+const buy = await router.quoteExactIn({
+  inputMint: MAINNET_AETH_USD.quoteMint, outputMint: MAINNET_AETH_USD.baseMint,
+  amountIn: 1_000_000n, slippageBps: 100, user, deadlineMs: Date.now() + 30_000,
+});
+// For a sell, reverse the mints and provide the raw aETH input amount.
+```
+
+The client validates the request before calling the provider once, with a
+two-second timeout. It validates the response's fixed programs, accounts, amounts,
+signers, expiry and signed transaction size before returning it. Buys return the
+exact encoded mint payout as both estimate and minimum; sells return the signed
+output minimum after checking the requested slippage floor. Provider errors,
+invalid transactions and expiry errors propagate without retries or fallback.
+There are no account-reader calls on this path.
+
+Clients without this provider retain their existing pairs. The direct provider
+is inactive on testnet. ETH/USD receive sizing and other ETH combinations reject
+with `UNSUPPORTED_PAIR`. Existing `propAmmQuoteProvider` behavior is unchanged.
+
+Consumers must narrow the quote result before deciding how to sign:
+
+```ts
+import { compileRouterMessage, type SwapQuote } from "@arch-network/swap-router-sdk";
+
+declare const quote: SwapQuote;
+declare const user: string;
+declare const recentBlockhash: Uint8Array;
+
+if (quote.execution === "serverTransaction") {
+  const { transaction, rfq } = quote;
+  // Sign transaction.message exactly as returned, then submit the user-signed
+  // transaction to /rfq/swap with quote_id: rfq.quoteId before quote.deadlineMs.
+  // Do not replace its blockhash, recompile its message or append instructions.
+} else {
+  const message = compileRouterMessage(quote.instructions, user, recentBlockhash);
+  // Existing router signing/submission path.
+}
+```
+
+`deadlineMs` on a server-transaction result is a client submission deadline;
+it must not be written into the original message. The SDK does not own HTTP
+transport, wallet signing or submission.
+
+See [AETH_AUSD_SDK_HANDOVER.md](AETH_AUSD_SDK_HANDOVER.md) for the fixed deployment,
+HTTP provider mapping, signing/submission contract and offline verification evidence.
+The [working example](examples/README.md) wires HTTP, wallet signing, submission,
+confirmation and explicit retries; its mocked tests cover both directions.

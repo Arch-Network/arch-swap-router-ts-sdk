@@ -1,5 +1,11 @@
 # Router SDK implementation handover
 
+For the mainnet aETH/aUSD direct RFQ extension, use
+[AETH_AUSD_SDK_HANDOVER.md](AETH_AUSD_SDK_HANDOVER.md) and the current
+[README](README.md#direct-rfq-transaction-contracts). The checkpoint notes below
+predate mainnet configuration and the `SwapQuote` union; use the README for the
+current public API and network behavior.
+
 Start with [SIMPLIFICATION_PLAN.md](SIMPLIFICATION_PLAN.md) for the agreed scope
 and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for checkpoints and evidence.
 The older graph/ranking design has been replaced by explicit fixed routes.
