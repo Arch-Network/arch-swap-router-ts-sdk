@@ -7,7 +7,8 @@ One quote call returns one estimate with its
 instructions, sized from either a fixed input or an approximate receive amount.
 Supported pairs use explicit one-to-three-hop routes
 through the two vaults and the aBTC/aUSD CLAMM, with optional PropAMM RFQs for
-exact-input swaps on either network.
+exact-input swaps on either network. An optional mainnet direct RFQ provider adds
+aUSD ↔ aETH exact-input swaps using the original server transactions.
 
 **Current status:** all 12 fixed directions have estimates and instructions,
 including direct CLAMM and two-/three-hop routes. Unsupported or identical mint
@@ -102,7 +103,8 @@ This is approximate receive sizing: execution spends the fixed input and may
 receive less than the target within slippage. It is not exact-output execution
 with a maximum-input allowance.
 
-Both methods support all 12 pairs. Receive sizing reuses the fetched, decoded
+Both methods support all 12 existing pairs. The two optional ETH/USD directions
+support `quoteExactIn` only. Receive sizing reuses the fetched, decoded
 state for a bounded local search; the read counts below are unchanged. Targets
 outside the vault/CLAMM limits reject instead of returning a partial quote.
 
@@ -273,10 +275,38 @@ interface DirectRfqQuote {
 }
 ```
 
-The optional `RouterClientOptions.directRfqQuoteProvider` reserves this contract.
-The client does not call it or expose ETH/USD routes yet; validation and dispatch
-are implemented in subsequent tasks. Existing `propAmmQuoteProvider` behavior is
-unchanged.
+Supply `directRfqQuoteProvider` with `network: "mainnet"` to add exactly two
+directions to `supportedPairs` (14 total): aUSD → aETH and aETH → aUSD.
+Use `MAINNET_AETH_USD.quoteMint` and `.baseMint` for these requests; the legacy
+`router.mints` configuration is separate. Both tokens use 6 decimal places.
+
+```ts
+import { createRouterClient, MAINNET_AETH_USD, type DirectRfqQuoteProvider,
+  type RouterDataSource } from "@arch-network/swap-router-sdk";
+
+declare const source: RouterDataSource;
+declare const directRfqQuoteProvider: DirectRfqQuoteProvider;
+declare const user: string;
+
+const router = createRouterClient({ network: "mainnet", source, directRfqQuoteProvider });
+const buy = await router.quoteExactIn({
+  inputMint: MAINNET_AETH_USD.quoteMint, outputMint: MAINNET_AETH_USD.baseMint,
+  amountIn: 1_000_000n, slippageBps: 100, user, deadlineMs: Date.now() + 30_000,
+});
+// For a sell, reverse the mints and provide the raw aETH input amount.
+```
+
+The client validates the request before calling the provider once, with a
+two-second timeout. It validates the response's fixed programs, accounts, amounts,
+signers, expiry and signed transaction size before returning it. Buys return the
+exact encoded mint payout as both estimate and minimum; sells return the signed
+output minimum after checking the requested slippage floor. Provider errors,
+invalid transactions and expiry errors propagate without retries or fallback.
+There are no account-reader calls on this path.
+
+Clients without this provider retain their existing pairs. The direct provider
+is inactive on testnet. ETH/USD receive sizing and other ETH combinations reject
+with `UNSUPPORTED_PAIR`. Existing `propAmmQuoteProvider` behavior is unchanged.
 
 Consumers must narrow the quote result before deciding how to sign:
 
@@ -301,3 +331,8 @@ if (quote.execution === "serverTransaction") {
 `deadlineMs` on a server-transaction result is a client submission deadline;
 it must not be written into the original message. The SDK does not own HTTP
 transport, wallet signing or submission.
+
+See [AETH_AUSD_SDK_HANDOVER.md](AETH_AUSD_SDK_HANDOVER.md) for the fixed deployment,
+HTTP provider mapping, signing/submission contract and offline verification evidence.
+The [working example](examples/README.md) wires HTTP, wallet signing, submission,
+confirmation and explicit retries; its mocked tests cover both directions.

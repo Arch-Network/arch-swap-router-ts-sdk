@@ -1,39 +1,56 @@
 import { fixedRoutes } from "./config/routes.js";
 import { NETWORKS, type NetworkConfig } from "./config/networks.js";
+import { MAINNET_AETH_USD as ethUsd } from "./config/aeth-usd.js";
+import { normalizeAethUsdBuy, normalizeAethUsdSell } from "./direct-rfq.js";
 import { RouterSdkError } from "./errors.js";
 import { loadClamm, prepareClammQuote } from "./clamm.js";
 import { quotePropAmm } from "./propamm.js";
 import { buildPropAmmInstructions, buildRouterInstruction } from "./transactions/instructions.js";
 import type { ResolvedStep } from "./transactions/types.js";
-import type { QuoteExactInRequest, QuoteForOutputRequest, RouterClient, RouterClientOptions, RouterSwapQuote } from "./types.js";
+import type { DirectRfqQuote, QuoteExactInRequest, QuoteForOutputRequest, RouterClient, RouterClientOptions, RouterSwapQuote, SwapQuote } from "./types.js";
 import { decodeAddress, deriveAddress, inputForOutput, readAccounts, U64_MAX } from "./utils.js";
 import { prepareVaultQuote } from "./vault.js";
 
-export function createRouterClient({ source, network = "testnet", propAmmQuoteProvider }: RouterClientOptions): RouterClient {
+function isAethUsdPair(inputMint: string, outputMint: string): boolean {
+  return (inputMint === ethUsd.quoteMint && outputMint === ethUsd.baseMint)
+    || (inputMint === ethUsd.baseMint && outputMint === ethUsd.quoteMint);
+}
+
+function validateRequest(request: QuoteExactInRequest | QuoteForOutputRequest, amount: bigint, forOutput: boolean): void {
+  for (const address of [request.inputMint, request.outputMint, request.user]) decodeAddress(address);
+  if (typeof amount !== "bigint" || amount <= 0n || amount > U64_MAX) {
+    throw new RouterSdkError("INVALID_REQUEST", `${forOutput ? "amountOut" : "amountIn"} must be a positive u64 bigint.`);
+  }
+  if (!Number.isInteger(request.slippageBps) || request.slippageBps < 0 || request.slippageBps > 9999) {
+    throw new RouterSdkError("INVALID_REQUEST", "slippageBps must be an integer in 0..9999.");
+  }
+  if (!Number.isSafeInteger(request.deadlineMs) || request.deadlineMs < 0) {
+    throw new RouterSdkError("INVALID_REQUEST", "deadlineMs must be a nonnegative safe integer.");
+  }
+}
+
+export function createRouterClient({ source, network = "testnet", propAmmQuoteProvider, directRfqQuoteProvider }: RouterClientOptions): RouterClient {
   if (!Object.hasOwn(NETWORKS, network)) {
     throw new RouterSdkError("INVALID_NETWORK", `Unknown network: ${network}.`);
   }
   const config: NetworkConfig | null = NETWORKS[network];
   const routes = config ? fixedRoutes(config.mints) : [];
+  const directProvider = network === "mainnet" ? directRfqQuoteProvider : undefined;
+  const directPairs = directProvider ? [
+    { inputMint: ethUsd.quoteMint, outputMint: ethUsd.baseMint },
+    { inputMint: ethUsd.baseMint, outputMint: ethUsd.quoteMint },
+  ] : [];
   async function quote(request: QuoteExactInRequest | QuoteForOutputRequest, amount: bigint, forOutput: boolean): Promise<RouterSwapQuote> {
     if (!config) throw new RouterSdkError("NETWORK_NOT_CONFIGURED", `${network} deployment is not configured.`);
     const { programs, venues } = config;
     const { inputMint, outputMint, slippageBps, user, deadlineMs } = request;
-    for (const address of [inputMint, outputMint, user]) decodeAddress(address);
-    if (typeof amount !== "bigint" || amount <= 0n || amount > U64_MAX) {
-      throw new RouterSdkError("INVALID_REQUEST", `${forOutput ? "amountOut" : "amountIn"} must be a positive u64 bigint.`);
-    }
-    if (!Number.isInteger(slippageBps) || slippageBps < 0 || slippageBps > 9999) {
-      throw new RouterSdkError("INVALID_REQUEST", "slippageBps must be an integer in 0..9999.");
-    }
-    if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 0) {
-      throw new RouterSdkError("INVALID_REQUEST", "deadlineMs must be a nonnegative safe integer.");
-    }
+    validateRequest(request, amount, forOutput);
     const route = routes.find(
       (route) => route.inputMint === inputMint && route.outputMint === outputMint,
     );
     if (!route) {
-      throw new RouterSdkError("UNSUPPORTED_PAIR", "The requested mint pair is not supported.");
+      throw new RouterSdkError("UNSUPPORTED_PAIR", forOutput && directProvider && isAethUsdPair(inputMint, outputMint)
+        ? "aETH/aUSD supports exact-input quotes only." : "The requested mint pair is not supported.");
     }
     const now = BigInt(Math.floor(Date.now() / 1000));
     const swapIndex = route.steps.findIndex((step) => step.venue === "clamm");
@@ -104,11 +121,32 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
       cause: new AggregateError([clamm.reason, rfq.status === "rejected" ? rfq.reason : new RouterSdkError("RFQ_EXPIRED", "PropAMM quote expired during selection.")]),
     });
   }
+  async function quoteExactIn(request: QuoteExactInRequest): Promise<SwapQuote> {
+    if (!directProvider || !isAethUsdPair(request.inputMint, request.outputMint)) return quote(request, request.amountIn, false);
+    // Keep the validated request stable across the provider's asynchronous call.
+    const input = { ...request };
+    validateRequest(input, input.amountIn, false);
+    if (input.deadlineMs <= Date.now()) throw new RouterSdkError("RFQ_EXPIRED", "Direct RFQ quote deadline has expired.");
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let rfq: DirectRfqQuote;
+    try {
+      rfq = await Promise.race([
+        Promise.resolve().then(() => directProvider.quoteExactIn({ ...input })),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new RouterSdkError("RFQ_TIMEOUT", "Direct RFQ quote exceeded 2 seconds.")), 2000);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+    return input.inputMint === ethUsd.quoteMint ? normalizeAethUsdBuy(input, rfq) : normalizeAethUsdSell(input, rfq);
+  }
+
   return Object.freeze<RouterClient>({
     network,
     mints: config?.mints ?? null,
-    supportedPairs: Object.freeze(routes.map(({ inputMint, outputMint }) => Object.freeze({ inputMint, outputMint }))),
-    quoteExactIn: (request) => quote(request, request.amountIn, false),
+    supportedPairs: Object.freeze([...routes, ...directPairs].map(({ inputMint, outputMint }) => Object.freeze({ inputMint, outputMint }))),
+    quoteExactIn,
     quoteForOutput: (request) => quote(request, request.amountOut, true),
   });
 }
