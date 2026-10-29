@@ -1,13 +1,13 @@
 // Exact-input subset of arch-swap's CLAMM helpers, checked against native Rust.
 // Provenance and independent fixtures: tests/fixtures/clamm/README.md.
-import { base58 } from "@scure/base";
+import { bytesToBase58, decodeI128LE, decodeU128LE } from "@arch-network/arch-sdk";
 import type { NetworkConfig } from "./config/networks.js";
 import type { Address } from "./types.js";
 import { RouterSdkError } from "./errors.js";
 import type { ResolvedStep } from "./transactions/types.js";
 import {
   accountData, decodeAddress, decodeMint, deriveAddress, divRoundUp,
-  readU128, u64, u128, u256, type AccountMap,
+  u64, u128, u256, type AccountMap,
 } from "./utils.js";
 
 const MIN_TICK = -443636, MAX_TICK = 443636, ARRAY_SIZE = 88;
@@ -53,7 +53,7 @@ export function decodePool(data: Uint8Array) {
   }
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   const tickSpacing = view.getUint16(41, true), tickCurrentIndex = view.getInt32(81, true);
-  const sqrtPrice = readU128(view, 65);
+  const sqrtPrice = decodeU128LE(data, 65);
   // A leftward crossing stores next_tick - 1, including at the minimum price.
   const priceTick = tickCurrentIndex === MIN_TICK - 1 ? MIN_TICK : tickCurrentIndex;
   if (tickSpacing === 0 || view.getUint16(43, true) !== tickSpacing
@@ -61,9 +61,9 @@ export function decodePool(data: Uint8Array) {
     || sqrtPrice > tickSqrtPrice(Math.min(tickCurrentIndex + 1, MAX_TICK))) {
     throw new RouterSdkError("INVALID_ACCOUNT", "Invalid CLAMM tick spacing or price.");
   }
-  const key = (offset: number) => base58.encode(data.subarray(offset, offset + 32));
+  const key = (offset: number) => bytesToBase58(data.subarray(offset, offset + 32));
   return {
-    tickSpacing, tickCurrentIndex, sqrtPrice, liquidity: readU128(view, 49), feeRate: view.getUint16(45, true),
+    tickSpacing, tickCurrentIndex, sqrtPrice, liquidity: decodeU128LE(data, 49), feeRate: view.getUint16(45, true),
     tokenMintA: key(101), tokenVaultA: key(133), tokenMintB: key(181), tokenVaultB: key(213),
   };
 }
@@ -89,7 +89,7 @@ export function decodeTickArray(data: Uint8Array, start: number, spacing: number
     throw new RouterSdkError("INVALID_ACCOUNT", "Invalid CLAMM tick array length or discriminator.");
   }
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-  if (view.getInt32(8, true) !== start || base58.encode(data.subarray(9956)) !== poolAddress) {
+  if (view.getInt32(8, true) !== start || bytesToBase58(data.subarray(9956)) !== poolAddress) {
     throw new RouterSdkError("INVALID_ACCOUNT", "Tick array does not match the selected pool/window.");
   }
   const ticks: InitializedTick[] = [];
@@ -99,7 +99,7 @@ export function decodeTickArray(data: Uint8Array, start: number, spacing: number
     if (data[offset] === 1) {
       const index = start + i * spacing;
       tickSqrtPrice(index);
-      ticks.push({ index, liquidityNet: readU128(view, offset + 1, true) });
+      ticks.push({ index, liquidityNet: decodeI128LE(data, offset + 1) });
     }
   }
   return ticks;
@@ -175,7 +175,7 @@ export function prepareClammQuote(state: ReturnType<typeof loadClamm>, accounts:
   const ticks = addresses.flatMap((address, i) => {
     const info = accounts.get(address);
     if (info === null) return []; // Confirmed absence is a native zeroed tick array.
-    if (info?.data.length === 0 && base58.encode(info.owner) === programs.systemProgramId && !info.is_executable) return [];
+    if (info?.data.length === 0 && bytesToBase58(info.owner) === programs.systemProgramId && !info.is_executable) return [];
     return decodeTickArray(accountData(accounts, address, programs.clammProgramId), starts[i]!, pool.tickSpacing, resolved.pool);
   }).sort((a, b) => resolved.aToB ? b.index - a.index : a.index - b.index);
   return { resolved, estimate(amountIn: bigint) {

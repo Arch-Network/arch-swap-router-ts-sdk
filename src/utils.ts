@@ -1,5 +1,7 @@
-import { PubkeyUtil, SanitizedMessageUtil, type AccountInfoResult, type AccountMeta, type Instruction, type Pubkey } from "@arch-network/arch-sdk";
-import { base58, hex } from "@scure/base";
+import {
+  base58ToBytes, bytesToBase58, bytesToHex, decodeAplMint, decodeAplTokenAccount, PubkeyUtil, SanitizedMessageUtil,
+  type AccountInfoResult, type AccountMeta, type Instruction, type Pubkey,
+} from "@arch-network/arch-sdk";
 import type { ProgramIds } from "./config/networks.js";
 import { RouterSdkError } from "./errors.js";
 import type { Address, RouterDataSource } from "./types.js";
@@ -27,11 +29,6 @@ export function u256(value: bigint): bigint {
 }
 
 export const divRoundUp = (value: bigint, divisor: bigint): bigint => (value + divisor - 1n) / divisor;
-
-export function readU128(view: DataView, offset: number, signed = false): bigint {
-  const high = signed ? view.getBigInt64(offset + 8, true) : view.getBigUint64(offset + 8, true);
-  return (high << 64n) + view.getBigUint64(offset, true);
-}
 
 export function mulDiv(a: bigint, b: bigint, divisor: bigint): bigint {
   const product = a * b;
@@ -84,7 +81,7 @@ export function assertIntegerRange(
 export function decodeAddress(address: Address): Pubkey {
   let bytes: Uint8Array;
   try {
-    bytes = base58.decode(address);
+    bytes = base58ToBytes(address);
   } catch (cause) {
     throw new RouterSdkError(
       "INVALID_ADDRESS",
@@ -92,7 +89,8 @@ export function decodeAddress(address: Address): Pubkey {
       { cause },
     );
   }
-  if (bytes.length !== 32) {
+  // base58ToBytes left-pads short values to 32 bytes; only the canonical 32-byte spelling round-trips.
+  if (bytesToBase58(bytes) !== address) {
     throw new RouterSdkError(
       "INVALID_ADDRESS",
       "Address must decode to exactly 32 bytes.",
@@ -113,8 +111,8 @@ export function compileRouterMessage(instructions: readonly Instruction[], user:
     num_readonly_unsigned_accounts: readonlyOthers } = message.header;
   const group = (i: number) => i === 0 ? 0 : i < signers - readonlySigners ? 1 : i < signers ? 2
     : i < message.account_keys.length - readonlyOthers ? 3 : 4;
-  // arch-sdk 0.0.28 uses insertion order; Rust uses a BTreeMap within each group.
-  const keys = message.account_keys.map((key, i) => ({ key, i, hex: hex.encode(key) }))
+  // arch-sdk uses insertion order; Rust uses a BTreeMap within each group.
+  const keys = message.account_keys.map((key, i) => ({ key, i, hex: bytesToHex(key) }))
     .sort((a, b) => group(a.i) - group(b.i) || (a.hex < b.hex ? -1 : a.hex > b.hex ? 1 : 0));
   const indices: number[] = [];
   keys.forEach(({ i }, index) => { indices[i] = index; });
@@ -131,11 +129,8 @@ export function deriveProgramAddress(
   seeds: readonly Uint8Array[],
   programId: Address,
 ): readonly [Address, number] {
-  const [address, bump] = PubkeyUtil.findProgramAddress(
-    [...seeds],
-    decodeAddress(programId),
-  );
-  return [base58.encode(address), bump];
+  const [address, bump] = PubkeyUtil.findProgramAddress(seeds, decodeAddress(programId));
+  return [bytesToBase58(address), bump];
 }
 
 export function deriveAddress(programId: Address, seed: string, ...seeds: Uint8Array[]): Address {
@@ -143,7 +138,7 @@ export function deriveAddress(programId: Address, seed: string, ...seeds: Uint8A
 }
 
 export function deriveAssociatedTokenAddress(owner: Address, mint: Address, programs: ProgramIds): Address {
-  return base58.encode(
+  return bytesToBase58(
     PubkeyUtil.getAssociatedTokenAddress(
       decodeAddress(mint),
       decodeAddress(owner),
@@ -183,36 +178,36 @@ export function accountData(
 ): Uint8Array {
   const info = accounts.get(address);
   if (!info) throw new RouterSdkError("MISSING_ACCOUNT", `Missing account ${address}.`);
-  if (base58.encode(info.owner) !== owner || info.is_executable) {
+  if (bytesToBase58(info.owner) !== owner || info.is_executable) {
     throw new RouterSdkError("INVALID_ACCOUNT", `Unexpected owner or executable state for ${address}.`);
   }
   return info.data;
 }
 
-/** Minimal APL readers, adapted from arch-vaults; provenance in tests/fixtures/vault/README.md. */
-function tokenData(data: Uint8Array, length: number, optionOffsets: readonly number[]): DataView {
+/**
+ * arch-sdk's APL decoders accept trailing bytes and any option tag; the router also requires the exact
+ * length and valid `COption` tags (provenance in tests/fixtures/vault/README.md).
+ */
+function checkTokenData(data: Uint8Array, length: number, optionOffsets: readonly number[]): void {
   if (data.length !== length) throw new RouterSdkError("INVALID_ACCOUNT", `Expected ${length} APL bytes.`);
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   if (optionOffsets.some((offset) => view.getUint32(offset, true) > 1)) {
     throw new RouterSdkError("INVALID_ACCOUNT", "Invalid APL option tag.");
   }
-  return view;
 }
 
 export function decodeMint(data: Uint8Array) {
-  const view = tokenData(data, 82, [0, 46]);
+  checkTokenData(data, 82, [0, 46]);
   if (data[45] !== 1) throw new RouterSdkError("INVALID_ACCOUNT", "Expected an initialized APL mint.");
-  return { supply: view.getBigUint64(36, true), decimals: data[44]! };
+  const { supply, decimals } = decodeAplMint(data);
+  return { supply, decimals };
 }
 
 export function decodeTokenAccount(data: Uint8Array) {
-  const view = tokenData(data, 165, [72, 109, 129]);
-  if (data[108] !== 1 && data[108] !== 2) {
+  checkTokenData(data, 165, [72, 109, 129]);
+  const { mint, owner, amount, state } = decodeAplTokenAccount(data);
+  if (state !== 1 && state !== 2) {
     throw new RouterSdkError("INVALID_ACCOUNT", "Expected an initialized APL token account.");
   }
-  return {
-    mint: base58.encode(data.subarray(0, 32)),
-    owner: base58.encode(data.subarray(32, 64)),
-    amount: view.getBigUint64(64, true),
-  };
+  return { mint: bytesToBase58(mint), owner: bytesToBase58(owner), amount };
 }

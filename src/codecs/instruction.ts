@@ -1,4 +1,4 @@
-import { SystemInstruction } from "@arch-network/arch-sdk";
+import { encodeU64LE } from "@arch-network/arch-sdk";
 import { RouterSdkError } from "../errors.js";
 import { assertIntegerRange, U64_MAX, U128_MAX } from "../utils.js";
 import type { RouteExactInV1Args, StepArgs } from "./types.js";
@@ -72,9 +72,9 @@ export function encodeRouteExactInV1(args: RouteExactInV1Args): Uint8Array {
     ROUTE_HEADER_LEN + steps.reduce((length, step) => length + step.length, 0),
   );
   data[0] = 0;
-  data.set(SystemInstruction.u64ToLeBytes(args.amountIn), 1);
-  data.set(SystemInstruction.u64ToLeBytes(args.minAmountOut), 9);
-  data.set(SystemInstruction.u64ToLeBytes(args.deadlineMs), 17);
+  data.set(encodeU64LE(args.amountIn), 1);
+  data.set(encodeU64LE(args.minAmountOut), 9);
+  data.set(encodeU64LE(args.deadlineMs), 17);
   data[25] = steps.length; // One-byte count, not a Borsh Vec length.
   let offset = ROUTE_HEADER_LEN;
   for (const step of steps) {
