@@ -1,0 +1,318 @@
+{
+  "address": "E5j9e2KTsP3cfde7ao8JvkCQzeMC2oKFB3JaaSVps2Uo",
+  "metadata": {
+    "name": "arch_swap_router",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Native Arch exact-input router for vault Mint, immediate Redeem, CLAMM and PropAMM swaps. Integers are little-endian; token amounts are raw atomic units."
+  },
+  "instructions": [
+    {
+      "name": "route_exact_in_v1",
+      "discriminator": [
+        0
+      ],
+      "docs": [
+        "One to three sequential steps; each hop consumes only the previous hop credit. The minimum is net final output since the route began.",
+        "RouteStepsV1 encodes the one-byte step count as an enum tag, followed by a fixed array. There is no u32 vector length.",
+        "After user and token_program, remaining accounts are step_count + 1 (mint, writable user ATA) pairs, then one venue group per step. All route mints and user ATAs must be distinct.",
+        "VaultMint group (6): vault_program, vault, reserve, protocol_fee_recipient_ata, manager_fee_recipient_ata, event_authority. The output share mint must be writable.",
+        "VaultRedeem group (9): vault_program, vault, reserve, escrow, redeem_entry, protocol_fee_recipient_ata, manager_fee_recipient_ata, event_authority, system_program. The input share mint must be writable.",
+        "ClammSwap group (8 + supplemental count): clamm_program, pool, pool_token_vault_a, pool_token_vault_b, tick_array_0, tick_array_1, tick_array_2, oracle, followed by supplemental tick arrays.",
+        "PropAmmSwap group (7): propamm_program, config, signing maker, writable user_nonce, writable base_vault, writable quote_vault, system_program. Buy spends quote and receives base; Sell spends base and receives quote. The native CPI receives the unchanged quote, measured hop input, and explicit min_out = 0; the router enforces the final minimum.",
+        "After all venue groups, optional trailer (2): associated_token_program, system_program, both read-only. When supplied, the user pays for idempotent creation of missing canonical user ATAs before balance snapshots. Existing valid ATAs are preserved; without the trailer all user ATAs must already exist. Venue accounts are not created by the router.",
+        "Mint and Redeem must fill immediately; amounts, minimum and deadline are checked by the program. Successful return data is RouteResultV1 with version 1."
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenT4em53UrV4gSvZ3nCS2mZeHaqTLapwt6iZt6Mk"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_in",
+          "type": "u64"
+        },
+        {
+          "name": "min_amount_out",
+          "type": "u64"
+        },
+        {
+          "name": "deadline_ms",
+          "type": "u64"
+        },
+        {
+          "name": "steps",
+          "type": {
+            "defined": {
+              "name": "RouteStepsV1"
+            }
+          }
+        }
+      ],
+      "returns": {
+        "defined": {
+          "name": "RouteResultV1"
+        }
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "RouteStepsV1",
+      "docs": [
+        "Enum tags 1, 2 and 3 are the native step count. Reserved tag 0 is rejected by the program."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Reserved"
+          },
+          {
+            "name": "One",
+            "fields": [
+              {
+                "name": "steps",
+                "type": {
+                  "array": [
+                    {
+                      "defined": {
+                        "name": "StepV1"
+                      }
+                    },
+                    1
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "Two",
+            "fields": [
+              {
+                "name": "steps",
+                "type": {
+                  "array": [
+                    {
+                      "defined": {
+                        "name": "StepV1"
+                      }
+                    },
+                    2
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "Three",
+            "fields": [
+              {
+                "name": "steps",
+                "type": {
+                  "array": [
+                    {
+                      "defined": {
+                        "name": "StepV1"
+                      }
+                    },
+                    3
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "StepV1",
+      "docs": [
+        "Native one-byte step tags: Mint=0, Redeem=1, CLAMM=2, PropAMM=3. At most one PropAMM step per route; both user and maker signatures are required."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "VaultMint"
+          },
+          {
+            "name": "VaultRedeem"
+          },
+          {
+            "name": "ClammSwap",
+            "fields": [
+              {
+                "name": "a_to_b",
+                "type": "bool"
+              },
+              {
+                "name": "sqrt_price_limit",
+                "type": "u128"
+              },
+              {
+                "name": "supplemental_tick_array_count",
+                "type": "u8"
+              }
+            ]
+          },
+          {
+            "name": "PropAmmSwap",
+            "fields": [
+              {
+                "name": "side",
+                "type": {
+                  "defined": {
+                    "name": "Side"
+                  }
+                }
+              },
+              {
+                "name": "quoted_base_amount",
+                "type": "u64"
+              },
+              {
+                "name": "quoted_quote_amount",
+                "type": "u64"
+              },
+              {
+                "name": "expiry_ms",
+                "type": "u64"
+              },
+              {
+                "name": "nonce",
+                "type": "u64"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Side",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Buy"
+          },
+          {
+            "name": "Sell"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RouteResultV1",
+      "docs": [
+        "17-byte successful return data. Check transaction success, return-data program ID and version == 1 before using the amounts."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "amount_in",
+            "type": "u64"
+          },
+          {
+            "name": "amount_out",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 1,
+      "name": "InvalidInstruction",
+      "msg": "Invalid instruction encoding"
+    },
+    {
+      "code": 2,
+      "name": "InvalidRoute",
+      "msg": "Invalid or unsupported route"
+    },
+    {
+      "code": 3,
+      "name": "UnsupportedProgram",
+      "msg": "Unexpected program ID"
+    },
+    {
+      "code": 4,
+      "name": "InvalidAccounts",
+      "msg": "Invalid route accounts"
+    },
+    {
+      "code": 5,
+      "name": "InvalidToken",
+      "msg": "Invalid mint or token account"
+    },
+    {
+      "code": 6,
+      "name": "MissingSignature",
+      "msg": "Missing required signature"
+    },
+    {
+      "code": 7,
+      "name": "RouteExpired",
+      "msg": "Route deadline has passed"
+    },
+    {
+      "code": 8,
+      "name": "AccountAlias",
+      "msg": "Route accounts must be distinct"
+    },
+    {
+      "code": 9,
+      "name": "InsufficientInput",
+      "msg": "Insufficient input token balance"
+    },
+    {
+      "code": 10,
+      "name": "IncompleteFill",
+      "msg": "Hop did not fully consume input and credit output"
+    },
+    {
+      "code": 11,
+      "name": "MinimumOutputNotMet",
+      "msg": "Final output is below the signed minimum"
+    },
+    {
+      "code": 12,
+      "name": "InvalidRfqTerms",
+      "msg": "Invalid RFQ terms"
+    },
+    {
+      "code": 13,
+      "name": "RfqExpired",
+      "msg": "RFQ quote has expired"
+    },
+    {
+      "code": 14,
+      "name": "NonImmediateRedemption",
+      "msg": "Redemption did not fill immediately"
+    },
+    {
+      "code": 15,
+      "name": "ArithmeticOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 16,
+      "name": "NotImplemented",
+      "msg": "Operation is not implemented"
+    }
+  ]
+}

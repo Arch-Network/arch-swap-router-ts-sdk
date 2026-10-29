@@ -63,14 +63,21 @@ Use readonly `router.network`, `router.mints`, and `router.supportedPairs` for
 frontend metadata. Existing `TESTNET_MINTS` and `SUPPORTED_PAIRS` exports remain
 testnet-only aliases.
 
-Mainnet is the mainnet-v2 deployment: router, CLAMM program and pool, PropAMM
-program and config, vault program and both vaults, and the aBTC/aUSD/primeBTC/primeUSD
-mints (8/6/8/6 decimals), configured in [src/config/networks.ts](src/config/networks.ts).
-Its CLAMM pool orders aBTC as token A and aUSD as token B, like testnet.
+Mainnet is the mainnet-v2 deployment and testnet the testnet-v2 deployment: router,
+CLAMM program and pool, PropAMM program and config, vault program and both vaults, and
+the aBTC/aUSD/primeBTC/primeUSD mints (8/6/8/6 decimals), configured in
+[src/config/networks.ts](src/config/networks.ts) and exported as `MAINNET`, `TESTNET`
+and `NETWORKS`. Both CLAMM pools order aBTC as token A and aUSD as token B. Each router
+binary embeds the vault, CLAMM and PropAMM program ids of its network (checked on chain).
 [tests/config/networks.test.ts](tests/config/networks.test.ts) pins every id and derivation.
 The client exposes all 12 fixed pairs. Supply a reader and optional RFQ provider for
 the selected network; there is no testnet fallback.
 Account validation, PDA/ATA derivation and instructions use the selected deployment.
+
+`routerProgramErrorTable()` returns the router's program error table (`ROUTER_ERRORS`,
+from the program IDL) for `decodeProgramError` from `@arch-network/arch-sdk`. The router
+forwards a failed venue CPI's code unchanged, so the table decodes only failures with
+no program logs.
 
 `SwapQuote` is a union of `RouterSwapQuote` and `ServerTransactionSwapQuote`.
 Both contain `inputMint`, `outputMint`, `amountIn`, `estimatedAmountOut`,
@@ -255,7 +262,12 @@ native instruction bytes, account positions/privileges, PDA/ATA derivation, and
 result framing. PropAMM tests additionally compare all eight complete signed
 Rust transaction fixtures, signer permissions and compiled size, plus candidate
 selection and failure isolation. Fixtures retain their original Rust provenance;
-tests do not establish live compatibility.
+tests do not establish live compatibility. The Rust fixtures were generated against
+the previous testnet deployment (router `E5j9e…`), so [tests/setup.ts](tests/setup.ts)
+substitutes [that recorded deployment](tests/fixtures/recorded-testnet.ts) for `testnet`
+during the suite; the shipped testnet-v2 constants are tested directly.
+[tests/mainnet-v2.test.ts](tests/mainnet-v2.test.ts) replays quotes against recorded
+mainnet-v2 accounts.
 
 Live smoke coverage is not part of the test suite. The package exports only its
 root entry point and has no wallet, transport, graph-discovery, or ranking framework.
