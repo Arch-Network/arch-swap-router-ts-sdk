@@ -1,9 +1,15 @@
 {
   "name": "@arch-network/swap-router-sdk",
   "version": "0.1.0",
-  "private": true,
-  "description": "TypeScript SDK scaffold for Arch swap router quotes and instructions.",
+  "description": "TypeScript SDK for Arch swap router quotes and instructions.",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Arch-Network/arch-swap-router-ts-sdk.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -29,10 +35,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@arch-network/arch-sdk": "0.0.28",
-    "@scure/base": "1.2.6"
+    "@arch-network/arch-sdk": "^0.0.31"
   },
   "devDependencies": {
+    "@scure/base": "1.2.6",
     "typescript": "5.9.3",
     "vitest": "3.2.4"
   }
