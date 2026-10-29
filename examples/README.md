@@ -101,8 +101,8 @@ replace its decoder with a lossless JSON adapter for larger output/expiry
 values. It never converts a rounded unsafe number into an accepted `bigint`.
 Byte values and account indexes are range-checked before normalization.
 
-Both tokens use 6 decimals. Use `MAINNET_AETH_USD` rather than the separate
-legacy `router.mints`. The SDK returns the exact minted payout for buys and the
+Both tokens use 6 decimals. Use `MAINNET_AETH_USD`; `router.mints` has no aETH
+(its aUSD is the same mint as `MAINNET_AETH_USD.quoteMint`). The SDK returns the exact minted payout for buys and the
 validated signed minimum for sells. Other pairs and receive sizing are outside
 this example.
 

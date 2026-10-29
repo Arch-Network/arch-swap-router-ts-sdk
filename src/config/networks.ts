@@ -35,9 +35,8 @@ export const TESTNET_VENUES = Object.freeze({
   }),
 });
 
-// mainnet-v2 deployment, as recorded by arch-prime's registry (packages/sdk/src/registry/mainnet.ts) and its
-// mainnet RPC account snapshot (packages/sdk/test/fixtures/registry/mainnet-v2-accounts.json, 2026-10-15):
-// owners, mint decimals (8/6/8/6), vault asset/share mints and the pool's token order are checked there.
+// mainnet-v2 deployment. Account evidence: tests/fixtures/mainnet-v2/accounts.json (mainnet RPC, 2026-10-15):
+// owners, mint decimals (8/6/8/6), vault asset/share mints and the pool's token order (aBTC as token A).
 export const MAINNET = Object.freeze({
   routerProgramId: "Bu8JuhykFEtJmUqYV98zJDtPr2J7LBMbEJX8DeT7XSeT",
   vaultProgramId: "BtPdgu3v6ruKYbhiuGLEx7Fa4rU6f15maftGhNRTP32L",

@@ -1,4 +1,5 @@
-// Mainnet deployment verified on 2026-10-27; independent of the legacy router venues.
+// Mainnet deployment verified on 2026-10-27. Its aUSD and PropAMM program are mainnet-v2's (config/networks.ts);
+// its PropAMM config is its own.
 export const MAINNET_AETH_USD = Object.freeze({
   baseMint: "AzuWEhnYUv6NTAFrC2MtzKb4nASh6sCMcD15WUmoFR45",
   baseDecimals: 6,

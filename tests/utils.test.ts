@@ -68,12 +68,18 @@ describe("address decoding", () => {
     expect(decodeAddress(TESTNET.systemProgramId)).toEqual(new Uint8Array(32));
   });
 
-  it.each(["0OIl", "", "1".repeat(31), "1".repeat(33)])(
+  it.each([
+    ["0OIl", "Address must be a base58-encoded public key."],
+    ["", "Address must decode to exactly 32 bytes."],
+    ["1".repeat(31), "Address must decode to exactly 32 bytes."],
+    ["1".repeat(33), "Address must decode to exactly 32 bytes."],
+    ["z".repeat(44), "Address must decode to exactly 32 bytes."],
+  ])(
     "rejects invalid public key %j",
-    (address) => {
+    (address, message) => {
       expect(() => decodeAddress(address)).toThrow(RouterSdkError);
       expect(() => decodeAddress(address)).toThrow(
-        expect.objectContaining({ code: "INVALID_ADDRESS" }),
+        expect.objectContaining({ code: "INVALID_ADDRESS", message }),
       );
     },
   );

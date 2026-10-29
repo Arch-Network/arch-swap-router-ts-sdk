@@ -1,10 +1,10 @@
 import { bytesToHex, encodeU16LE, hexToBytes } from "@arch-network/arch-sdk";
 import { afterEach, describe, expect, it } from "vitest";
-import { MAINNET, MAINNET_MINTS, MAINNET_VENUES, NETWORKS } from "../../src/config/networks.js";
+import { MAINNET, MAINNET_MINTS, MAINNET_VENUES, NETWORKS, TESTNET } from "../../src/index.js";
 import { decodeAddress, deriveAddress, deriveAssociatedTokenAddress, deriveProgramAddress } from "../../src/utils.js";
 
-// arch-prime packages/sdk/src/registry/mainnet.ts and test/fixtures/registry/mainnet-v2-accounts.json
-// (`addresses`, read from mainnet RPC on 2026-10-15), as lowercase hex.
+// The mainnet-v2 deployment record as lowercase hex: program ids as transcribed in arch-prime's
+// registry/mainnet.ts, accounts from the 2026-10-15 snapshot (tests/fixtures/mainnet-v2/README.md).
 const REGISTRY = {
   router: "a1ef55dc1509784c6c9228ac602d411f762a4fd857df8855a1813fc303afe690",
   vaults: "a1bf14cb9e197c446e0b10a9a732524f89dd2b13bd4c3dbd6b5ddcda242178e5",
@@ -24,6 +24,18 @@ const REGISTRY = {
 const POOL_TICK_SPACING = 64;
 
 const hexOf = (address: string) => bytesToHex(decodeAddress(address));
+
+describe("public entry", () => {
+  it("exports each network's program ids", () => {
+    expect(NETWORKS.mainnet.programs).toBe(MAINNET);
+    expect(NETWORKS.testnet.programs).toBe(TESTNET);
+    for (const { programs, propamm } of Object.values(NETWORKS)) {
+      for (const id of [programs.routerProgramId, programs.vaultProgramId, programs.clammProgramId, propamm.programId]) {
+        expect(decodeAddress(id)).toHaveLength(32);
+      }
+    }
+  });
+});
 
 describe("mainnet-v2 deployment", () => {
   const { propamm } = NETWORKS.mainnet;

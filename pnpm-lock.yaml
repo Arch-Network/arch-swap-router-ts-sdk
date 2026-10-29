@@ -7,11 +7,10 @@ settings:
 importers:
 
   .:
-    dependencies:
-      '@arch-network/arch-sdk':
-        specifier: ^0.0.31
-        version: 0.0.31
     devDependencies:
+      '@arch-network/arch-sdk':
+        specifier: 0.0.31
+        version: 0.0.31
       '@scure/base':
         specifier: 1.2.6
         version: 1.2.6

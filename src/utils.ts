@@ -79,18 +79,18 @@ export function assertIntegerRange(
 }
 
 export function decodeAddress(address: Address): Pubkey {
-  let bytes: Uint8Array;
+  if (typeof address !== "string" || !/^[1-9A-HJ-NP-Za-km-z]*$/.test(address)) {
+    throw new RouterSdkError("INVALID_ADDRESS", "Address must be a base58-encoded public key.");
+  }
+  // Valid base58 from here: base58ToBytes fails only above 32 bytes and left-pads shorter values,
+  // so only the canonical 32-byte spelling round-trips.
+  let bytes: Uint8Array | undefined;
   try {
     bytes = base58ToBytes(address);
-  } catch (cause) {
-    throw new RouterSdkError(
-      "INVALID_ADDRESS",
-      "Address must be a base58-encoded public key.",
-      { cause },
-    );
+  } catch {
+    bytes = undefined;
   }
-  // base58ToBytes left-pads short values to 32 bytes; only the canonical 32-byte spelling round-trips.
-  if (bytesToBase58(bytes) !== address) {
+  if (bytes === undefined || bytesToBase58(bytes) !== address) {
     throw new RouterSdkError(
       "INVALID_ADDRESS",
       "Address must decode to exactly 32 bytes.",

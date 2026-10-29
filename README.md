@@ -238,8 +238,9 @@ deployment.
 
 ## Development
 
-Use Node 20.19+ in the 20.x line or Node 22.12+. The only runtime dependency is
-`@arch-network/arch-sdk@^0.0.31`, whose PDA and ATA derivation need no global `Buffer`;
+Use Node 22.12+. `@arch-network/arch-sdk` is the only
+runtime dependency, declared as a peer (`>=0.0.31 <0.1.0`) so the application and this SDK
+share one copy; its PDA and ATA derivation need no global `Buffer`;
 tests also use `@scure/base` as an independent encoder. Use pnpm 10.12.4.
 
 ```sh
@@ -286,8 +287,8 @@ interface DirectRfqQuote {
 
 Supply `directRfqQuoteProvider` with `network: "mainnet"` to add exactly two
 directions to `supportedPairs` (14 total): aUSD → aETH and aETH → aUSD.
-Use `MAINNET_AETH_USD.quoteMint` and `.baseMint` for these requests; the legacy
-`router.mints` configuration is separate. Both tokens use 6 decimal places.
+Use `MAINNET_AETH_USD.quoteMint` and `.baseMint` for these requests; aETH is not in
+`router.mints`, whose aUSD is the same mint as `MAINNET_AETH_USD.quoteMint`. Both tokens use 6 decimal places.
 
 ```ts
 import { createRouterClient, MAINNET_AETH_USD, type DirectRfqQuoteProvider,

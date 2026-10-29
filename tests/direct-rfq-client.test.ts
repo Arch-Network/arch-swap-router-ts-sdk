@@ -141,10 +141,12 @@ describe("direct ETH/USD client dispatch", () => {
     expectNoFallback(state);
   });
 
+  // The pre-mainnet-v2 aUSD mint, retired by the v2 deployment.
+  const RETIRED_AUSD = "92Vu6DVnoeqgwexfVwDMseaZAe4PQzUQBBU2Rae1aDeS";
   const unsupported = [
     [market.baseMint, MAINNET_MINTS.aBTC], [MAINNET_MINTS.aBTC, market.baseMint],
     [market.baseMint, MAINNET_MINTS.primeUSD], [MAINNET_MINTS.primeUSD, market.baseMint],
-    [market.baseMint, market.baseMint], [market.baseMint, "92Vu6DVnoeqgwexfVwDMseaZAe4PQzUQBBU2Rae1aDeS"],
+    [market.baseMint, market.baseMint], [market.baseMint, RETIRED_AUSD],
     ["Bfbd38zzuJkKSyiSUzwsp1aJ26L9HdwVpHeAYrodXw1D", market.quoteMint],
   ];
   it.each(unsupported)("rejects unsupported combination %s → %s without routing", async (inputMint, outputMint) => {

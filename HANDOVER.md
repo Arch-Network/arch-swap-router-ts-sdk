@@ -121,11 +121,11 @@ selecting another route or expanding the tick window.
 
 ## Dependencies and verification
 
-Reuse the pinned Arch SDK for instructions, PDA/ATA derivation, and integer
-helpers. Use `@scure/base` for base58. No sibling filesystem dependencies,
-frontend aliases, extra transport, or generic venue plugin framework belong in
-the package. Browser verification must exercise the actual PDA path; Arch SDK
-0.0.28 requires a small explicit Buffer compatibility setup.
+Reuse Arch SDK (`@arch-network/arch-sdk` 0.0.31) for instructions, PDA/ATA
+derivation, base58/hex and integer helpers; it is the only runtime dependency, a peer.
+No sibling filesystem dependencies, frontend aliases, extra transport, or generic
+venue plugin framework belong in the package. Arch SDK 0.0.31's PDA/ATA
+derivation needs no global `Buffer`, so browsers need no polyfill.
 
 ```sh
 pnpm install --frozen-lockfile
