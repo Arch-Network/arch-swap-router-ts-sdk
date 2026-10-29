@@ -38,8 +38,8 @@ describe("compact router client", () => {
     await expect(router.quoteExactIn(input)).rejects.toThrow("Unexpected read");
     await expect(router.quoteForOutput({ ...input, amountOut: 1000n })).rejects.toThrow("Unexpected read");
     expect(reader.getAccounts.mock.calls).toEqual([
-      [[MAINNET_VENUES.clamm.address, MAINNET_MINTS.aUSD, MAINNET_MINTS.aBTC]],
-      [[MAINNET_VENUES.clamm.address, MAINNET_MINTS.aUSD, MAINNET_MINTS.aBTC]],
+      [[MAINNET_VENUES.clamm.address, MAINNET_MINTS.aBTC, MAINNET_MINTS.aUSD]],
+      [[MAINNET_VENUES.clamm.address, MAINNET_MINTS.aBTC, MAINNET_MINTS.aUSD]],
     ]);
     expect(createRouterClient({ source: reader }).supportedPairs).toEqual(SUPPORTED_PAIRS);
   });
@@ -50,7 +50,7 @@ describe("compact router client", () => {
     expect(new Set(addresses).size).toBe(addresses.length);
     expect(MAINNET_VENUES.btcVault).toMatchObject({ assetMint: MAINNET_MINTS.aBTC, shareMint: MAINNET_MINTS.primeBTC });
     expect(MAINNET_VENUES.usdVault).toMatchObject({ assetMint: MAINNET_MINTS.aUSD, shareMint: MAINNET_MINTS.primeUSD });
-    expect(MAINNET_VENUES.clamm).toMatchObject({ tokenMintA: MAINNET_MINTS.aUSD, tokenMintB: MAINNET_MINTS.aBTC });
+    expect(MAINNET_VENUES.clamm).toMatchObject({ tokenMintA: MAINNET_MINTS.aBTC, tokenMintB: MAINNET_MINTS.aUSD });
     for (const mint of Object.values(MAINNET_MINTS)) expect(Object.values(TESTNET_MINTS)).not.toContain(mint);
   });
 

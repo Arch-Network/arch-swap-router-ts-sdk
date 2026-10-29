@@ -144,7 +144,7 @@ describe("direct ETH/USD client dispatch", () => {
   const unsupported = [
     [market.baseMint, MAINNET_MINTS.aBTC], [MAINNET_MINTS.aBTC, market.baseMint],
     [market.baseMint, MAINNET_MINTS.primeUSD], [MAINNET_MINTS.primeUSD, market.baseMint],
-    [market.baseMint, market.baseMint], [market.baseMint, MAINNET_MINTS.aUSD],
+    [market.baseMint, market.baseMint], [market.baseMint, "92Vu6DVnoeqgwexfVwDMseaZAe4PQzUQBBU2Rae1aDeS"],
     ["Bfbd38zzuJkKSyiSUzwsp1aJ26L9HdwVpHeAYrodXw1D", market.quoteMint],
   ];
   it.each(unsupported)("rejects unsupported combination %s → %s without routing", async (inputMint, outputMint) => {

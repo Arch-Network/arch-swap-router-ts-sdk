@@ -37,7 +37,7 @@ execute deployed programs or simulate their account-creation CPIs.
 
 `client.test.ts` verifies request validation and unsupported/identical pairs,
 all before reads. It also covers default/explicit testnet metadata, immutable
-selection, unknown networks, valid mainnet placeholders, and both mainnet quote
+selection, unknown networks, valid mainnet addresses, and both mainnet quote
 methods using their own reader and propagating failures.
 `config/routes.test.ts` checks all 12 directed pairs against
 native fixture paths, operation/venue order, route continuity, unique mints,
