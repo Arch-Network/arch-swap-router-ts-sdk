@@ -245,8 +245,8 @@ mints and venues live in `src/config/networks.ts`; the same fixed route topology
 uses selected mints. Account loaders, ownership checks, PDA/ATA derivation and
 instruction assembly receive the selected configuration; quote math is unchanged.
 
-Mainnet is an explicit `null` placeholder. Client construction succeeds, while
-both quote methods reject with `NETWORK_NOT_CONFIGURED` before reads. There is
+Mainnet is configured with the mainnet-v2 deployment (it was originally an explicit
+`null` placeholder that rejected with `NETWORK_NOT_CONFIGURED` before reads). There is
 no fallback to testnet. Clients expose readonly `network`, `mints` (null when
 unconfigured), and `supportedPairs` (empty when unconfigured). Existing testnet
 metadata exports are retained. The app supplies a matching reader and creates
@@ -265,12 +265,11 @@ remain pending; checkpoint 6 is still next.
   quote call, and application-owned compilation, sizing, signing, and submission.
 - [ ] Document refresh timing and deadline handling as frontend responsibilities.
   Resolve indexer cache misses in the app reader before returning account absence.
-- [ ] Use client mint/pair metadata and a matching reader for the selected network;
-  show mainnet as unconfigured until its deployment addresses are supplied.
+- [ ] Use client mint/pair metadata and a matching reader for the selected network.
+  Mainnet carries the mainnet-v2 deployment addresses.
 - [ ] Verify an installed tarball in Node and a real browser, including PDA
-  derivation and a fixture-backed quote. Document the small explicit `Buffer`
-  setup required by Arch SDK 0.0.28; avoid broad Node polyfills.
-- [ ] Add package/typecheck/build/test CI and confirm no sibling dependencies,
+  derivation and a fixture-backed quote. Arch SDK 0.0.31 needs no `Buffer` polyfill.
+- [x] Add package/typecheck/build/test CI and confirm no sibling dependencies,
   frontend aliases, or undeclared imports are packed.
 - [ ] Pass the required checks.
 
@@ -287,8 +286,8 @@ documentation update.
 
 ## Completion rules
 
-Keep the package private, the existing pinned dependencies, and exact-input
-execution. Testnet is configured; mainnet is selectable but unconfigured.
+The package is published to npm from `main` (`.github/workflows/publish.yml`);
+keep exact-input execution. Testnet and mainnet (mainnet-v2) are configured.
 Graph discovery, ranking, caller-configurable venues, PropAMM, broader
 tick windows, prefetch optimizations, and expanded receipt helpers are deferred.
 The application owns refresh, final transaction sizing, signing, submission,

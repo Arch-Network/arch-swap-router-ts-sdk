@@ -1,8 +1,7 @@
 # Arch swap router TypeScript SDK
 
 A compact, browser-oriented SDK for fixed-pair swap estimates and router
-instructions on Arch. Testnet and mainnet swaps are configured; mainnet vaults
-and prime tokens remain placeholders.
+instructions on Arch. Testnet and mainnet (mainnet-v2) swaps are configured.
 One quote call returns one estimate with its
 instructions, sized from either a fixed input or an approximate receive amount.
 Supported pairs use explicit one-to-three-hop routes
@@ -64,14 +63,21 @@ Use readonly `router.network`, `router.mints`, and `router.supportedPairs` for
 frontend metadata. Existing `TESTNET_MINTS` and `SUPPORTED_PAIRS` exports remain
 testnet-only aliases.
 
-Mainnet's router, CLAMM pool/program, PropAMM deployment and aBTC/aUSD mints are
-configured in [src/config/networks.ts](src/config/networks.ts). Its CLAMM pool
-orders aUSD as token A and aBTC as token B, the reverse of testnet.
-The vault program, vault accounts and prime-token mints remain **placeholders**;
-replace those before using mainnet vault routes. The client still exposes all
-12 fixed pairs. Supply a reader and optional RFQ provider for the selected
-network; there is no testnet fallback.
+Mainnet is the mainnet-v2 deployment and testnet the testnet-v2 deployment: router,
+CLAMM program and pool, PropAMM program and config, vault program and both vaults, and
+the aBTC/aUSD/primeBTC/primeUSD mints (8/6/8/6 decimals), configured in
+[src/config/networks.ts](src/config/networks.ts) and exported as `MAINNET`, `TESTNET`
+and `NETWORKS`. Both CLAMM pools order aBTC as token A and aUSD as token B. Each router
+binary embeds the vault, CLAMM and PropAMM program ids of its network (checked on chain).
+[tests/config/networks.test.ts](tests/config/networks.test.ts) pins every id and derivation.
+The client exposes all 12 fixed pairs. Supply a reader and optional RFQ provider for
+the selected network; there is no testnet fallback.
 Account validation, PDA/ATA derivation and instructions use the selected deployment.
+
+`routerProgramErrorTable()` returns the router's program error table (`ROUTER_ERRORS`,
+from the program IDL) for `decodeProgramError` from `@arch-network/arch-sdk`. The router
+forwards a failed venue CPI's code unchanged, so the table decodes only failures with
+no program logs.
 
 `SwapQuote` is a union of `RouterSwapQuote` and `ServerTransactionSwapQuote`.
 Both contain `inputMint`, `outputMint`, `amountIn`, `estimatedAmountOut`,
@@ -218,7 +224,7 @@ addresses stay fixed during subsequent signer rotations. Only `quoteSigner`
 changes between quotes, so rotation needs no SDK release or additional RPC read.
 
 For a router RFQ winner, compile with **`compileRouterMessage`**, which corrects
-arch-sdk 0.0.28's insertion ordering to the Rust account ordering required by the
+arch-sdk's insertion ordering to the Rust account ordering required by the
 signing server. Sign the resulting router message with the user, then send
 `POST /rfq/swap` with `{ quote_id: quote.rfq.quoteId, version: 0,
 signatures: [userSignature], message }` in the server's JSON transaction format
@@ -239,8 +245,10 @@ deployment.
 
 ## Development
 
-Use Node 20.19+ in the 20.x line or Node 22.12+. Dependencies remain pinned to
-`@arch-network/arch-sdk@0.0.28` and `@scure/base@1.2.6`, with pnpm 10.12.4.
+Use Node 22.12+. `@arch-network/arch-sdk` is the only
+runtime dependency, declared as a peer (`>=0.0.31 <0.1.0`) so the application and this SDK
+share one copy; its PDA and ATA derivation need no global `Buffer`;
+tests also use `@scure/base` as an independent encoder. Use pnpm 10.12.4.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -254,11 +262,25 @@ native instruction bytes, account positions/privileges, PDA/ATA derivation, and
 result framing. PropAMM tests additionally compare all eight complete signed
 Rust transaction fixtures, signer permissions and compiled size, plus candidate
 selection and failure isolation. Fixtures retain their original Rust provenance;
-tests do not establish live compatibility.
+tests do not establish live compatibility. The Rust fixtures were generated against
+the previous testnet deployment (router `E5j9e…`), so [tests/setup.ts](tests/setup.ts)
+substitutes [that recorded deployment](tests/fixtures/recorded-testnet.ts) for `testnet`
+during the suite; the shipped testnet-v2 constants are tested directly.
+[tests/mainnet-v2.test.ts](tests/mainnet-v2.test.ts) replays quotes against recorded
+mainnet-v2 accounts.
 
-Package/browser verification and live smoke coverage remain later work. The
-package stays private, exports only its root entry point, and has no wallet,
-transport, graph-discovery, or ranking framework.
+Live smoke coverage is not part of the test suite. The package exports only its
+root entry point and has no wallet, transport, graph-discovery, or ranking framework.
+
+## Release
+
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs typecheck, build and
+tests on every pull request and push to `main`. Releasing is: bump `version` in
+`package.json` in a PR and merge it.
+[.github/workflows/publish.yml](.github/workflows/publish.yml) runs on every push to
+`main`; when npm lacks that version it verifies, publishes with provenance (npm trusted
+publishing, or the `NPM_TOKEN` secret when set) and creates the GitHub release
+`swap-router-sdk-v<version>`.
 
 ## Direct RFQ transaction contracts
 
@@ -277,8 +299,8 @@ interface DirectRfqQuote {
 
 Supply `directRfqQuoteProvider` with `network: "mainnet"` to add exactly two
 directions to `supportedPairs` (14 total): aUSD → aETH and aETH → aUSD.
-Use `MAINNET_AETH_USD.quoteMint` and `.baseMint` for these requests; the legacy
-`router.mints` configuration is separate. Both tokens use 6 decimal places.
+Use `MAINNET_AETH_USD.quoteMint` and `.baseMint` for these requests; aETH is not in
+`router.mints`, whose aUSD is the same mint as `MAINNET_AETH_USD.quoteMint`. Both tokens use 6 decimal places.
 
 ```ts
 import { createRouterClient, MAINNET_AETH_USD, type DirectRfqQuoteProvider,

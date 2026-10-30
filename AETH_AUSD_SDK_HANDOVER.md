@@ -11,8 +11,9 @@ HTTP/wallet/submission flow with injected callbacks and offline mocked tests.
 Create the client with `network: "mainnet"`, the existing `source`, and
 `directRfqQuoteProvider: DirectRfqQuoteProvider`. It advertises 14 pairs: the 12
 existing directions plus these two exact-input directions. Use the exported
-`MAINNET_AETH_USD` constants for requests; `router.mints` remains the separate
-legacy BTC/vault configuration. Both new tokens have 6 decimals.
+`MAINNET_AETH_USD` constants for requests; `router.mints` is the BTC/vault
+configuration, whose aUSD is the same mint as `MAINNET_AETH_USD.quoteMint` since
+mainnet-v2. Both aETH and aUSD have 6 decimals.
 
 | Direction | `inputMint` | `outputMint` | Raw input example | Execution / output minimum |
 | --- | --- | --- | --- | --- |
@@ -166,6 +167,6 @@ confirmation without re-submission. The example's response decoder rejects
 unsafe numeric metadata; larger output/expiry values require a lossless adapter.
 
 The SDK checkout is on `aeth-mint`, based on `467ef98`. SDK-4 through SDK-6 and
-the usage-example changes are uncommitted at handoff. The package remains private;
-no publication or deployment is included. Live missing-account creation,
+the usage-example changes are uncommitted at handoff. Publication is now
+automatic from `main` (see README "Release"); no deployment is included. Live missing-account creation,
 deployment coordination, packaging and funded smoke tests remain rollout work.

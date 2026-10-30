@@ -69,6 +69,24 @@ describe("native CLAMM contract", () => {
     expect(() => loadClamm(accounts, true, config)).toThrow(expect.objectContaining({ code: "INVALID_ACCOUNT" }));
   });
 
+  // Neither deployment orders aUSD as token A any more; a venue may still, and the side follows the pool's order.
+  it.each([true, false])("follows a reversed-orientation venue (aUSD as token A) for aToB=%s", (aToB) => {
+    const quote = (reversed: boolean) => {
+      const { accounts } = setup();
+      const [mintA, mintB] = reversed ? [TESTNET_MINTS.aUSD, TESTNET_MINTS.aBTC] : [TESTNET_MINTS.aBTC, TESTNET_MINTS.aUSD];
+      const pool = accounts.get(poolAddress)!;
+      pool.data.set(decodeAddress(mintA), 101); pool.data.set(decodeAddress(mintB), 181);
+      const config = { ...NETWORKS.testnet, venues: { ...TESTNET_VENUES, clamm: { address: poolAddress, tokenMintA: mintA, tokenMintB: mintB } } };
+      const state = loadClamm(accounts, aToB, config);
+      const ticks = new Map(state.addresses.map((address) => [address, accounts.get(address) ?? null]));
+      return { resolved: state.resolved, estimate: prepareClammQuote(state, ticks).estimate(1_000_000_000n), mintA, mintB };
+    };
+    const reversed = quote(true), regular = quote(false);
+    expect(reversed.resolved).toMatchObject({ aToB, outputMint: aToB ? reversed.mintB : reversed.mintA });
+    expect(reversed.resolved.outputMint).toBe(aToB ? TESTNET_MINTS.aBTC : TESTNET_MINTS.aUSD);
+    expect(reversed.estimate).toBe(regular.estimate);
+  });
+
   it.each(native.ticks)("matches native tick $tick", ({ tick, sqrtPrice }) => {
     expect(tickSqrtPrice(tick)).toBe(BigInt(sqrtPrice));
   });
@@ -153,13 +171,13 @@ describe("fixed route quotes", () => {
   beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(Number(now) * 1000); });
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it.each([true, false])("uses mainnet's reversed CLAMM order for aToB=%s", async (aToB) => {
+  it.each([true, false])("uses mainnet's CLAMM deployment, BTC as token A, for aToB=%s", async (aToB) => {
     const { accounts, source, request } = setup();
     const { programs, mints, venues } = NETWORKS.mainnet;
     const pool = accounts.get(poolAddress)!;
     pool.owner = decodeAddress(programs.clammProgramId);
-    pool.data.set(decodeAddress(mints.aUSD), 101);
-    pool.data.set(decodeAddress(mints.aBTC), 181);
+    pool.data.set(decodeAddress(mints.aBTC), 101);
+    pool.data.set(decodeAddress(mints.aUSD), 181);
     accounts.delete(poolAddress);
     accounts.set(venues.clamm.address, pool);
     for (const symbol of ["aUSD", "aBTC"] as const) {
@@ -167,7 +185,7 @@ describe("fixed route quotes", () => {
       accounts.delete(TESTNET_MINTS[symbol]);
     }
     const quote = await createRouterClient({ source, network: "mainnet" }).quoteExactIn({
-      ...request, inputMint: aToB ? mints.aUSD : mints.aBTC, outputMint: aToB ? mints.aBTC : mints.aUSD,
+      ...request, inputMint: aToB ? mints.aBTC : mints.aUSD, outputMint: aToB ? mints.aUSD : mints.aBTC,
     });
     const instruction = quote.instructions[0]!;
     expect(base58.encode(instruction.program_id)).toBe(programs.routerProgramId);
@@ -175,7 +193,7 @@ describe("fixed route quotes", () => {
     expect(quote.estimatedAmountOut).toBe(aToB ? 685687466535n : 1412189n);
     expect(instruction.accounts.slice(6, 8).map((meta) => base58.encode(meta.pubkey)))
       .toEqual([programs.clammProgramId, venues.clamm.address]);
-    expect(source.getAccounts.mock.calls[0]![0]).toEqual([venues.clamm.address, mints.aUSD, mints.aBTC]);
+    expect(source.getAccounts.mock.calls[0]![0]).toEqual([venues.clamm.address, mints.aBTC, mints.aUSD]);
     expect(source.getAccounts).toHaveBeenCalledTimes(2);
   });
 

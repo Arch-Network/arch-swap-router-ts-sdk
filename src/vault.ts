@@ -1,6 +1,6 @@
 // Minimal arch-vaults state/preview port, aligned with native Mint and Redeem.
 // Source revisions, layout and math fixtures: tests/fixtures/vault/README.md.
-import { base58 } from "@scure/base";
+import { bytesToBase58 } from "@arch-network/arch-sdk";
 import type { ProgramIds, VaultVenue } from "./config/networks.js";
 import { RouterSdkError } from "./errors.js";
 import type { ResolvedStep } from "./transactions/types.js";
@@ -23,7 +23,7 @@ export function decodeVault(data: Uint8Array) {
     if (data[offset] === 1 && value <= 65535n) return { kind: "percentage", bps: Number(value) };
     throw new RouterSdkError("INVALID_ACCOUNT", "Invalid stored vault fee.");
   };
-  const key = (offset: number) => base58.encode(data.subarray(offset, offset + 32));
+  const key = (offset: number) => bytesToBase58(data.subarray(offset, offset + 32));
   return {
     offChainBalance: view.getBigUint64(8, true),
     offChainReportedAt: view.getBigInt64(16, true),

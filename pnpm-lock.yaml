@@ -7,14 +7,13 @@ settings:
 importers:
 
   .:
-    dependencies:
+    devDependencies:
       '@arch-network/arch-sdk':
-        specifier: 0.0.28
-        version: 0.0.28
+        specifier: 0.0.31
+        version: 0.0.31
       '@scure/base':
         specifier: 1.2.6
         version: 1.2.6
-    devDependencies:
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -24,8 +23,8 @@ importers:
 
 packages:
 
-  '@arch-network/arch-sdk@0.0.28':
-    resolution: {integrity: sha512-52WPTfzoZNGXP1UWJeVhBZIjVMVvZEcFJY9PggKv3K9JvPoXh+ccHYcic09+praKQxfDRcmgc+sn/mIuw/TXsQ==}
+  '@arch-network/arch-sdk@0.0.31':
+    resolution: {integrity: sha512-K3dlhEM/WRZ8MViGHLTjcYzXqnbY07gc4nV7qwV+AZcaBW7TWby5MT2fpcAsO6jowjEYQwPYdD9DuLGjvnggnA==}
 
   '@esbuild/aix-ppc64@0.28.2':
     resolution: {integrity: sha512-XExcO+dvLKvVtNTibSTBej1NCAbaGhWn9Ww1ZPx80qsahhPFe/8jgWP0IchNe0F3HwkU7n8ejhH8bjonqht8mQ==}
@@ -593,7 +592,7 @@ packages:
 
 snapshots:
 
-  '@arch-network/arch-sdk@0.0.28':
+  '@arch-network/arch-sdk@0.0.31':
     dependencies:
       '@noble/curves': 1.9.7
       '@noble/hashes': 1.8.0

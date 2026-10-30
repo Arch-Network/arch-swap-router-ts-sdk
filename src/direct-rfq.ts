@@ -1,5 +1,4 @@
-import { RUNTIME_TX_SIZE_LIMIT, TransactionUtil } from "@arch-network/arch-sdk";
-import { base58 } from "@scure/base";
+import { bytesToBase58, RUNTIME_TX_SIZE_LIMIT, TransactionUtil } from "@arch-network/arch-sdk";
 import { MAINNET_AETH_USD as market } from "./config/aeth-usd.js";
 import { RouterSdkError } from "./errors.js";
 import type { DirectRfqQuote, QuoteExactInRequest, ServerTransactionSwapQuote } from "./types.js";
@@ -40,7 +39,7 @@ function readDirectRfq(request: QuoteExactInRequest, quote: DirectRfqQuote, serv
     && bytes(message.recent_blockhash, 32) && Array.isArray(message.instructions) && message.instructions.length === instructionCount,
     "Invalid direct RFQ message framing.");
   for (const key of message.account_keys) requireRfq(bytes(key, 32), "Invalid message public key.");
-  const keys = message.account_keys.map(base58.encode);
+  const keys = message.account_keys.map(bytesToBase58);
   requireRfq(new Set(keys).size === keys.length, "Repeated message public key.");
   requireRfq(keys[0] === request.user && keys[1] === serverSigner, "Unexpected RFQ fee payer or server signer.");
   for (const instruction of message.instructions) {
@@ -90,7 +89,7 @@ export function normalizeAethUsdBuy(request: QuoteExactInRequest, quote: DirectR
   const amountOut = mintData.getBigUint64(33, true);
   requireRfq(paymentData.getBigUint64(1, true) === request.amountIn, "Payment differs from the requested input.");
   requireRfq(amountOut > 0n && amountOut === quote.estimatedAmountOut, "Mint payout differs from the quoted output.");
-  requireRfq(base58.encode(mint.data.subarray(41)) === request.user, "Mint data names another recipient.");
+  requireRfq(bytesToBase58(mint.data.subarray(41)) === request.user, "Mint data names another recipient.");
 
   const paymentKeys = [userAta(user, market.quoteMint), market.quoteVault, request.user];
   const mintKeys = [

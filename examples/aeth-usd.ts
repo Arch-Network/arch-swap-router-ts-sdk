@@ -1,5 +1,4 @@
-import { TransactionUtil } from "@arch-network/arch-sdk";
-import { base58, hex } from "@scure/base";
+import { base58ToBytes, bytesToHex, TransactionUtil } from "@arch-network/arch-sdk";
 import {
   createRouterClient, MAINNET_AETH_USD as market, RouterSdkError,
   type DirectRfqQuoteProvider, type QuoteExactInRequest, type RouterDataSource,
@@ -96,9 +95,9 @@ export async function prepareAethUsdSwap(options: AethUsdExampleOptions, request
       // Encode the u64 amount as a JSON numeric literal without a Number conversion.
       // All interpolated strings below are hex or fixed literals, and the SDK has
       // already validated the amount, user and slippage before invoking this provider.
-      const body = `{"base_mint":"${hex.encode(base58.decode(market.baseMint))}",`
-        + `"quote_mint":"${hex.encode(base58.decode(market.quoteMint))}","side":"${buy ? "buy" : "sell"}",`
-        + `"amount":${input.amountIn.toString()},"user_pubkey":"${hex.encode(base58.decode(input.user))}",`
+      const body = `{"base_mint":"${bytesToHex(base58ToBytes(market.baseMint))}",`
+        + `"quote_mint":"${bytesToHex(base58ToBytes(market.quoteMint))}","side":"${buy ? "buy" : "sell"}",`
+        + `"amount":${input.amountIn.toString()},"user_pubkey":"${bytesToHex(base58ToBytes(input.user))}",`
         + `"slippage_bps":${input.slippageBps}}`;
       return decodeQuote(await post(`${serverUrl}/rfq/quote`, body), buy);
     },
@@ -107,7 +106,7 @@ export async function prepareAethUsdSwap(options: AethUsdExampleOptions, request
   const quote = await router.quoteExactIn(request);
   if (quote.execution !== "serverTransaction") throw new RouterSdkError("INVALID_RFQ", "Expected a direct server transaction.");
   const { transaction, deadlineMs, rfq: { quoteId } } = quote;
-  const originalBytes = hex.encode(TransactionUtil.serialize(transaction));
+  const originalBytes = bytesToHex(TransactionUtil.serialize(transaction));
   let body: string | undefined;
   let transactionHash: string | undefined;
   let inFlight: Promise<string> | undefined;
@@ -116,7 +115,7 @@ export async function prepareAethUsdSwap(options: AethUsdExampleOptions, request
     if (Date.now() >= deadlineMs) throw new RouterSdkError("RFQ_EXPIRED", "Get a fresh quote before signing or submitting.");
   }
   function requireUnchanged(): void {
-    if (hex.encode(TransactionUtil.serialize(transaction)) !== originalBytes) {
+    if (bytesToHex(TransactionUtil.serialize(transaction)) !== originalBytes) {
       throw new RouterSdkError("MESSAGE_CHANGED", "The original RFQ transaction was modified.");
     }
   }

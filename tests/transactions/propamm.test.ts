@@ -140,7 +140,8 @@ describe("native PropAMM contract", () => {
 
   it.each([
     ["testnet", "FosDeThFmSTGcaQxgyhaPWhBrnEovCJ7jHzTcwp1dmYi"],
-    ["mainnet", "9evqkMyLFGPCgvg15bJgEiwp5Y95ZQkQYtpfhetxcibQ"],
+    // mainnet-v2: config_id read from the config account in arch-prime's mainnet-v2-accounts.json (offset 73).
+    ["mainnet", "C6j1T57YT4EuBPo2PppkSdZCEuzBCVAXE6m7XadbTKYh"],
   ] as const)("pins the %s v2 config to the migration signer", (network, configId) => {
     const deployment = NETWORKS[network].propamm;
     expect(deriveAddress(deployment.programId, "config_v2", decodeAddress(configId))).toBe(deployment.config);
