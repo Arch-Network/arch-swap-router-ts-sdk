@@ -24,7 +24,7 @@ importers:
 packages:
 
   '@arch-network/arch-sdk@0.0.31':
-    resolution: {integrity: sha512-PTUVFe3KMikLiVHgDczWgup6koseQI6Lfx99Bj6nNEFcrIhnGzkM+ujrXZQzg0ZQDdOKOR/7rvcfoIuYiVaFTQ==}
+    resolution: {integrity: sha512-K3dlhEM/WRZ8MViGHLTjcYzXqnbY07gc4nV7qwV+AZcaBW7TWby5MT2fpcAsO6jowjEYQwPYdD9DuLGjvnggnA==}
 
   '@esbuild/aix-ppc64@0.28.2':
     resolution: {integrity: sha512-XExcO+dvLKvVtNTibSTBej1NCAbaGhWn9Ww1ZPx80qsahhPFe/8jgWP0IchNe0F3HwkU7n8ejhH8bjonqht8mQ==}
