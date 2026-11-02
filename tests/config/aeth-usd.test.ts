@@ -1,4 +1,5 @@
 import { TransactionUtil } from "@arch-network/arch-sdk";
+import { TRANSACTION_SIZE_LIMIT } from "../../src/index.js";
 import { base58, hex } from "@scure/base";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAINNET_AETH_USD as market } from "../../src/index.js";
@@ -46,7 +47,7 @@ describe("fixed mainnet aETH/aUSD market", () => {
 
     const measured = { ...transaction, signatures: [new Uint8Array(64), new Uint8Array(64)] };
     expect(TransactionUtil.serializedSize(measured)).toBe(fixture.signed_size);
-    expect(fixture.signed_size).toBeLessThanOrEqual(1232);
+    expect(fixture.signed_size).toBeLessThanOrEqual(TRANSACTION_SIZE_LIMIT);
     const programs = message.instructions.map(ix => keys[ix.program_id_index]);
     expect(programs).toEqual(buy ? [market.tokenProgramId, market.bridgeProgramId] : [market.programId]);
 

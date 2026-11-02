@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@arch-network/arch-sdk':
-        specifier: 0.0.28
-        version: 0.0.28
+        specifier: 0.13.0
+        version: 0.13.0
       '@scure/base':
         specifier: 1.2.6
         version: 1.2.6
@@ -24,8 +24,8 @@ importers:
 
 packages:
 
-  '@arch-network/arch-sdk@0.0.28':
-    resolution: {integrity: sha512-52WPTfzoZNGXP1UWJeVhBZIjVMVvZEcFJY9PggKv3K9JvPoXh+ccHYcic09+praKQxfDRcmgc+sn/mIuw/TXsQ==}
+  '@arch-network/arch-sdk@0.13.0':
+    resolution: {integrity: sha512-fduSbBu555YLbIHrgbA+tLuVzHmxyQgjZc8XqkpJIc/RQL10i+Mcnn2tUenmb773IraAYf3HMrWgNttDpQPsAw==}
 
   '@esbuild/aix-ppc64@0.28.2':
     resolution: {integrity: sha512-XExcO+dvLKvVtNTibSTBej1NCAbaGhWn9Ww1ZPx80qsahhPFe/8jgWP0IchNe0F3HwkU7n8ejhH8bjonqht8mQ==}
@@ -593,7 +593,7 @@ packages:
 
 snapshots:
 
-  '@arch-network/arch-sdk@0.0.28':
+  '@arch-network/arch-sdk@0.13.0':
     dependencies:
       '@noble/curves': 1.9.7
       '@noble/hashes': 1.8.0

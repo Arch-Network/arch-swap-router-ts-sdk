@@ -152,6 +152,13 @@ For instruction-based router quotes, the application owns quote refresh, final t
 blockhashes, signing, submission, deadline handling, and confirmation. The SDK
 provides estimates and instruction encoding, not execution preflight.
 
+The runtime transaction limit is **4,096 bytes**, exported as
+`TRANSACTION_SIZE_LIMIT`, an alias of arch-sdk's `RUNTIME_TX_SIZE_LIMIT`.
+Measure application-assembled transactions with `TransactionUtil.serializedSize`,
+including all required 64-byte signatures. The size guards follow the dependency's
+limit without a local override.
+The live quote smoke test compiles and measures every supported route.
+
 ## Optional PropAMM quotes
 
 Inject an application-owned provider returning `PropAmmQuote`: a nonempty
@@ -191,9 +198,9 @@ quotes and `quoteForOutput` never call the provider.
 
 The PropAMM deadline is `min(request.deadlineMs, terms.expiryMs)`, rechecked at
 selection. Original compact terms are preserved. The SDK checks the compiled
-PropAMM bundle against 1,232 bytes, including two 64-byte signatures; callers
+PropAMM bundle against 4,096 bytes, including two 64-byte signatures; callers
 must recheck if they alter it. The native three-hop fixture is 1,225 bytes with
-shared fee destinations; other fee accounts can make it too large.
+shared fee destinations; distinct fee accounts increase its serialized size.
 
 The application provider maps requests to `POST /rfq/quote`: deployment aBTC
 `base_mint` and aUSD `quote_mint` in hex, `side` (`sell` for aBTC → aUSD, `buy`
@@ -218,7 +225,7 @@ addresses stay fixed during subsequent signer rotations. Only `quoteSigner`
 changes between quotes, so rotation needs no SDK release or additional RPC read.
 
 For a router RFQ winner, compile with **`compileRouterMessage`**, which corrects
-arch-sdk 0.0.28's insertion ordering to the Rust account ordering required by the
+arch-sdk 0.13.0's insertion ordering to the Rust account ordering required by the
 signing server. Sign the resulting router message with the user, then send
 `POST /rfq/swap` with `{ quote_id: quote.rfq.quoteId, version: 0,
 signatures: [userSignature], message }` in the server's JSON transaction format
@@ -242,7 +249,7 @@ deployment.
 ## Development
 
 Use Node 20.19+ in the 20.x line or Node 22.12+. Dependencies remain pinned to
-`@arch-network/arch-sdk@0.0.28` and `@scure/base@1.2.6`, with pnpm 10.12.4.
+`@arch-network/arch-sdk@0.13.0` and `@scure/base@1.2.6`, with pnpm 10.12.4.
 
 ```sh
 pnpm install --frozen-lockfile

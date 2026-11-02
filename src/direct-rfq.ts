@@ -1,8 +1,8 @@
-import { RUNTIME_TX_SIZE_LIMIT, TransactionUtil } from "@arch-network/arch-sdk";
 import { base58 } from "@scure/base";
 import { MAINNET_AETH_USD as market } from "./config/aeth-usd.js";
 import { RouterSdkError } from "./errors.js";
 import type { DirectRfqQuote, QuoteExactInRequest, ServerTransactionSwapQuote } from "./types.js";
+import { assertTransactionSize } from "./transactions/size.js";
 import { decodeAddress, deriveAddress, deriveProgramAddress, U64_MAX } from "./utils.js";
 
 function requireRfq(valid: boolean, message: string): void {
@@ -52,10 +52,7 @@ function readDirectRfq(request: QuoteExactInRequest, quote: DirectRfqQuote, serv
     }
   }
   // The RFQ response is unsigned; reserve space for both eventual signatures.
-  const signedSize = TransactionUtil.serializedSize({ ...transaction, signatures: [new Uint8Array(64), new Uint8Array(64)] });
-  if (signedSize > RUNTIME_TX_SIZE_LIMIT) {
-    throw new RouterSdkError("TRANSACTION_TOO_LARGE", `Direct RFQ transaction is ${signedSize} bytes; limit is ${RUNTIME_TX_SIZE_LIMIT}.`);
-  }
+  assertTransactionSize({ ...transaction, signatures: [new Uint8Array(64), new Uint8Array(64)] }, "Direct RFQ transaction");
   return { user, deadlineMs, transaction, message, header, keys };
 }
 

@@ -118,7 +118,7 @@ and transaction fees must also be funded according to the deployed programs.
 The SDK checks these complete layouts and their privileges without querying
 account existence. Offline tests establish the layouts; funded account creation
 and live execution remain rollout checks. The unchanged native buy/sell fixtures
-measure 738/696 bytes, including both 64-byte signatures, below the 1,232-byte
+measure 738/696 bytes, including both 64-byte signatures, below the 4,096-byte
 runtime limit. The SDK reserves both signatures when enforcing that limit.
 
 ## Source and verification

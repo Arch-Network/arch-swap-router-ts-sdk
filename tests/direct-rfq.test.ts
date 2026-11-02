@@ -1,6 +1,7 @@
 import { TransactionUtil } from "@arch-network/arch-sdk";
 import { hex } from "@scure/base";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { TRANSACTION_SIZE_LIMIT } from "../src/index.js";
 import { MAINNET_AETH_USD as market } from "../src/config/aeth-usd.js";
 import { normalizeAethUsdBuy } from "../src/direct-rfq.js";
 import type { DirectRfqQuote, QuoteExactInRequest } from "../src/types.js";
@@ -184,9 +185,11 @@ describe("aUSD → aETH treasury-buy normalization", () => {
 
   it("counts both missing signatures when rejecting an oversized message", () => {
     const { request, quote } = setup();
-    for (let i = 1; i <= 16; i++) quote.transaction.message.account_keys.push(new Uint8Array(32).fill(i));
-    quote.transaction.message.header.num_readonly_unsigned_accounts += 16;
-    expect(TransactionUtil.serializedSize(quote.transaction)).toBeLessThanOrEqual(1232);
+    for (let i = 1; i <= 106; i++) quote.transaction.message.account_keys.push(new Uint8Array(32).fill(i));
+    quote.transaction.message.header.num_readonly_unsigned_accounts += 106;
+    expect(TransactionUtil.serializedSize(quote.transaction)).toBeLessThanOrEqual(TRANSACTION_SIZE_LIMIT);
+    expect(TransactionUtil.serializedSize({ ...quote.transaction, signatures: [new Uint8Array(64), new Uint8Array(64)] }))
+      .toBeGreaterThan(TRANSACTION_SIZE_LIMIT);
     expect(() => normalizeAethUsdBuy(request, quote)).toThrow(expect.objectContaining({ code: "TRANSACTION_TOO_LARGE" }));
   });
 });
