@@ -6,11 +6,29 @@ import { createMainnetPropAmmRfqProvider } from "./helpers/propamm-rfq.js";
 
 const rpcUrl = process.env.ARCH_RPC_URL;
 const rfqUrl = process.env.ARCH_RFQ_URL ?? "https://vaults.veloxapi.net/propamm/rfq";
+const amounts = { aUSD: 1_000_000n, aBTC: 1_000n, primeUSD: 1_000_000n, primeBTC: 1_000n };
+const user = base58.encode(new Uint8Array(32).fill(1)); // Quote-only dummy public key.
 
-it.skipIf(!rpcUrl).each([
-  { input: "aUSD", output: "aBTC", amountIn: 1_000_000n }, // 1 aUSD (6 decimals).
-  { input: "aBTC", output: "aUSD", amountIn: 1_000n }, // 0.00001 aBTC (8 decimals).
-] as const)("gets a live mainnet $input → $output quote", async ({ input, output, amountIn }) => {
+// Explicit expectations cover every directed pair, independently of SDK route metadata.
+const routes = [
+  { path: ["aUSD", "aBTC"], operations: ["swap"] },
+  { path: ["aBTC", "aUSD"], operations: ["swap"] },
+  { path: ["aBTC", "primeBTC"], operations: ["vaultMint"] },
+  { path: ["primeBTC", "aBTC"], operations: ["vaultRedeem"] },
+  { path: ["aUSD", "primeUSD"], operations: ["vaultMint"] },
+  { path: ["primeUSD", "aUSD"], operations: ["vaultRedeem"] },
+  { path: ["primeBTC", "aBTC", "aUSD"], operations: ["vaultRedeem", "swap"] },
+  { path: ["aUSD", "aBTC", "primeBTC"], operations: ["swap", "vaultMint"] },
+  { path: ["primeUSD", "aUSD", "aBTC"], operations: ["vaultRedeem", "swap"] },
+  { path: ["aBTC", "aUSD", "primeUSD"], operations: ["swap", "vaultMint"] },
+  { path: ["primeBTC", "aBTC", "aUSD", "primeUSD"], operations: ["vaultRedeem", "swap", "vaultMint"] },
+  { path: ["primeUSD", "aUSD", "aBTC", "primeBTC"], operations: ["vaultRedeem", "swap", "vaultMint"] },
+] as const;
+
+it.skipIf(!rpcUrl).each(routes.map((route) => ({
+  ...route, input: route.path[0], output: route.path[route.path.length - 1]!,
+})))("gets a live mainnet $input → $output quote", async ({ input, output, path, operations }) => {
+  const amountIn = amounts[input]; // USD tokens use 6 decimals; BTC tokens use 8.
   const rpc = new RpcConnection(rpcUrl!);
   const source: RouterDataSource = {
     async getAccounts(addresses) {
@@ -37,20 +55,9 @@ it.skipIf(!rpcUrl).each([
     outputMint: mints[output],
     amountIn,
     slippageBps: 50, // 0.5%.
-    user: base58.encode(new Uint8Array(32).fill(1)), // Quote-only dummy public key.
+    user,
     deadlineMs: Date.now() + 120_000,
   });
-
-  expect(propAmmQuoteProvider.quoteExactIn).toHaveBeenCalledExactlyOnceWith({
-    inputMint: mints[input], outputMint: mints[output], amountIn,
-    user: base58.encode(new Uint8Array(32).fill(1)),
-  });
-  const rfqCall = propAmmQuoteProvider.quoteExactIn.mock.results[0];
-  if (rfqCall?.type !== "return") throw new Error("PropAMM RFQ was not requested");
-  // Surface HTTP/decoding failures even when the SDK successfully falls back to CLAMM.
-  const rfq = await rfqCall.value;
-  expect(rfq.terms.expiryMs).toBeGreaterThan(BigInt(Date.now()));
-  expect(quote.estimatedAmountOut).toBeGreaterThanOrEqual(rfq.estimatedAmountOut);
 
   expect(quote.inputMint).toBe(mints[input]);
   expect(quote.outputMint).toBe(mints[output]);
@@ -63,13 +70,55 @@ it.skipIf(!rpcUrl).each([
     throw new Error("Expected a router quote");
   }
   expect(quote.instructions.length).toBeGreaterThan(0);
+  expect(quote.hops.map((hop) => hop.kind === "clamm" || hop.kind === "propamm" ? "swap" : hop.kind))
+    .toEqual(operations);
+  expect([quote.inputMint, ...quote.hops.map((hop) => hop.outputMint)])
+    .toEqual(path.map((mint) => mints[mint]));
+  for (const [index, hop] of quote.hops.entries()) {
+    const previous = quote.hops[index - 1];
+    expect(hop.inputMint).toBe(previous?.outputMint ?? quote.inputMint);
+    expect(hop.amountIn).toBe(previous?.estimatedAmountOut ?? amountIn);
+    expect(hop.estimatedAmountOut).toBeGreaterThan(0n);
+  }
+  expect(quote.hops.at(-1)!.estimatedAmountOut).toBe(quote.estimatedAmountOut);
 
   const symbols = new Map(Object.entries(mints).map(([symbol, mint]) => [mint, symbol]));
   const symbol = (mint: string) => symbols.get(mint) ?? mint;
-  console.log(`PropAMM RFQ estimated ${output} output, raw:`, rfq.estimatedAmountOut.toString());
+  const swapIndex = operations.findIndex((operation) => operation === "swap");
+  if (swapIndex < 0) {
+    expect(propAmmQuoteProvider.quoteExactIn).not.toHaveBeenCalled();
+  } else {
+    const swap = quote.hops[swapIndex]!;
+    // A preceding redemption must supply its net asset output, not the share input.
+    expect(propAmmQuoteProvider.quoteExactIn).toHaveBeenCalledExactlyOnceWith({
+      inputMint: swap.inputMint, outputMint: swap.outputMint, amountIn: swap.amountIn, user,
+    });
+    const rfqCall = propAmmQuoteProvider.quoteExactIn.mock.results[0];
+    if (rfqCall?.type !== "return") throw new Error("PropAMM RFQ was not requested");
+    // Surface RFQ failures even when the SDK successfully falls back to CLAMM.
+    const rfq = await rfqCall.value;
+    expect(rfq.terms.expiryMs).toBeGreaterThan(BigInt(Date.now()));
+    if (quote.rfq) {
+      expect(quote.rfq.quoteId).toBe(rfq.quoteId);
+      expect(swap.kind).toBe("propamm");
+      expect(swap.estimatedAmountOut).toBe(rfq.estimatedAmountOut);
+    } else {
+      expect(swap.kind).toBe("clamm");
+    }
+    // With a vault suffix, RFQ output is underlying assets and final output is
+    // shares; compare raw estimates only when the swap is the final hop.
+    if (swapIndex === quote.hops.length - 1) {
+      expect(quote.estimatedAmountOut).toBeGreaterThanOrEqual(rfq.estimatedAmountOut);
+    }
+    console.log(`PropAMM RFQ estimated ${symbol(swap.outputMint)} output, raw:`, rfq.estimatedAmountOut.toString());
+  }
   console.log("Route:", [
     symbol(quote.inputMint),
     ...quote.hops.map((hop) => `--[${hop.kind}]--> ${symbol(hop.outputMint)}`),
   ].join(" "));
+  console.table(quote.hops.map((hop, index) => ({
+    hop: index + 1, kind: hop.kind, input: symbol(hop.inputMint), output: symbol(hop.outputMint),
+    amountInRaw: hop.amountIn.toString(), estimatedAmountOutRaw: hop.estimatedAmountOut.toString(),
+  })));
   console.log(`Estimated ${output} output, raw:`, quote.estimatedAmountOut.toString());
 }, 30_000);

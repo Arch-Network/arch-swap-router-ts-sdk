@@ -2,29 +2,48 @@
 
 ## Live quote smoke test
 
-`quote.e2e.test.ts` requests quotes in both directions using live mainnet
-accounts: 1 aUSD → aBTC and 0.00001 aBTC → aUSD. It also requests PropAMM quotes
-from `https://vaults.veloxapi.net/propamm/rfq/quote`, using the test-only HTTP
-adapter in `helpers/propamm-rfq.ts`. The SDK compares CLAMM and PropAMM and
-selects the higher estimated output; CLAMM wins ties. Each test checks that
-the RFQ provider was called once and returned a fresh quote, the selected
-estimate is at least the RFQ estimate, and the pair, input amount, positive
-estimated/minimum output and router instructions are valid.
+`quote.e2e.test.ts` requests live mainnet quotes for all 12 directed pairs among
+aBTC, aUSD, primeBTC and primeUSD:
+
+| Route type | Pairs, each tested in both directions |
+| --- | --- |
+| Asset swap | aBTC ↔ aUSD |
+| Direct vault mint/redeem | aBTC ↔ primeBTC; aUSD ↔ primeUSD |
+| Vault plus swap | primeBTC ↔ aUSD; primeUSD ↔ aBTC |
+| Redeem, swap, mint | primeBTC ↔ primeUSD |
+
+Inputs are 1 aUSD/primeUSD or 0.00001 aBTC/primeBTC. Each test checks an explicit
+expected token path and operation sequence, positive estimated/minimum output,
+and returned router instructions. Every hop must consume the preceding hop's
+estimated output, and the final hop must match the overall estimate.
+
+Swap routes also request PropAMM quotes from
+`https://vaults.veloxapi.net/propamm/rfq/quote`, using the test-only HTTP adapter
+in `helpers/propamm-rfq.ts`. The SDK compares CLAMM and PropAMM by final output;
+CLAMM wins ties. The tests require exactly one fresh RFQ for the swap leg using
+its actual asset mints and net input after any vault redemption. Direct vault
+mint/redeem routes must make no RFQ requests. A selected PropAMM hop must match
+the received RFQ's quote ID and estimate. For routes ending in a swap, the final
+estimate must be at least the RFQ estimate. A vault suffix changes output units
+from assets to shares, so these raw amounts are not compared across that suffix.
+
 It uses a dummy public key and only reads state; no wallet, funded balance,
 signing or transaction submission is needed.
 The reader normalizes JSON byte arrays and supplies an empty legacy `utxo`
 field when the RPC omits it; quote calculation does not use that field.
 
-Each test prints the PropAMM RFQ estimate, the selected route from `quote.hops`
-with token symbols and each hop's kind, and the selected estimated raw output.
+Each test prints the PropAMM RFQ estimate when applicable, the selected route
+from `quote.hops`, a table of each hop's raw input/output, and the final estimate.
 Depending on prices, the routes can differ by direction, for example:
 
 ```text
 Route: aUSD --[propamm]--> aBTC
 Route: aBTC --[clamm]--> aUSD
+Route: aBTC --[vaultMint]--> primeBTC
+Route: primeUSD --[vaultRedeem]--> aUSD --[propamm]--> aBTC --[vaultMint]--> primeBTC
 ```
 
-Both tests are skipped unless `ARCH_RPC_URL` is set. Run them with a mainnet RPC:
+All live tests are skipped unless `ARCH_RPC_URL` is set. Run them with a mainnet RPC:
 
 ```sh
 ARCH_RPC_URL=https://rpc.mainnet.arch.network \
@@ -41,8 +60,12 @@ encoded input. It aborts HTTP requests after 1.8 seconds, within the SDK's
 Output depends on live liquidity, so the tests check positive amounts rather
 than a fixed price. RFQ HTTP/decoding/expiry failures fail the smoke tests even
 when the SDK falls back to CLAMM; they cannot silently pass without RFQ coverage.
-RPC, deployment and liquidity failures also fail the tests. This verifies quote
-generation; it does not execute a swap.
+RPC, deployment and liquidity failures also fail the tests. Vault mint quotes
+can reject stale NAV, paused vaults or deposit caps; immediate redeem quotes
+can reject a nonempty queue or insufficient reserves. These failures remain
+visible rather than being skipped. This verifies live quote generation and
+instruction construction. Funded signing, submission and confirmation tests
+are still needed to establish transaction execution.
 
 `propamm-rfq-provider.test.ts` checks the HTTP adapter offline against the pinned
 native Buy/Sell trade bytes. It covers both payload lengths, account-index
