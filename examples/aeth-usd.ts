@@ -84,15 +84,14 @@ function decodeQuote(raw: string, buy: boolean) {
     estimatedAmountOut: safeU64(buy ? estimate.base_amount : estimate.quote_amount) };
 }
 
-/** Quote first so the caller can review the amount before invoking the wallet. */
-export async function prepareAethUsdSwap(options: AethUsdExampleOptions, request: QuoteExactInRequest): Promise<PreparedAethUsdSwap> {
-  const buy = request.inputMint === market.quoteMint && request.outputMint === market.baseMint;
-  const sell = request.inputMint === market.baseMint && request.outputMint === market.quoteMint;
-  if (!buy && !sell) throw new RouterSdkError("UNSUPPORTED_PAIR", "This example supports only mainnet aUSD ↔ aETH.");
-  const { post, signMessage, confirm } = options;
-  const serverUrl = options.serverUrl.replace(/\/+$/, "");
-  const provider: DirectRfqQuoteProvider = {
+/** Quote-only HTTP provider; rfqUrl includes /rfq, without /quote. */
+export function createAethUsdRfqProvider(rfqUrl: string, post: AethUsdExampleOptions["post"]): DirectRfqQuoteProvider {
+  const url = `${rfqUrl.replace(/\/+$/, "")}/quote`;
+  return {
     async quoteExactIn(input) {
+      const buy = input.inputMint === market.quoteMint && input.outputMint === market.baseMint;
+      const sell = input.inputMint === market.baseMint && input.outputMint === market.quoteMint;
+      if (!buy && !sell) throw new RouterSdkError("UNSUPPORTED_PAIR", "This example supports only mainnet aUSD ↔ aETH.");
       // Encode the u64 amount as a JSON numeric literal without a Number conversion.
       // All interpolated strings below are hex or fixed literals, and the SDK has
       // already validated the amount, user and slippage before invoking this provider.
@@ -100,9 +99,19 @@ export async function prepareAethUsdSwap(options: AethUsdExampleOptions, request
         + `"quote_mint":"${hex.encode(base58.decode(market.quoteMint))}","side":"${buy ? "buy" : "sell"}",`
         + `"amount":${input.amountIn.toString()},"user_pubkey":"${hex.encode(base58.decode(input.user))}",`
         + `"slippage_bps":${input.slippageBps}}`;
-      return decodeQuote(await post(`${serverUrl}/rfq/quote`, body), buy);
+      return decodeQuote(await post(url, body), buy);
     },
   };
+}
+
+/** Quote first so the caller can review the amount before invoking the wallet. */
+export async function prepareAethUsdSwap(options: AethUsdExampleOptions, request: QuoteExactInRequest): Promise<PreparedAethUsdSwap> {
+  const buy = request.inputMint === market.quoteMint && request.outputMint === market.baseMint;
+  const sell = request.inputMint === market.baseMint && request.outputMint === market.quoteMint;
+  if (!buy && !sell) throw new RouterSdkError("UNSUPPORTED_PAIR", "This example supports only mainnet aUSD ↔ aETH.");
+  const { post, signMessage, confirm } = options;
+  const serverUrl = options.serverUrl.replace(/\/+$/, "");
+  const provider = createAethUsdRfqProvider(`${serverUrl}/rfq`, post);
   const router = createRouterClient({ network: "mainnet", source: options.source, directRfqQuoteProvider: provider });
   const quote = await router.quoteExactIn(request);
   if (quote.execution !== "serverTransaction") throw new RouterSdkError("INVALID_RFQ", "Expected a direct server transaction.");

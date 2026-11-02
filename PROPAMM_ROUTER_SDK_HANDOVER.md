@@ -1,5 +1,9 @@
 # PropAMM integration into the router TypeScript SDK
 
+The current SDK transaction limit is 4,096 bytes. The 1,232-byte limit discussed
+below records the original integration constraints; see the current README
+and `TRANSACTION_SIZE_LIMIT` export for size checks.
+
 Handover prepared on 2026-09-18. Target repository:
 `~/Arch/arch-swap-router-ts-sdk`.
 

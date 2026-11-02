@@ -109,12 +109,15 @@ describe("PropAMM route selection", () => {
     expect(await client.quoteExactIn(withSuffix)).toEqual(expected);
   });
 
-  it("rejects an oversized PropAMM candidate and retains CLAMM", async () => {
+  it("retains a better PropAMM candidate with distinct vault fee destinations", async () => {
     const { client, provider, source, request, accounts } = setupRfq();
     accounts.get(TESTNET_VENUES.usdVault.address)!.data.set(new Uint8Array(32).fill(99), 201);
     const route = { ...request, inputMint: mints.primeBTC, outputMint: mints.primeUSD };
     const expected = await createRouterClient({ source }).quoteExactIn(route);
-    expect(await client.quoteExactIn(route)).toEqual(expected);
+    const quote = await client.quoteExactIn(route);
+    expect(quote.rfq).toEqual({ quoteId: "rfq-1" });
+    expect(quote.hops.map((hop) => hop.kind)).toEqual(["vaultRedeem", "propamm", "vaultMint"]);
+    expect(quote.estimatedAmountOut).toBeGreaterThan(expected.estimatedAmountOut);
     expect(provider.quoteExactIn).toHaveBeenCalledOnce();
   });
 

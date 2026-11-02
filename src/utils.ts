@@ -113,7 +113,7 @@ export function compileRouterMessage(instructions: readonly Instruction[], user:
     num_readonly_unsigned_accounts: readonlyOthers } = message.header;
   const group = (i: number) => i === 0 ? 0 : i < signers - readonlySigners ? 1 : i < signers ? 2
     : i < message.account_keys.length - readonlyOthers ? 3 : 4;
-  // arch-sdk 0.0.28 uses insertion order; Rust uses a BTreeMap within each group.
+  // Arch SDK compilation uses insertion order; Rust uses a BTreeMap within each group.
   const keys = message.account_keys.map((key, i) => ({ key, i, hex: hex.encode(key) }))
     .sort((a, b) => group(a.i) - group(b.i) || (a.hex < b.hex ? -1 : a.hex > b.hex ? 1 : 0));
   const indices: number[] = [];

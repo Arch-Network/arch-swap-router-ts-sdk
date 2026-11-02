@@ -1,8 +1,8 @@
 # Arch swap router TypeScript SDK
 
 A compact, browser-oriented SDK for fixed-pair swap estimates and router
-instructions on Arch. Testnet and mainnet swaps are configured; mainnet vaults
-and prime tokens remain placeholders.
+instructions on Arch. Testnet and mainnet-v2 swaps, vaults and prime tokens
+are configured.
 One quote call returns one estimate with its
 instructions, sized from either a fixed input or an approximate receive amount.
 Supported pairs use explicit one-to-three-hop routes
@@ -66,9 +66,9 @@ testnet-only aliases.
 
 Mainnet's router, CLAMM pool/program, PropAMM deployment and aBTC/aUSD mints are
 configured in [src/config/networks.ts](src/config/networks.ts). Its CLAMM pool
-orders aUSD as token A and aBTC as token B, the reverse of testnet.
-The vault program, vault accounts and prime-token mints remain **placeholders**;
-replace those before using mainnet vault routes. The client still exposes all
+orders aBTC as token A and aUSD as token B. Its vaults and prime-token mints
+match the mainnet-v2 deployment. The BTC RFQ and aETH market use the same
+PropAMM program and config. The client still exposes all
 12 fixed pairs. Supply a reader and optional RFQ provider for the selected
 network; there is no testnet fallback.
 Account validation, PDA/ATA derivation and instructions use the selected deployment.
@@ -152,6 +152,13 @@ For instruction-based router quotes, the application owns quote refresh, final t
 blockhashes, signing, submission, deadline handling, and confirmation. The SDK
 provides estimates and instruction encoding, not execution preflight.
 
+The runtime transaction limit is **4,096 bytes**, exported as
+`TRANSACTION_SIZE_LIMIT`, an alias of arch-sdk's `RUNTIME_TX_SIZE_LIMIT`.
+Measure application-assembled transactions with `TransactionUtil.serializedSize`,
+including all required 64-byte signatures. The size guards follow the dependency's
+limit without a local override.
+The live quote smoke test compiles and measures every supported route.
+
 ## Optional PropAMM quotes
 
 Inject an application-owned provider returning `PropAmmQuote`: a nonempty
@@ -191,9 +198,9 @@ quotes and `quoteForOutput` never call the provider.
 
 The PropAMM deadline is `min(request.deadlineMs, terms.expiryMs)`, rechecked at
 selection. Original compact terms are preserved. The SDK checks the compiled
-PropAMM bundle against 1,232 bytes, including two 64-byte signatures; callers
+PropAMM bundle against 4,096 bytes, including two 64-byte signatures; callers
 must recheck if they alter it. The native three-hop fixture is 1,225 bytes with
-shared fee destinations; other fee accounts can make it too large.
+shared fee destinations; distinct fee accounts increase its serialized size.
 
 The application provider maps requests to `POST /rfq/quote`: deployment aBTC
 `base_mint` and aUSD `quote_mint` in hex, `side` (`sell` for aBTC → aUSD, `buy`
@@ -218,7 +225,7 @@ addresses stay fixed during subsequent signer rotations. Only `quoteSigner`
 changes between quotes, so rotation needs no SDK release or additional RPC read.
 
 For a router RFQ winner, compile with **`compileRouterMessage`**, which corrects
-arch-sdk 0.0.28's insertion ordering to the Rust account ordering required by the
+arch-sdk 0.13.0's insertion ordering to the Rust account ordering required by the
 signing server. Sign the resulting router message with the user, then send
 `POST /rfq/swap` with `{ quote_id: quote.rfq.quoteId, version: 0,
 signatures: [userSignature], message }` in the server's JSON transaction format
@@ -229,7 +236,9 @@ Once submission binds the quote, retries must use the identical message; a new
 blockhash or route requires a fresh quote. The SDK does not sign or submit.
 
 After redemption, PropAMM accepts measured input only within
-`ceil(quotedInput * 9950 / 10000) .. quotedInput`. Execution outside that range
+`ceil(quotedInput * (10000 - max_input_shortfall_bps) / 10000) .. quotedInput`.
+PropAMM v4 stores the tolerance in its config; v2/v3 default to 50 bps.
+The on-chain router must support the config's storage version. Execution outside that range
 fails atomically; the SDK does not pad/cap the input or consume existing
 intermediate balances. There is no post-signing venue fallback.
 
@@ -240,7 +249,7 @@ deployment.
 ## Development
 
 Use Node 20.19+ in the 20.x line or Node 22.12+. Dependencies remain pinned to
-`@arch-network/arch-sdk@0.0.28` and `@scure/base@1.2.6`, with pnpm 10.12.4.
+`@arch-network/arch-sdk@0.13.0` and `@scure/base@1.2.6`, with pnpm 10.12.4.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -277,8 +286,8 @@ interface DirectRfqQuote {
 
 Supply `directRfqQuoteProvider` with `network: "mainnet"` to add exactly two
 directions to `supportedPairs` (14 total): aUSD → aETH and aETH → aUSD.
-Use `MAINNET_AETH_USD.quoteMint` and `.baseMint` for these requests; the legacy
-`router.mints` configuration is separate. Both tokens use 6 decimal places.
+Use `MAINNET_AETH_USD.quoteMint` and `.baseMint` for these requests. Its aUSD
+mint is also `router.mints.aUSD`. aETH uses 9 decimal places; aUSD uses 6.
 
 ```ts
 import { createRouterClient, MAINNET_AETH_USD, type DirectRfqQuoteProvider,

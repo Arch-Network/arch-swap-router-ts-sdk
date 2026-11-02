@@ -1,6 +1,7 @@
 import { TransactionUtil } from "@arch-network/arch-sdk";
 import { hex } from "@scure/base";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { TRANSACTION_SIZE_LIMIT } from "../src/index.js";
 import { MAINNET_AETH_USD as market } from "../src/config/aeth-usd.js";
 import { normalizeAethUsdSell } from "../src/direct-rfq.js";
 import { RouterSdkError } from "../src/errors.js";
@@ -37,10 +38,10 @@ describe("aETH → aUSD direct-sell normalization", () => {
     const result = normalizeAethUsdSell(request, quote);
     expect(result).toEqual({
       execution: "serverTransaction", inputMint: market.baseMint, outputMint: market.quoteMint,
-      amountIn: 1_000n, estimatedAmountOut: 2_500_000n, minAmountOut: 2_475_000n,
+      amountIn: 1_000_000n, estimatedAmountOut: 2_500_000n, minAmountOut: 2_475_000n,
       deadlineMs: fixture.expires_at_ms,
       hops: [{ kind: "propamm", inputMint: market.baseMint, outputMint: market.quoteMint,
-        amountIn: 1_000n, estimatedAmountOut: 2_500_000n }],
+        amountIn: 1_000_000n, estimatedAmountOut: 2_500_000n }],
       transaction: quote.transaction, rfq: { quoteId: "sell-quote" },
     });
     expect(result.transaction).toBe(quote.transaction);
@@ -194,9 +195,11 @@ describe("aETH → aUSD direct-sell normalization", () => {
 
   it("includes both signatures in the packet limit", () => {
     const { request, quote } = setup();
-    for (let i = 1; i <= 17; i++) quote.transaction.message.account_keys.push(new Uint8Array(32).fill(i));
-    quote.transaction.message.header.num_readonly_unsigned_accounts += 17;
-    expect(TransactionUtil.serializedSize(quote.transaction)).toBeLessThanOrEqual(1232);
+    for (let i = 1; i <= 107; i++) quote.transaction.message.account_keys.push(new Uint8Array(32).fill(i));
+    quote.transaction.message.header.num_readonly_unsigned_accounts += 107;
+    expect(TransactionUtil.serializedSize(quote.transaction)).toBeLessThanOrEqual(TRANSACTION_SIZE_LIMIT);
+    expect(TransactionUtil.serializedSize({ ...quote.transaction, signatures: [new Uint8Array(64), new Uint8Array(64)] }))
+      .toBeGreaterThan(TRANSACTION_SIZE_LIMIT);
     expect(() => normalizeAethUsdSell(request, quote)).toThrow(expect.objectContaining({ code: "TRANSACTION_TOO_LARGE" }));
   });
 });

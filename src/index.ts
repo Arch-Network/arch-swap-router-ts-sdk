@@ -5,6 +5,7 @@ export { TESTNET_MINTS, type Network, type NetworkMints } from "./config/network
 export { SUPPORTED_PAIRS } from "./config/routes.js";
 export { RouterSdkError } from "./errors.js";
 export { compileRouterMessage } from "./utils.js";
+export { TRANSACTION_SIZE_LIMIT } from "./transactions/size.js";
 export type {
   Address,
   DirectRfqQuote,

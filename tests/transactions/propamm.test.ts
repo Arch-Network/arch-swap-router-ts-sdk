@@ -1,6 +1,7 @@
 import { TransactionUtil, type RuntimeTransaction } from "@arch-network/arch-sdk";
 import { base58, hex } from "@scure/base";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { TRANSACTION_SIZE_LIMIT } from "../../src/index.js";
 import { encodeRouteExactInV1 } from "../../src/codecs/instruction.js";
 import { NETWORKS, TESTNET } from "../../src/config/networks.js";
 import { quotePropAmm } from "../../src/propamm.js";
@@ -86,17 +87,20 @@ describe("native PropAMM contract", () => {
     expect(message.account_keys.slice(0, 2).map(base58.encode)).toEqual([input.user, propamm.maker]);
     const size = TransactionUtil.serializedSize({ ...tx, message });
     expect(size).toBe(fixture.transaction_hex.length / 2);
-    expect(size).toBeLessThanOrEqual(1232);
+    expect(size).toBeLessThanOrEqual(TRANSACTION_SIZE_LIMIT);
     if (fixture.redeem && fixture.mint) expect(size).toBe(1225);
   });
 
-  it("counts both signatures and rejects extra fee destinations that exceed the limit", () => {
+  it("accepts a 1,257-byte bundle with distinct fee destinations under the new limit", () => {
     const fixture = fixtures.find((f) => f.redeem && f.mint)!;
     const input = nativeInput(nativeTransaction(fixture.transaction_hex));
     const steps = input.steps.map((s) => s.kind === "vaultMint"
       ? { ...s, managerFeeShares: base58.encode(new Uint8Array(32).fill(99)) } : s);
-    expect(() => buildPropAmmInstructions({ ...input, steps }, TESTNET))
-      .toThrow(expect.objectContaining({ code: "TRANSACTION_TOO_LARGE", message: expect.stringContaining("1257") }));
+    const instructions = buildPropAmmInstructions({ ...input, steps }, TESTNET);
+    const message = compileRouterMessage(instructions, input.user, new Uint8Array(32));
+    const size = TransactionUtil.serializedSize({ version: 0, message, signatures: [new Uint8Array(64), new Uint8Array(64)] });
+    expect(size).toBe(1257);
+    expect(size).toBeLessThanOrEqual(TRANSACTION_SIZE_LIMIT);
   });
 
   it("rejects a maker used as the user or a vault fee account", () => {
@@ -140,7 +144,7 @@ describe("native PropAMM contract", () => {
 
   it.each([
     ["testnet", "FosDeThFmSTGcaQxgyhaPWhBrnEovCJ7jHzTcwp1dmYi"],
-    ["mainnet", "9evqkMyLFGPCgvg15bJgEiwp5Y95ZQkQYtpfhetxcibQ"],
+    ["mainnet", "A97DopD3nWbcwj89Suma32AhGfGUiLYZZzKqpP3H1PiG"],
   ] as const)("pins the %s v2 config to the migration signer", (network, configId) => {
     const deployment = NETWORKS[network].propamm;
     expect(deriveAddress(deployment.programId, "config_v2", decodeAddress(configId))).toBe(deployment.config);

@@ -6,6 +6,11 @@ submit → confirm flow. It uses the SDK's public entry point and exports
 wallet signing flow, account reading and confirmation are supplied by the app.
 The two new directions do not call the account reader.
 
+`createAethUsdRfqProvider(rfqUrl, post)` exports the same HTTP provider separately
+for quote-only integrations using `createRouterClient`'s `directRfqQuoteProvider`.
+Its URL includes `/rfq`, without `/quote`. The live smoke tests use this provider
+without invoking wallet signing, submission or confirmation.
+
 Run the offline example tests from the SDK root:
 
 ```sh
@@ -52,7 +57,7 @@ function prepareBuy() {
 function prepareSell() {
   return prepareAethUsdSwap(options, {
     inputMint: market.baseMint, outputMint: market.quoteMint,
-    amountIn: 1_000n, // Spend 0.001 aETH, in raw 6-decimal units.
+    amountIn: 1_000_000n, // Spend 0.001 aETH, in raw 9-decimal units.
     slippageBps: 100, user, deadlineMs: Date.now() + 30_000,
   });
 }
@@ -101,8 +106,8 @@ replace its decoder with a lossless JSON adapter for larger output/expiry
 values. It never converts a rounded unsafe number into an accepted `bigint`.
 Byte values and account indexes are range-checked before normalization.
 
-Both tokens use 6 decimals. Use `MAINNET_AETH_USD` rather than the separate
-legacy `router.mints`. The SDK returns the exact minted payout for buys and the
+aETH uses 9 decimals; aUSD uses 6. Use `MAINNET_AETH_USD` for the ETH market's
+mint identities. The SDK returns the exact minted payout for buys and the
 validated signed minimum for sells. Other pairs and receive sizing are outside
 this example.
 
