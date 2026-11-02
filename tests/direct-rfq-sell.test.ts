@@ -37,10 +37,10 @@ describe("aETH → aUSD direct-sell normalization", () => {
     const result = normalizeAethUsdSell(request, quote);
     expect(result).toEqual({
       execution: "serverTransaction", inputMint: market.baseMint, outputMint: market.quoteMint,
-      amountIn: 1_000n, estimatedAmountOut: 2_500_000n, minAmountOut: 2_475_000n,
+      amountIn: 1_000_000n, estimatedAmountOut: 2_500_000n, minAmountOut: 2_475_000n,
       deadlineMs: fixture.expires_at_ms,
       hops: [{ kind: "propamm", inputMint: market.baseMint, outputMint: market.quoteMint,
-        amountIn: 1_000n, estimatedAmountOut: 2_500_000n }],
+        amountIn: 1_000_000n, estimatedAmountOut: 2_500_000n }],
       transaction: quote.transaction, rfq: { quoteId: "sell-quote" },
     });
     expect(result.transaction).toBe(quote.transaction);

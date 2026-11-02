@@ -20,7 +20,7 @@ afterEach(() => { vi.restoreAllMocks(); });
 describe("fixed mainnet aETH/aUSD market", () => {
   it("matches the canonical config and vault addresses", () => {
     expect(Object.isFrozen(market)).toBe(true);
-    expect(market.baseDecimals).toBe(6);
+    expect(market.baseDecimals).toBe(9);
     expect(market.quoteDecimals).toBe(6);
     for (const value of Object.values(market)) if (typeof value === "string") expect(decodeAddress(value)).toHaveLength(32);
     expect(deriveAddress(market.programId, "config_v2", decodeAddress(market.quoteSigner))).toBe(market.config);

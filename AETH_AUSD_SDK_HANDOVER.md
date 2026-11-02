@@ -12,12 +12,12 @@ Create the client with `network: "mainnet"`, the existing `source`, and
 `directRfqQuoteProvider: DirectRfqQuoteProvider`. It advertises 14 pairs: the 12
 existing directions plus these two exact-input directions. Use the exported
 `MAINNET_AETH_USD` constants for requests; `router.mints` remains the separate
-legacy BTC/vault configuration. Both new tokens have 6 decimals.
+BTC/vault configuration. The current aETH mint has 9 decimals; aUSD has 6.
 
 | Direction | `inputMint` | `outputMint` | Raw input example | Execution / output minimum |
 | --- | --- | --- | --- | --- |
 | Buy aETH | `MAINNET_AETH_USD.quoteMint` | `MAINNET_AETH_USD.baseMint` | `1_000_000n` = 1 aUSD | aUSD payment + bridge treasury mint; exact encoded aETH payout. |
-| Sell aETH | `MAINNET_AETH_USD.baseMint` | `MAINNET_AETH_USD.quoteMint` | `1_000n` = 0.001 aETH | PropAMM `ExecuteTrade`; signed minimum must cover the requested slippage floor. |
+| Sell aETH | `MAINNET_AETH_USD.baseMint` | `MAINNET_AETH_USD.quoteMint` | `1_000_000n` = 0.001 aETH | PropAMM `ExecuteTrade`; signed minimum must cover the requested slippage floor. |
 
 Call `quoteExactIn` with these mints, raw `amountIn: bigint`, `slippageBps`, the
 user's base58 address, and a safe integer `deadlineMs` in Unix milliseconds.
@@ -124,10 +124,21 @@ runtime limit. The SDK reserves both signatures when enforcing that limit.
 ## Source and verification
 
 The fixed deployment is exported from [src/config/aeth-usd.ts](src/config/aeth-usd.ts):
-aETH `AzuWEhnYUv6NTAFrC2MtzKb4nASh6sCMcD15WUmoFR45` and
+aETH `7g1nPCjKW7zzZ4q7mcABeFXaPSLfBQ6syrz4HnPGAVYt` (9 decimals) and
 aUSD `DQcBfwHu8gr8KGt3BE5BDUfBjGgFuDJYm9ByVTDsrww9`. Other identities and
 signer roles are pinned there. A signer/deployment change requires reviewing
 these pins; this path does not perform discovery.
+
+Deployment identities were refreshed on 2026-11-02 against
+`https://vaults.veloxapi.net/propamm/markets` and Arch mainnet RPC. The bridge
+is `5n1fsUDhPiaALmxpaFCJeFdyTkZkxWXecgurV6dSxMq3`. The supplied config
+`3jwSNH8P5tNFMY72ZwFi5z3gEkK1vVor3xcAFvr4DHzr` was still v3/115 bytes
+at verification. A sell quote passed the SDK validator. Buy quotes returned
+`422 quote_not_executable: adjustment_buy_base_underflow` with an empty aETH
+vault, so live treasury-buy verification is pending a server-side resolution.
+Offline buy fixtures verify the pinned Rust builder layout with the new pins;
+they do not establish that the new bridge's deployed buy path has executed.
+No funded transactions were signed or submitted.
 
 Fixtures and the HTTP/layout mappings above use PropAMM `minting` revision
 [`dfdbc9a36646066cbec067fa9e9a700232804855`](https://github.com/Arch-Network/prop-amm/commit/dfdbc9a36646066cbec067fa9e9a700232804855).

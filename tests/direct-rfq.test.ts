@@ -36,10 +36,10 @@ describe("aUSD → aETH treasury-buy normalization", () => {
     const result = normalizeAethUsdBuy(request, quote);
     expect(result).toEqual({
       execution: "serverTransaction", inputMint: market.quoteMint, outputMint: market.baseMint,
-      amountIn: 1_000_000n, estimatedAmountOut: 400n, minAmountOut: 400n,
+      amountIn: 1_000_000n, estimatedAmountOut: 400_000n, minAmountOut: 400_000n,
       deadlineMs: fixture.expires_at_ms,
       hops: [{ kind: "treasuryMint", inputMint: market.quoteMint, outputMint: market.baseMint,
-        amountIn: 1_000_000n, estimatedAmountOut: 400n }],
+        amountIn: 1_000_000n, estimatedAmountOut: 400_000n }],
       transaction: quote.transaction, rfq: { quoteId: "buy-quote" },
     });
     expect(result.transaction).toBe(quote.transaction);
@@ -63,7 +63,7 @@ describe("aUSD → aETH treasury-buy normalization", () => {
 
   it.each([0, 9999])("retains the exact minted payout with slippage %s bps", slippageBps => {
     const { request, quote } = setup();
-    expect(normalizeAethUsdBuy({ ...request, slippageBps }, quote).minAmountOut).toBe(400n);
+    expect(normalizeAethUsdBuy({ ...request, slippageBps }, quote).minAmountOut).toBe(400_000n);
   });
 
   it("accepts a fresh mint ID only with its matching treasury-mint PDA", () => {

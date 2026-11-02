@@ -35,40 +35,39 @@ export const TESTNET_VENUES = Object.freeze({
   }),
 });
 
-// Mainnet router: arch-swap-router/src/lib.rs; venues/mints: arch-swap/src/constants.
-// TODO(mainnet): replace the vault program, vault accounts and prime-token placeholders.
+// Mainnet-v2 deployment: arch-swap-router/.github/workflows/arch-program.yml.
+// Mints, vault ownership and pool order checked against Arch RPC on 2026-11-02.
 export const MAINNET = Object.freeze({
-  routerProgramId: "F6YfVndxkgWQmjUmw6RGSxRqEDnMrf4iDBVZEjj9XbXq",
-  vaultProgramId: "9nTRc9YKsmcT8mWyhqQSpoLAjeMAZGFbe3eJaQpt8Jvu",
-  clammProgramId: "BARRjgWSp8Gv8gTntfrGB74HwhsTCV32BAd3sjxESzK8",
+  routerProgramId: "Bu8JuhykFEtJmUqYV98zJDtPr2J7LBMbEJX8DeT7XSeT",
+  vaultProgramId: "BtPdgu3v6ruKYbhiuGLEx7Fa4rU6f15maftGhNRTP32L",
+  clammProgramId: "AzvVQ4qV2DnokUgtxskJ2V11BP5M5Fvx51G3aUgnZm7A",
   tokenProgramId: "TokenT4em53UrV4gSvZ3nCS2mZeHaqTLapwt6iZt6Mk",
   associatedTokenProgramId: "ATok9pxLsNzM5zJJ3UQpXBrMriHpZiY5Yio3GKYU4we3",
   systemProgramId: "11111111111111111111111111111111",
 } as const);
 
 export const MAINNET_MINTS = Object.freeze({
-  aBTC: "AQigE59FdX7GigaFfQxeQP9ne3tVGBqMB5brL2aDFqPf",
-  aUSD: "92Vu6DVnoeqgwexfVwDMseaZAe4PQzUQBBU2Rae1aDeS",
-  primeBTC: "A48cBMQNExoMh8X1T2i7zJRDiHByFWzssgJvow1H7eDj",
-  primeUSD: "A83uKesNqG6aqDmWtL33HBByxSQAvaghS5yasK3sryYS",
+  aBTC: "78s6DsmwRnCYiQDvAKbJoeAbGDa68zifa1cgqTb4tBbM",
+  aUSD: "DQcBfwHu8gr8KGt3BE5BDUfBjGgFuDJYm9ByVTDsrww9",
+  primeBTC: "Bg138vbUo1h3cvRBQ9yRdqbGX2Cm2pwRexj1LaVVTQYj",
+  primeUSD: "C9fDCY2oJjM3KUHGkr5TidcbJMz7Me9FHHBR2YDnGVrK",
 } as const);
 
 export const MAINNET_VENUES = Object.freeze({
   btcVault: Object.freeze({
-    address: "AByCTxLPRZPoyK22KdMxa3xkCbcNbeNWzVeEvh6UcJs9",
+    address: "DWCi7kuDVBESrZUqNMwX54BW8DgMPS1GTZqANAD9n31t",
     assetMint: MAINNET_MINTS.aBTC,
     shareMint: MAINNET_MINTS.primeBTC,
   }),
   usdVault: Object.freeze({
-    address: "AFtVcFoQ1rh37QGXkvgsrvjWSkpaGi4LYuJtz595MeBr",
+    address: "9pzq5sCYyx2KjEtTcXyTHmYeiXmBerzfaVKXWDbQANkz",
     assetMint: MAINNET_MINTS.aUSD,
     shareMint: MAINNET_MINTS.primeUSD,
   }),
   clamm: Object.freeze({
-    address: "FUt4zGu6edj6TfZUkWAWNAvd6oSM3omWviNKwh8qvkZi",
-    // Mainnet's pool order is the reverse of testnet's.
-    tokenMintA: MAINNET_MINTS.aUSD,
-    tokenMintB: MAINNET_MINTS.aBTC,
+    address: "BFfBYemdhWnnKtWbz3fkKwr7qnXbFCNjVGnoDygXokA8",
+    tokenMintA: MAINNET_MINTS.aBTC,
+    tokenMintB: MAINNET_MINTS.aUSD,
   }),
 });
 
@@ -113,8 +112,8 @@ export const NETWORKS = Object.freeze({
   mainnet: Object.freeze({
     programs: MAINNET, mints: MAINNET_MINTS, venues: MAINNET_VENUES,
     propamm: Object.freeze({
-      programId: "FD4NxsLrf1fmp4dmDLvNsdHG6hXNiDrRqAtqTBu1CsKR",
-      config: "2J1NMyykgaiuL6zU4akynjtGGYyqgKQpvdpH8QB6q7ZL",
+      programId: "5KMw4VNavLhM5wxTxyQGm8hs5ymFhqMCZ5BpkHybcEBV",
+      config: "3jwSNH8P5tNFMY72ZwFi5z3gEkK1vVor3xcAFvr4DHzr",
       baseMint: MAINNET_MINTS.aBTC, quoteMint: MAINNET_MINTS.aUSD,
     }),
   }),

@@ -31,8 +31,8 @@ fn main() {
     let config = key("3jwSNH8P5tNFMY72ZwFi5z3gEkK1vVor3xcAFvr4DHzr");
     let maker = key("A97DopD3nWbcwj89Suma32AhGfGUiLYZZzKqpP3H1PiG");
     let treasury = key("G31RGX9tmr7wE43aDPBHCLigAGn1EvvFQCvayZZm8kSK");
-    let bridge = key("BDPQ6wpXukc8YrjRBYFwCHBspWnHSLQjPFPEjgRJ8Riy");
-    let base = key("AzuWEhnYUv6NTAFrC2MtzKb4nASh6sCMcD15WUmoFR45");
+    let bridge = key("5n1fsUDhPiaALmxpaFCJeFdyTkZkxWXecgurV6dSxMq3");
+    let base = key("7g1nPCjKW7zzZ4q7mcABeFXaPSLfBQ6syrz4HnPGAVYt");
     let quote_mint = key("DQcBfwHu8gr8KGt3BE5BDUfBjGgFuDJYm9ByVTDsrww9");
     let user = key("9CEiuSgdHtub59syFf4Usf5eEJaEN5eQqEjJNeCatrJs");
     let base_vault = derive_vault_pda(&program, &config, &base).unwrap().0;
@@ -45,7 +45,7 @@ fn main() {
             base_mint: base,
             quote_mint,
             side,
-            base_amount: if buy { 400 } else { 1_000 },
+            base_amount: if buy { 400_000 } else { 1_000_000 },
             quote_amount: if buy { 1_000_000 } else { 2_500_000 },
             user_pubkey: user,
             expiry_ts: EXPIRY_MS,

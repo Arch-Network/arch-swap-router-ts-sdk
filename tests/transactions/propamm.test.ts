@@ -140,7 +140,7 @@ describe("native PropAMM contract", () => {
 
   it.each([
     ["testnet", "FosDeThFmSTGcaQxgyhaPWhBrnEovCJ7jHzTcwp1dmYi"],
-    ["mainnet", "9evqkMyLFGPCgvg15bJgEiwp5Y95ZQkQYtpfhetxcibQ"],
+    ["mainnet", "A97DopD3nWbcwj89Suma32AhGfGUiLYZZzKqpP3H1PiG"],
   ] as const)("pins the %s v2 config to the migration signer", (network, configId) => {
     const deployment = NETWORKS[network].propamm;
     expect(deriveAddress(deployment.programId, "config_v2", decodeAddress(configId))).toBe(deployment.config);

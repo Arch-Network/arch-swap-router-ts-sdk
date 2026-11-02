@@ -16,14 +16,15 @@ from prop-amm's `minting` revision
 bytes. The standalone exporter supplies only the server error type needed to
 compile `treasury_mint.rs` outside the server binary.
 
-Mainnet program/mint identities are real. The user, blockhash, mint ID, quote
+Mainnet program/mint identities were refreshed against the 2026-11-02 deployment
+(aETH `7g1nPC…`, 9 decimals; bridge `5n1fsU…`). The user, blockhash, mint ID, quote
 amounts and time are test values. No private keys or signatures are included.
 The fixed clock is `1800000000000` ms and expiry is 30 seconds later. These
 fixtures are for offline ABI tests, not transaction submission.
 
 At an illustrative price of 2,500 aUSD per aETH, the buy spends 1 aUSD for
-400 aETH base units; the sell spends 1,000 aETH base units for 2.5 aUSD, with
-a 1% output minimum. Both tokens have 6 decimals. Amount strings represent
+400,000 aETH base units; the sell spends 1,000,000 aETH base units for 2.5 aUSD, with
+a 1% output minimum. aETH has 9 decimals and aUSD has 6. Amount strings represent
 integer base units, and `signed_size` counts two placeholder signatures.
 
 ## Regenerate

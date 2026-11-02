@@ -1,8 +1,8 @@
 # Arch swap router TypeScript SDK
 
 A compact, browser-oriented SDK for fixed-pair swap estimates and router
-instructions on Arch. Testnet and mainnet swaps are configured; mainnet vaults
-and prime tokens remain placeholders.
+instructions on Arch. Testnet and mainnet-v2 swaps, vaults and prime tokens
+are configured.
 One quote call returns one estimate with its
 instructions, sized from either a fixed input or an approximate receive amount.
 Supported pairs use explicit one-to-three-hop routes
@@ -66,9 +66,9 @@ testnet-only aliases.
 
 Mainnet's router, CLAMM pool/program, PropAMM deployment and aBTC/aUSD mints are
 configured in [src/config/networks.ts](src/config/networks.ts). Its CLAMM pool
-orders aUSD as token A and aBTC as token B, the reverse of testnet.
-The vault program, vault accounts and prime-token mints remain **placeholders**;
-replace those before using mainnet vault routes. The client still exposes all
+orders aBTC as token A and aUSD as token B. Its vaults and prime-token mints
+match the mainnet-v2 deployment. The BTC RFQ and aETH market use the same
+PropAMM program and config. The client still exposes all
 12 fixed pairs. Supply a reader and optional RFQ provider for the selected
 network; there is no testnet fallback.
 Account validation, PDA/ATA derivation and instructions use the selected deployment.
@@ -229,7 +229,9 @@ Once submission binds the quote, retries must use the identical message; a new
 blockhash or route requires a fresh quote. The SDK does not sign or submit.
 
 After redemption, PropAMM accepts measured input only within
-`ceil(quotedInput * 9950 / 10000) .. quotedInput`. Execution outside that range
+`ceil(quotedInput * (10000 - max_input_shortfall_bps) / 10000) .. quotedInput`.
+PropAMM v4 stores the tolerance in its config; v2/v3 default to 50 bps.
+The on-chain router must support the config's storage version. Execution outside that range
 fails atomically; the SDK does not pad/cap the input or consume existing
 intermediate balances. There is no post-signing venue fallback.
 
@@ -277,8 +279,8 @@ interface DirectRfqQuote {
 
 Supply `directRfqQuoteProvider` with `network: "mainnet"` to add exactly two
 directions to `supportedPairs` (14 total): aUSD → aETH and aETH → aUSD.
-Use `MAINNET_AETH_USD.quoteMint` and `.baseMint` for these requests; the legacy
-`router.mints` configuration is separate. Both tokens use 6 decimal places.
+Use `MAINNET_AETH_USD.quoteMint` and `.baseMint` for these requests. Its aUSD
+mint is also `router.mints.aUSD`. aETH uses 9 decimal places; aUSD uses 6.
 
 ```ts
 import { createRouterClient, MAINNET_AETH_USD, type DirectRfqQuoteProvider,
