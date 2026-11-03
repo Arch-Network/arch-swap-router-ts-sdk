@@ -1,15 +1,12 @@
-import { fixedRoutes } from "./config/routes.js";
+import { buildRouteGraph, findRoutes, supportedPairs } from "./config/routes.js";
 import { NETWORKS, type NetworkConfig } from "./config/networks.js";
 import { MAINNET_AETH_USD as ethUsd } from "./config/aeth-usd.js";
-import { normalizeAethUsdBuy, normalizeAethUsdSell } from "./direct-rfq.js";
+import { composableAethSell, normalizeAethUsdBuy, normalizeAethUsdSell } from "./direct-rfq.js";
 import { RouterSdkError } from "./errors.js";
-import { loadClamm, prepareClammQuote } from "./clamm.js";
-import { quotePropAmm } from "./propamm.js";
-import { buildPropAmmInstructions, buildRouterInstruction } from "./transactions/instructions.js";
-import type { ResolvedStep } from "./transactions/types.js";
-import type { DirectRfqQuote, QuoteExactInRequest, QuoteForOutputRequest, RouterClient, RouterClientOptions, RouterSwapQuote, SwapQuote } from "./types.js";
-import { decodeAddress, deriveAddress, inputForOutput, readAccounts, U64_MAX } from "./utils.js";
-import { prepareVaultQuote } from "./vault.js";
+import { quoteCandidates } from "./quote-candidates.js";
+import { prepareQuoteState } from "./quote-state.js";
+import type { DirectRfqQuote, PropAmmQuoteProvider, QuoteExactInRequest, QuoteForOutputRequest, RouterClient, RouterClientOptions, RouterSwapQuote, SwapQuote } from "./types.js";
+import { decodeAddress, U64_MAX } from "./utils.js";
 
 function isAethUsdPair(inputMint: string, outputMint: string): boolean {
   return (inputMint === ethUsd.quoteMint && outputMint === ethUsd.baseMint)
@@ -29,100 +26,51 @@ function validateRequest(request: QuoteExactInRequest | QuoteForOutputRequest, a
   }
 }
 
-export function createRouterClient({ source, network = "testnet", propAmmQuoteProvider, directRfqQuoteProvider }: RouterClientOptions): RouterClient {
+export function createRouterClient({ source, network = "testnet", propAmmQuoteProvider, directRfqQuoteProvider, composableAethSells = false }: RouterClientOptions): RouterClient {
   if (!Object.hasOwn(NETWORKS, network)) {
     throw new RouterSdkError("INVALID_NETWORK", `Unknown network: ${network}.`);
   }
   const config: NetworkConfig | null = NETWORKS[network];
-  const routes = config ? fixedRoutes(config.mints) : [];
   const directProvider = network === "mainnet" ? directRfqQuoteProvider : undefined;
+  if (composableAethSells && !directProvider) {
+    throw new RouterSdkError("INVALID_REQUEST", "Composable aETH sells require a mainnet directRfqQuoteProvider.");
+  }
+  const enabledMarkets = [...(propAmmQuoteProvider ? ["btc-usd"] : []), ...(composableAethSells ? ["aeth-usd"] : [])];
+  const graph = config ? buildRouteGraph(config, enabledMarkets) : undefined;
+  const pairs = graph ? supportedPairs(graph) : [];
   const directPairs = directProvider ? [
     { inputMint: ethUsd.quoteMint, outputMint: ethUsd.baseMint },
     { inputMint: ethUsd.baseMint, outputMint: ethUsd.quoteMint },
   ] : [];
   async function quote(request: QuoteExactInRequest | QuoteForOutputRequest, amount: bigint, forOutput: boolean): Promise<RouterSwapQuote> {
-    if (!config) throw new RouterSdkError("NETWORK_NOT_CONFIGURED", `${network} deployment is not configured.`);
-    const { programs, venues } = config;
+    if (!config || !graph) throw new RouterSdkError("NETWORK_NOT_CONFIGURED", `${network} deployment is not configured.`);
     const { inputMint, outputMint, slippageBps, user, deadlineMs } = request;
     validateRequest(request, amount, forOutput);
-    const route = routes.find(
-      (route) => route.inputMint === inputMint && route.outputMint === outputMint,
-    );
-    if (!route) {
+    const candidates = findRoutes(graph, inputMint, outputMint, { forOutput });
+    if (!candidates.length) {
       throw new RouterSdkError("UNSUPPORTED_PAIR", forOutput && directProvider && isAethUsdPair(inputMint, outputMint)
         ? "aETH/aUSD supports exact-input quotes only." : "The requested mint pair is not supported.");
     }
-    const now = BigInt(Math.floor(Date.now() / 1000));
-    const swapIndex = route.steps.findIndex((step) => step.venue === "clamm");
-    const clammStep = route.steps[swapIndex];
-    const propamm = !forOutput && clammStep && propAmmQuoteProvider ? config.propamm : undefined;
-    const pool = venues.clamm;
-    const clammKeys = [pool.address, pool.tokenMintA, pool.tokenMintB];
-    const keys = route.steps.flatMap((step) => {
-      if (step.venue === "clamm") {
-        // With RFQ enabled, isolate pool reads so their failure cannot hide PropAMM.
-        return propamm ? [] : clammKeys;
-      }
-      const vault = venues[step.venue];
-      return [vault.address, vault.assetMint, vault.shareMint, deriveAddress(programs.vaultProgramId, "reserve", decodeAddress(vault.shareMint))];
+    if (composableAethSells && inputMint === ethUsd.baseMint && deadlineMs <= Date.now()) {
+      throw new RouterSdkError("RFQ_EXPIRED", "Composable aETH sell deadline has expired.");
+    }
+    const state = await prepareQuoteState(source, config, candidates);
+    const providers = new Map<string, PropAmmQuoteProvider>();
+    if (propAmmQuoteProvider) providers.set("btc-usd", propAmmQuoteProvider);
+    if (composableAethSells && directProvider) providers.set("aeth-usd", {
+      async quoteExactIn(input) {
+        const sell = { ...input, slippageBps, deadlineMs };
+        return composableAethSell(sell, await directProvider.quoteExactIn({ ...sell }));
+      },
     });
-    const accounts = keys.length ? await readAccounts(source, keys) : new Map();
-    const vaults = route.steps.map((step) => step.venue === "clamm"
-      ? undefined
-      : prepareVaultQuote(accounts, venues[step.venue], step.operation, now, programs));
-    const swapInput = propamm && swapIndex > 0 ? vaults[0]!.estimate(amount) : amount;
-    const buildQuote = (amountIn: bigint, amountsOut: readonly bigint[], steps: readonly ResolvedStep[], effectiveDeadline = deadlineMs, quoteId?: string): RouterSwapQuote => {
-      const amountOut = amountsOut[amountsOut.length - 1]!;
-      const minAmountOut = amountOut * BigInt(10_000 - slippageBps) / 10_000n;
-      if (minAmountOut === 0n) throw new RouterSdkError("ZERO_OUTPUT", "Slippage leaves a zero minimum output.");
-      const input = { user, inputMint, amountIn, minAmountOut, deadlineMs: effectiveDeadline, steps };
-      return {
-        inputMint, outputMint, amountIn, estimatedAmountOut: amountOut, minAmountOut, deadlineMs: effectiveDeadline,
-        hops: steps.map((step, i) => ({
-          kind: step.kind, inputMint: i === 0 ? inputMint : steps[i - 1]!.outputMint, outputMint: step.outputMint,
-          amountIn: i === 0 ? amountIn : amountsOut[i - 1]!, estimatedAmountOut: amountsOut[i]!,
-        })),
-        instructions: quoteId === undefined ? [buildRouterInstruction(input, programs)] : buildPropAmmInstructions(input, programs),
-        ...(quoteId === undefined ? {} : { rfq: { quoteId } }),
-      };
-    };
-    const quoteClamm = async () => {
-      let swap;
-      if (clammStep) {
-        const poolAccounts = propamm
-          ? new Map([...accounts, ...await readAccounts(source, clammKeys.filter((key) => !accounts.has(key)))])
-          : accounts;
-        const clamm = loadClamm(poolAccounts, clammStep.inputMint === pool.tokenMintA, config);
-        swap = prepareClammQuote(clamm, await readAccounts(source, clamm.addresses));
-      }
-      const hops = vaults.map((vault) => vault ?? swap!);
-      const estimate = (input: bigint) => hops.reduce((value, hop) => hop.estimate(value), input);
-      const amountIn = forOutput ? inputForOutput(estimate, amount).amountIn : amount;
-      let value = amountIn;
-      const amountsOut = hops.map((hop, i) => value = propamm && i < swapIndex ? swapInput : hop.estimate(value));
-      return buildQuote(amountIn, amountsOut, hops.map((hop) => hop.resolved));
-    };
-    if (!propamm) return quoteClamm();
-
-    const quoteRfq = async () => {
-      const rfq = await quotePropAmm(propAmmQuoteProvider!, {
-        inputMint: clammStep!.inputMint, outputMint: clammStep!.outputMint, amountIn: swapInput, user, deadlineMs,
-      }, propamm);
-      const amountsOut = vaults.map((vault, i) => i < swapIndex ? swapInput
-        : vault ? vault.estimate(rfq.estimatedAmountOut) : rfq.estimatedAmountOut);
-      return buildQuote(amount, amountsOut, vaults.map((vault) => vault?.resolved ?? rfq.resolved), rfq.deadlineMs, rfq.quoteId);
-    };
-    const [clamm, rfq] = await Promise.allSettled([quoteClamm(), quoteRfq()]);
-    // Pool/tick reads may have outlasted a valid RFQ: check freshness at selection.
-    if (rfq.status === "fulfilled" && rfq.value.deadlineMs > Date.now()
-      && (clamm.status === "rejected" || rfq.value.estimatedAmountOut > clamm.value.estimatedAmountOut)) return rfq.value;
-    if (clamm.status === "fulfilled") return clamm.value;
-    throw new RouterSdkError("NO_ROUTE", "Neither CLAMM nor PropAMM produced a usable quote.", {
-      cause: new AggregateError([clamm.reason, rfq.status === "rejected" ? rfq.reason : new RouterSdkError("RFQ_EXPIRED", "PropAMM quote expired during selection.")]),
+    return quoteCandidates({
+      candidates, state, config, request: { inputMint, outputMint, slippageBps, user, deadlineMs },
+      amount, forOutput, propAmmQuoteProviders: providers,
     });
   }
   async function quoteExactIn(request: QuoteExactInRequest): Promise<SwapQuote> {
-    if (!directProvider || !isAethUsdPair(request.inputMint, request.outputMint)) return quote(request, request.amountIn, false);
+    if (!directProvider || !isAethUsdPair(request.inputMint, request.outputMint)
+      || (composableAethSells && request.inputMint === ethUsd.baseMint)) return quote(request, request.amountIn, false);
     // Keep the validated request stable across the provider's asynchronous call.
     const input = { ...request };
     validateRequest(input, input.amountIn, false);
@@ -145,7 +93,8 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
   return Object.freeze<RouterClient>({
     network,
     mints: config?.mints ?? null,
-    supportedPairs: Object.freeze([...routes, ...directPairs].map(({ inputMint, outputMint }) => Object.freeze({ inputMint, outputMint }))),
+    supportedPairs: Object.freeze([...new Map([...pairs, ...directPairs].map((pair) =>
+      [`${pair.inputMint}:${pair.outputMint}`, Object.freeze(pair)] as const)).values()]),
     quoteExactIn,
     quoteForOutput: (request) => quote(request, request.amountOut, true),
   });

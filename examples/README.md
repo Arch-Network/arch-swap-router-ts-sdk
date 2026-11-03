@@ -11,6 +11,40 @@ for quote-only integrations using `createRouterClient`'s `directRfqQuoteProvider
 Its URL includes `/rfq`, without `/quote`. The live smoke tests use this provider
 without invoking wallet signing, submission or confirmation.
 
+## Composable sell quotes
+
+Reuse that provider with the mainnet router's optional sell mode:
+
+```ts
+import { createRouterClient, MAINNET_AETH_USD } from "@arch-network/swap-router-sdk";
+import { createAethUsdRfqProvider } from "./aeth-usd.js";
+
+const router = createRouterClient({
+  network: "mainnet", source,
+  directRfqQuoteProvider: createAethUsdRfqProvider(`${options.serverUrl}/rfq`, options.post),
+  composableAethSells: true,
+});
+const quote = await router.quoteExactIn({
+  inputMint: MAINNET_AETH_USD.baseMint, outputMint: router.mints!.primeUSD,
+  amountIn: 1_000_000n, slippageBps: 100, user,
+  deadlineMs: Date.now() + 30_000,
+});
+```
+
+Here `source`, `options` and the wallet's `user` come from the application's
+callbacks below. `quote` contains router instructions for aETH → aUSD → primeUSD;
+use `MAINNET_AETH_USD.quoteMint` for aUSD output. Narrow the quote to the router
+branch, compile with `compileRouterMessage` and a fresh blockhash, user-sign that
+complete message, and send its flat transaction plus `quote_id: quote.rfq!.quoteId`
+to `/rfq/swap`. The server must enable the matching router and vault program.
+There are zero account-reader calls for aUSD and one four-account batch for
+primeUSD, plus one RFQ call in either case.
+
+`prepareAethUsdSwap` below continues to prepare original direct transactions;
+the opt-in above uses `createRouterClient` directly. Treasury buys keep their
+original flow. BTC compositions, reverse primeUSD buys and receive sizing are
+not enabled by this option. No signing or submission occurs when quoting.
+
 Run the offline example tests from the SDK root:
 
 ```sh

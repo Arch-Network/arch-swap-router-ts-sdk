@@ -1,8 +1,8 @@
 import { base58 } from "@scure/base";
 import { MAINNET_AETH_USD as market } from "./config/aeth-usd.js";
 import { RouterSdkError } from "./errors.js";
-import type { DirectRfqQuote, QuoteExactInRequest, ServerTransactionSwapQuote } from "./types.js";
-import { assertTransactionSize } from "./transactions/size.js";
+import type { DirectRfqQuote, PropAmmQuote, QuoteExactInRequest, ServerTransactionSwapQuote } from "./types.js";
+import { assertMessageLimits } from "./transactions/size.js";
 import { decodeAddress, deriveAddress, deriveProgramAddress, U64_MAX } from "./utils.js";
 
 function requireRfq(valid: boolean, message: string): void {
@@ -52,7 +52,7 @@ function readDirectRfq(request: QuoteExactInRequest, quote: DirectRfqQuote, serv
     }
   }
   // The RFQ response is unsigned; reserve space for both eventual signatures.
-  assertTransactionSize({ ...transaction, signatures: [new Uint8Array(64), new Uint8Array(64)] }, "Direct RFQ transaction");
+  assertMessageLimits(message, "Direct RFQ transaction");
   return { user, deadlineMs, transaction, message, header, keys };
 }
 
@@ -154,5 +154,19 @@ export function normalizeAethUsdSell(request: QuoteExactInRequest, quote: Direct
     hops: [{ kind: "propamm", inputMint: request.inputMint, outputMint: request.outputMint,
       amountIn: request.amountIn, estimatedAmountOut: quote.estimatedAmountOut }],
     transaction, rfq: { quoteId: quote.quoteId },
+  };
+}
+
+/** Reuse a validated native sell's terms in a separately co-signed router message. */
+export function composableAethSell(request: QuoteExactInRequest, quote: DirectRfqQuote): PropAmmQuote {
+  normalizeAethUsdSell(request, quote);
+  const data = quote.transaction.message.instructions[0]!.data;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  return {
+    quoteId: quote.quoteId, quoteSigner: market.quoteSigner, estimatedAmountOut: quote.estimatedAmountOut,
+    terms: {
+      side: "sell", baseAmount: view.getBigUint64(2, true), quoteAmount: view.getBigUint64(10, true),
+      expiryMs: view.getBigUint64(18, true), nonce: view.getBigUint64(26, true),
+    },
   };
 }

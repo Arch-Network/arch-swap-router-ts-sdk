@@ -42,7 +42,7 @@ describe("mainnet-v2 deployment account snapshots", () => {
   });
 
   it("shares the verified PropAMM config across the BTC and ETH markets", () => {
-    const deployment = NETWORKS.mainnet.propamm;
+    const deployment = NETWORKS.mainnet.propammMarkets[0]!;
     expect(deployment.config).toBe(accounts.propammConfig.address);
     expect(deployment.programId).toBe(accounts.propammConfig.owner);
     expect(eth.config).toBe(deployment.config);

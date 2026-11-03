@@ -2,7 +2,7 @@ import { base58, hex } from "@scure/base";
 import { RouterSdkError, type PropAmmQuoteProvider } from "../../src/index.js";
 import { NETWORKS } from "../../src/config/networks.js";
 
-const deployment = NETWORKS.mainnet.propamm;
+const deployment = NETWORKS.mainnet.propammMarkets[0]!;
 const hexAddress = (address: string) => hex.encode(base58.decode(address));
 
 function record(value: unknown): Record<string, unknown> {

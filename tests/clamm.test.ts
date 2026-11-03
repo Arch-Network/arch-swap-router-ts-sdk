@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccountInfoResult } from "@arch-network/arch-sdk";
 import { createRouterClient, TESTNET_MINTS } from "../src/index.js";
 import { NETWORKS, TESTNET, TESTNET_VENUES } from "../src/config/networks.js";
-import { FIXED_ROUTES } from "../src/config/routes.js";
+import { TESTNET_ROUTES } from "../src/config/routes.js";
 import { decodePool, decodeTickArray, loadClamm, prepareClammQuote, simulateClamm, tickSqrtPrice, tickWindow } from "../src/clamm.js";
 import { decodeAddress, deriveAddress, U64_MAX } from "../src/utils.js";
 import { expectedRouterInstruction, fixtures, namedFixture } from "./transactions/fixtures.js";
@@ -149,7 +149,7 @@ describe("native CLAMM contract", () => {
   });
 });
 
-describe("fixed route quotes", () => {
+describe("graph-generated route quotes", () => {
   beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(Number(now) * 1000); });
   afterEach(() => { vi.restoreAllMocks(); });
 
@@ -197,7 +197,7 @@ describe("fixed route quotes", () => {
     const { accounts, source, request, client } = setup();
     const inputMint = TESTNET_MINTS[expected.input as keyof typeof TESTNET_MINTS];
     const outputMint = TESTNET_MINTS[expected.output as keyof typeof TESTNET_MINTS];
-    const route = FIXED_ROUTES.find((r) => r.inputMint === inputMint && r.outputMint === outputMint)!;
+    const route = TESTNET_ROUTES.find((r) => r.inputMint === inputMint && r.outputMint === outputMint)!;
     const containsClamm = route.steps.some((s) => s.venue === "clamm");
     const quote = await client.quoteExactIn({ ...request, inputMint, outputMint });
     expect(quote.estimatedAmountOut).toBe(BigInt(expected.amountOut));
@@ -238,7 +238,7 @@ describe("fixed route quotes", () => {
       inputMint: TESTNET_MINTS[expected.input as keyof typeof TESTNET_MINTS],
       outputMint: TESTNET_MINTS[expected.output as keyof typeof TESTNET_MINTS],
     };
-    const route = FIXED_ROUTES.find((r) => r.inputMint === pair.inputMint && r.outputMint === pair.outputMint)!;
+    const route = TESTNET_ROUTES.find((r) => r.inputMint === pair.inputMint && r.outputMint === pair.outputMint)!;
     const quote = await client.quoteForOutput({ ...request, ...pair, amountOut: BigInt(expected.amountOut) });
     expect(quote.estimatedAmountOut).toBe(BigInt(expected.amountOut));
     expect(quote.minAmountOut).toBe(BigInt(expected.minAmountOut));

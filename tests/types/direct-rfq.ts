@@ -65,6 +65,14 @@ export async function receiveQuoteRemainsRouter(client: RouterClient, request: Q
   return quote.instructions;
 }
 
+export function clientWithComposableAethSells(source: RouterDataSource, directRfqQuoteProvider: DirectRfqQuoteProvider): RouterClient {
+  const options: RouterClientOptions = { source, network: "mainnet", directRfqQuoteProvider, composableAethSells: true };
+  // @ts-expect-error The explicit opt-in must be boolean.
+  const invalid: RouterClientOptions = { ...options, composableAethSells: "true" };
+  void invalid;
+  return createRouterClient(options);
+}
+
 export function serverQuoteRequiresId(quote: Omit<ServerTransactionSwapQuote, "rfq">) {
   // @ts-expect-error Every server transaction needs RFQ submission metadata.
   const invalid: SwapQuote = quote;

@@ -4,7 +4,7 @@ import { NETWORKS } from "../src/config/networks.js";
 import native from "./fixtures/propamm/trades.json" with { type: "json" };
 import { createMainnetPropAmmRfqProvider } from "./helpers/propamm-rfq.js";
 
-const deployment = NETWORKS.mainnet.propamm;
+const deployment = NETWORKS.mainnet.propammMarkets[0]!;
 const rfqUrl = "https://vaults.veloxapi.net/propamm/rfq";
 const user = base58.encode(new Uint8Array(32).fill(1));
 const signer = base58.encode(new Uint8Array(32).fill(2));
