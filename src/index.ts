@@ -8,6 +8,7 @@ export { compileRouterMessage } from "./utils.js";
 export { TRANSACTION_SIZE_LIMIT } from "./transactions/size.js";
 export type {
   Address,
+  DirectRfqMarket,
   DirectRfqQuote,
   DirectRfqQuoteProvider,
   PropAmmQuote,

@@ -81,6 +81,8 @@ export interface VaultVenue {
   readonly shareMint: Address;
 }
 export interface PropAmmDeployment {
+  readonly treasuryAuthority?: Address;
+  readonly bridgeProgramId?: Address;
   readonly programId: Address;
   readonly config: Address;
   readonly baseMint: Address;

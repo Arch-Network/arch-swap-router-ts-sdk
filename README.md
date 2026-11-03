@@ -467,3 +467,9 @@ See [AETH_AUSD_SDK_HANDOVER.md](AETH_AUSD_SDK_HANDOVER.md) for the fixed deploym
 HTTP provider mapping, signing/submission contract and offline verification evidence.
 The [working example](examples/README.md) wires HTTP, wallet signing, submission,
 confirmation and explicit retries; its mocked tests cover both directions.
+
+### Additional treasury markets
+
+`directRfqMarkets` accepts trusted deployment records for assets using the same treasury-buy and compact-sell templates as ETH. Supply this catalog from application configuration, never from the quote response or an unverified `/markets` response. The router derives each token vault and bridge asset account, validates the entire server transaction against the selected record, and composes the validated terms into a router instruction. Omit the option to retain the pinned ETH default; an empty array disables direct markets. These graph edges support exact input only and can compose with vault and CLAMM edges. Arch Prime can wrap the resulting instructions with lending transfers.
+
+The RFQ service must separately enable the token, pricing-engine asset and market. Listing a token in this SDK does not create accounts, enable lending-account settlement, or guarantee maker capacity. Mainnet remains the only network with direct RFQ support. `composableAethSells` still describes the existing ETH router composition only.

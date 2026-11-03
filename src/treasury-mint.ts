@@ -15,18 +15,19 @@ export interface TreasuryMintQuote {
 
 /** Canonical addresses are derived locally; treasury routing adds no account read. */
 export function resolveTreasuryMint(quote: TreasuryMintQuote, deployment: PropAmmDeployment): ResolvedStep {
-  if (deployment.programId !== market.programId || deployment.config !== market.config
-    || deployment.baseMint !== market.baseMint || deployment.quoteMint !== market.quoteMint) {
+  const trusted = deployment.treasuryAuthority && deployment.bridgeProgramId ? deployment : market;
+  if (deployment.programId !== trusted.programId || deployment.config !== trusted.config
+    || deployment.baseMint !== trusted.baseMint || deployment.quoteMint !== trusted.quoteMint) {
     throw new RouterSdkError("INVALID_RFQ", "Treasury quote does not match the aETH deployment.");
   }
   return {
     kind: "treasuryMint", outputMint: deployment.baseMint,
     terms: { ...quote.terms, issuanceId: quote.terms.issuanceId.slice() },
-    bridgeProgramId: market.bridgeProgramId, treasuryAuthority: market.treasuryAuthority,
-    bridgeConfig: deriveAddress(market.bridgeProgramId, "config"),
-    assetConfig: deriveAddress(market.bridgeProgramId, "asset", decodeAddress(deployment.baseMint)),
-    issuanceReceipt: deriveAddress(market.bridgeProgramId, "treasury_mint", quote.terms.issuanceId),
-    mintAuthority: deriveAddress(market.bridgeProgramId, "mint-authority", decodeAddress(deployment.baseMint)),
+    bridgeProgramId: trusted.bridgeProgramId!, treasuryAuthority: trusted.treasuryAuthority!,
+    bridgeConfig: deriveAddress(trusted.bridgeProgramId!, "config"),
+    assetConfig: deriveAddress(trusted.bridgeProgramId!, "asset", decodeAddress(deployment.baseMint)),
+    issuanceReceipt: deriveAddress(trusted.bridgeProgramId!, "treasury_mint", quote.terms.issuanceId),
+    mintAuthority: deriveAddress(trusted.bridgeProgramId!, "mint-authority", decodeAddress(deployment.baseMint)),
     propammConfig: deployment.config,
     paymentVault: deriveAddress(deployment.programId, "vault", decodeAddress(deployment.config), decodeAddress(deployment.quoteMint)),
   };

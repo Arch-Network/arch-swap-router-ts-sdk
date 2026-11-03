@@ -72,6 +72,20 @@ export interface DirectRfqQuote {
   readonly treasuryAuthorization?: TreasuryAuthorization;
 }
 
+/** Trusted deployment data supplied by the host, never taken from an RFQ response. */
+export interface DirectRfqMarket {
+  readonly baseMint: Address;
+  readonly quoteMint: Address;
+  readonly programId: Address;
+  readonly config: Address;
+  readonly quoteSigner: Address;
+  readonly treasuryAuthority: Address;
+  readonly bridgeProgramId: Address;
+  readonly tokenProgramId: Address;
+  readonly associatedTokenProgramId: Address;
+  readonly systemProgramId: Address;
+}
+
 export interface DirectRfqQuoteProvider {
   quoteExactIn(request: QuoteExactInRequest): Promise<DirectRfqQuote>;
 }
@@ -121,6 +135,8 @@ export interface RouterClientOptions {
   readonly propAmmQuoteProvider?: PropAmmQuoteProvider;
   /** aETH/aUSD native swap or treasury packets; enables all mainnet aETH graph routes. */
   readonly directRfqQuoteProvider?: DirectRfqQuoteProvider;
+  /** Trusted RFQ markets added to the routing graph; omitted retains ETH, [] disables it. */
+  readonly directRfqMarkets?: readonly DirectRfqMarket[];
 }
 
 export interface RouterClient {

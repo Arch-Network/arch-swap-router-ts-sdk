@@ -1,7 +1,7 @@
 import { buildRouteGraph, findRoutes, supportedPairs } from "./config/routes.js";
 import { NETWORKS, type NetworkConfig } from "./config/networks.js";
 import { MAINNET_AETH_USD as ethUsd } from "./config/aeth-usd.js";
-import { composableAethSwap } from "./direct-rfq.js";
+import { composableDirectRfqSwap } from "./direct-rfq.js";
 import { RouterSdkError } from "./errors.js";
 import type { RoutedRfqQuoteProvider } from "./propamm.js";
 import { quoteCandidates } from "./quote-candidates.js";
@@ -22,13 +22,21 @@ function validateRequest(request: QuoteExactInRequest | QuoteForOutputRequest, a
   }
 }
 
-export function createRouterClient({ source, network = "testnet", propAmmQuoteProvider, directRfqQuoteProvider }: RouterClientOptions): RouterClient {
+export function createRouterClient({ source, network = "testnet", propAmmQuoteProvider, directRfqQuoteProvider, directRfqMarkets = [ethUsd] }: RouterClientOptions): RouterClient {
   if (!Object.hasOwn(NETWORKS, network)) {
     throw new RouterSdkError("INVALID_NETWORK", `Unknown network: ${network}.`);
   }
-  const config: NetworkConfig | null = NETWORKS[network];
+  const original = NETWORKS[network];
+  const markets = network === "mainnet" ? directRfqMarkets.map((market, index) => {
+    for (const key of ["baseMint", "quoteMint", "programId", "config", "quoteSigner", "treasuryAuthority", "bridgeProgramId", "tokenProgramId", "associatedTokenProgramId", "systemProgramId"] as const) decodeAddress(market[key]);
+    if (market.baseMint === market.quoteMint) throw new RouterSdkError("INVALID_REQUEST", "Distinct market mints required.");
+    return Object.freeze({ ...market, id: `configured-${index}`, sides: ["buy", "sell"] as const, allowClamm: true });
+  }) : [];
+  const keys = markets.map(m => [m.baseMint, m.quoteMint].sort().join(":"));
+  if (new Set(keys).size !== keys.length) throw new RouterSdkError("INVALID_REQUEST", "Duplicate direct RFQ market.");
+  const config: NetworkConfig = { ...original, propammMarkets: [...original.propammMarkets.filter(m => m.id !== "aeth-usd"), ...markets] };
   const directProvider = network === "mainnet" ? directRfqQuoteProvider : undefined;
-  const enabledMarkets = [...(propAmmQuoteProvider ? ["btc-usd"] : []), ...(directProvider ? ["aeth-usd"] : [])];
+  const enabledMarkets = [...(propAmmQuoteProvider ? ["btc-usd"] : []), ...(directProvider ? markets.map(m => m.id) : [])];
   const graph = config ? buildRouteGraph(config, enabledMarkets) : undefined;
   const pairs = graph ? supportedPairs(graph) : [];
   async function quote(request: QuoteExactInRequest | QuoteForOutputRequest, amount: bigint, forOutput: boolean): Promise<RouterSwapQuote> {
@@ -47,10 +55,10 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
     const state = await prepareQuoteState(source, config, candidates);
     const providers = new Map<string, RoutedRfqQuoteProvider>();
     if (propAmmQuoteProvider) providers.set("btc-usd", propAmmQuoteProvider);
-    if (directProvider) providers.set("aeth-usd", {
+    if (directProvider) for (const market of markets) providers.set(market.id, {
       async quoteExactIn(input) {
         const swap = { ...input, slippageBps, deadlineMs };
-        return composableAethSwap(swap, await directProvider.quoteExactIn({ ...swap }));
+        return composableDirectRfqSwap(swap, await directProvider.quoteExactIn({ ...swap }), market);
       },
     });
     return quoteCandidates({
