@@ -26,7 +26,7 @@ describe.skipIf(!repository)("SDK packets against the external PropAMM CLAMM val
     const states = [...assets.map(setupComposableAeth), ...assets.map(setupComposableAethBuy)];
     for (const state of states) {
       const quote = await state.client.quoteExactIn(state.request);
-      if (quote.execution === "serverTransaction") throw new Error("Expected a router packet");
+
       const message = compileRouterMessage(quote.instructions, state.request.user, new Uint8Array(32));
       const transaction = { version: 0, message, signatures: [new Uint8Array(64), new Uint8Array(64)] };
       const signedSize = TransactionUtil.serializedSize(transaction);

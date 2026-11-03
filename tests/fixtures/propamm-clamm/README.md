@@ -1,6 +1,6 @@
 # PropAMM CLAMM validator replay
 
-This optional offline test creates real SDK quotes for all eight opted-in aETH
+This optional offline test creates real SDK quotes for all eight mainnet aETH
 buy/sell directions and compiles the external PropAMM server's **unmodified**
 `server/src/router_transaction.rs` into a temporary Rust binary. `verify.rs`
 provides only the enclosing error and issued-quote types used by that module.

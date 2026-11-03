@@ -27,7 +27,7 @@ describe("native aETH buy routing", () => {
       : await createRouterClient({ network: "mainnet", source: state.source }).quoteExactIn({ ...state.request, outputMint: market.quoteMint });
     state.source.getAccounts.mockClear();
     const quote = await state.client.quoteExactIn(state.request);
-    if (quote.execution === "serverTransaction") throw new Error("Expected a router buy");
+
     const amountIn = prefix?.estimatedAmountOut ?? state.request.amountIn;
     expect(state.directRfqQuoteProvider.quoteExactIn).toHaveBeenCalledExactlyOnceWith({
       ...state.request, inputMint: market.quoteMint, amountIn,
@@ -57,38 +57,10 @@ describe("native aETH buy routing", () => {
     expect(rfq.transaction.signatures).toEqual([]);
   });
 
-  it.each([
-    { sells: false, buys: false, count: 14 }, { sells: true, buys: false, count: 17 },
-    { sells: false, buys: true, count: 17 }, { sells: true, buys: true, count: 20 },
-  ])("exposes $count unique pairs with sells=$sells and buys=$buys", ({ sells, buys, count }) => {
-    const state = setup();
-    const client = createRouterClient({ ...state.options, composableAethSells: sells, composableAethBuys: buys });
-    expect(client.supportedPairs).toHaveLength(count);
-    expect(new Set(client.supportedPairs.map(pair => `${pair.inputMint}:${pair.outputMint}`)).size).toBe(count);
-    for (const mint of [config.mints.aBTC, config.mints.primeBTC, config.mints.primeUSD]) {
-      expect(client.supportedPairs.some(pair => pair.inputMint === mint && pair.outputMint === market.baseMint)).toBe(buys);
-      expect(client.supportedPairs.some(pair => pair.inputMint === market.baseMint && pair.outputMint === mint)).toBe(sells);
-    }
-    expect(config.propammMarkets[1]!.sides).toEqual(["sell", "buy"]);
-    expect(Object.isFrozen(config.propammMarkets[1]!.sides)).toBe(true);
-    expect(client.supportedPairs.every(Object.isFrozen)).toBe(true);
-    expect(state.source.getAccounts).not.toHaveBeenCalled();
-    expect(state.directRfqQuoteProvider.quoteExactIn).not.toHaveBeenCalled();
-  });
-
   it("reaches all 20 directions without a BTC RFQ provider", () => {
     const state = setup();
     const { propAmmQuoteProvider: _unused, ...options } = state.options;
     expect(createRouterClient(options).supportedPairs).toHaveLength(20);
-  });
-
-  it.each(["mainnet", "testnet"] as const)("requires a mainnet direct provider for buys on %s", network => {
-    const state = setup();
-    expect(() => createRouterClient({ source: state.source, network, composableAethBuys: true }))
-      .toThrow(expect.objectContaining({ code: "INVALID_REQUEST" }));
-    if (network === "testnet") expect(() => createRouterClient({ ...state.options, network }))
-      .toThrow(expect.objectContaining({ code: "INVALID_REQUEST" }));
-    expect(state.source.getAccounts).not.toHaveBeenCalled();
   });
 
   it.each(cases)("rejects expired requests and receive sizing before I/O from $input", async ({ input }) => {
@@ -126,7 +98,7 @@ describe("native aETH buy routing", () => {
     const quote = await state.client.quoteExactIn({ ...state.request, amountIn });
     expect(quote.amountIn).toBe(amountIn);
     expect(quote.estimatedAmountOut).toBe(amountIn * 2n / 5n);
-    if (quote.execution === "serverTransaction") throw new Error("Expected a router buy");
+
     expect(new DataView(quote.instructions[1]!.data.buffer).getBigUint64(36, true)).toBe(amountIn);
   });
 

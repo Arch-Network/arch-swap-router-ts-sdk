@@ -4,10 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRouterClient, MAINNET_AETH_USD as market, type DirectRfqQuote, type QuoteExactInRequest } from "../src/index.js";
 import { MAINNET_MINTS } from "../src/config/networks.js";
 import fixtures from "./fixtures/aeth-usd/transactions.json" with { type: "json" };
+import nativeBuy from "./fixtures/aeth-usd/native-buy.json" with { type: "json" };
 import { nativeTransaction } from "./fixtures/aeth-usd/transactions.js";
 
 function setup(side = "buy") {
-  const fixture = fixtures.cases.find(value => value.side === side)!;
+  const fixture = side === "buy" ? nativeBuy : fixtures.cases.find(value => value.side === side)!;
   const request = {
     inputMint: fixture.input_mint, outputMint: fixture.output_mint,
     amountIn: BigInt(fixture.amount_in), slippageBps: 100,
@@ -32,22 +33,21 @@ function expectNoFallback({ source, propAmmQuoteProvider }: ReturnType<typeof se
 beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(fixtures.now_ms); });
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
 
-describe("direct ETH/USD client dispatch", () => {
-  it.each(["buy", "sell"])("returns the validated original %s transaction through the public API", async side => {
+describe("automatic ETH/USD router dispatch", () => {
+  it.each(["buy", "sell"])("always returns router instructions for %s without a composability option", async side => {
     const state = setup(side);
     const result = await state.router.quoteExactIn(state.request);
     expect(result).toMatchObject({
-      execution: "serverTransaction", inputMint: state.request.inputMint, outputMint: state.request.outputMint,
+      inputMint: state.request.inputMint, outputMint: state.request.outputMint,
       amountIn: state.request.amountIn, estimatedAmountOut: state.rfq.estimatedAmountOut,
       minAmountOut: BigInt(state.fixture.min_amount_out), deadlineMs: state.fixture.expires_at_ms,
       rfq: { quoteId: state.rfq.quoteId },
-      hops: [{ kind: side === "buy" ? "treasuryMint" : "propamm", inputMint: state.request.inputMint,
+      hops: [{ kind: "propamm", inputMint: state.request.inputMint,
         outputMint: state.request.outputMint, amountIn: state.request.amountIn, estimatedAmountOut: state.rfq.estimatedAmountOut }],
     });
-    if (result.execution !== "serverTransaction") throw new Error("Expected a server transaction");
-    expect(result.transaction).toBe(state.rfq.transaction);
-    expect(hex.encode(TransactionUtil.serialize(result.transaction))).toBe(state.fixture.transaction_hex);
-    expect(result).not.toHaveProperty("instructions");
+    expect(hex.encode(TransactionUtil.serialize(state.rfq.transaction))).toBe(state.fixture.transaction_hex);
+    expect(result).not.toHaveProperty("transaction");
+    expect(result.instructions).toHaveLength(2);
     expect(state.directRfqQuoteProvider.quoteExactIn.mock.calls).toEqual([[state.request]]);
     expectNoFallback(state);
   });
@@ -67,9 +67,8 @@ describe("direct ETH/USD client dispatch", () => {
     const expectedBytes = hex.encode(TransactionUtil.serialize(state.rfq.transaction));
     expect(expectedBytes).not.toBe(state.fixture.transaction_hex);
     const result = await state.router.quoteExactIn(state.request);
-    if (result.execution !== "serverTransaction") throw new Error("Expected a server transaction");
-    expect(result.transaction).toBe(state.rfq.transaction);
-    expect(hex.encode(TransactionUtil.serialize(result.transaction))).toBe(expectedBytes);
+    expect(result.instructions).toHaveLength(2);
+    expect(hex.encode(TransactionUtil.serialize(state.rfq.transaction))).toBe(expectedBytes);
     expectNoFallback(state);
   });
 
@@ -78,8 +77,7 @@ describe("direct ETH/USD client dispatch", () => {
     state.request.deadlineMs = fixtures.now_ms + 1;
     const result = await state.router.quoteExactIn(state.request);
     expect(result.deadlineMs).toBe(state.request.deadlineMs);
-    if (result.execution !== "serverTransaction") throw new Error("Expected a server transaction");
-    expect(hex.encode(TransactionUtil.serialize(result.transaction))).toBe(state.fixture.transaction_hex);
+    expect(hex.encode(TransactionUtil.serialize(state.rfq.transaction))).toBe(state.fixture.transaction_hex);
   });
 
   it.each(["buy", "sell"])("rejects %s when the client deadline elapses before the still-fresh server expiry", async side => {
@@ -94,19 +92,27 @@ describe("direct ETH/USD client dispatch", () => {
     expectNoFallback(state);
   });
 
-  it("adds exactly two frozen pairs to mainnet metadata without changing the legacy mints", () => {
+  it("adds all eight aETH directions to frozen mainnet metadata", () => {
     const { router, source } = setup();
-    const legacy = createRouterClient({ network: "mainnet", source });
-    expect(router.supportedPairs).toEqual([
-      ...legacy.supportedPairs,
-      { inputMint: market.quoteMint, outputMint: market.baseMint },
-      { inputMint: market.baseMint, outputMint: market.quoteMint },
-    ]);
-    expect(router.supportedPairs).toHaveLength(14);
-    expect(new Set(router.supportedPairs.map(pair => `${pair.inputMint}/${pair.outputMint}`)).size).toBe(14);
+    const core = createRouterClient({ network: "mainnet", source });
+    expect(router.supportedPairs).toEqual(expect.arrayContaining([...core.supportedPairs]));
+    expect(router.supportedPairs).toHaveLength(20);
+    expect(new Set(router.supportedPairs.map(pair => `${pair.inputMint}/${pair.outputMint}`)).size).toBe(20);
+    for (const mint of Object.values(MAINNET_MINTS)) {
+      expect(router.supportedPairs).toContainEqual({ inputMint: mint, outputMint: market.baseMint });
+      expect(router.supportedPairs).toContainEqual({ inputMint: market.baseMint, outputMint: mint });
+    }
     expect(Object.isFrozen(router.supportedPairs)).toBe(true);
     expect(router.supportedPairs.every(Object.isFrozen)).toBe(true);
-    expect(router.mints).toBe(legacy.mints);
+    expect(router.mints).toBe(core.mints);
+  });
+
+  it("rejects treasury packets instead of selecting a legacy direct path", async () => {
+    const state = setup();
+    state.directRfqQuoteProvider.quoteExactIn.mockResolvedValue({ ...state.rfq,
+      transaction: nativeTransaction(fixtures.cases.find(value => value.side === "buy")!.transaction_hex) });
+    await expect(state.router.quoteExactIn(state.request)).rejects.toMatchObject({ code: "INVALID_RFQ" });
+    expectNoFallback(state);
   });
 
   it.each(["buy", "sell"])("requires an explicit mainnet provider for %s", async side => {
@@ -142,8 +148,6 @@ describe("direct ETH/USD client dispatch", () => {
   });
 
   const unsupported = [
-    [market.baseMint, MAINNET_MINTS.aBTC], [MAINNET_MINTS.aBTC, market.baseMint],
-    [market.baseMint, MAINNET_MINTS.primeUSD], [MAINNET_MINTS.primeUSD, market.baseMint],
     [market.baseMint, market.baseMint],
     ["AzuWEhnYUv6NTAFrC2MtzKb4nASh6sCMcD15WUmoFR45", market.quoteMint],
     ["Bfbd38zzuJkKSyiSUzwsp1aJ26L9HdwVpHeAYrodXw1D", market.quoteMint],
@@ -232,7 +236,7 @@ describe("direct ETH/USD client dispatch", () => {
     if (outcome === "rejection") state.directRfqQuoteProvider.quoteExactIn.mockRejectedValue(new Error("Rejected"));
     const pending = state.router.quoteExactIn(state.request);
     if (outcome === "rejection") await expect(pending).rejects.toThrow("Rejected");
-    else await expect(pending).resolves.toMatchObject({ execution: "serverTransaction" });
+    else await expect(pending).resolves.toHaveProperty("instructions");
     expect(vi.getTimerCount()).toBe(0);
   });
 

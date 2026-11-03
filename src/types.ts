@@ -99,12 +99,8 @@ export interface RouterClientOptions {
   readonly source: RouterDataSource;
   /** Optional exact-input alternative to CLAMM; must use the selected network. Each RFQ waits at most 2s. */
   readonly propAmmQuoteProvider?: PropAmmQuoteProvider;
-  /** Exact-input server transactions for the fixed mainnet aETH/aUSD market. */
+  /** Native aETH/aUSD quote packets; enables all mainnet aETH buy/sell graph routes. */
   readonly directRfqQuoteProvider?: DirectRfqQuoteProvider;
-  /** Mainnet only; reuse the direct provider for router sells to aUSD/primeUSD/aBTC/primeBTC. */
-  readonly composableAethSells?: boolean;
-  /** Mainnet only; require native PropAMM buys from the direct provider for router routes into aETH. */
-  readonly composableAethBuys?: boolean;
 }
 
 export interface RouterClient {
@@ -112,7 +108,7 @@ export interface RouterClient {
   /** Null until the selected network's deployment is configured. */
   readonly mints: NetworkMints | null;
   readonly supportedPairs: readonly { readonly inputMint: Address; readonly outputMint: Address }[];
-  quoteExactIn(request: QuoteExactInRequest): Promise<SwapQuote>;
+  quoteExactIn(request: QuoteExactInRequest): Promise<RouterSwapQuote>;
   /** The returned transaction still spends a fixed input; output may vary within slippage. */
   quoteForOutput(request: QuoteForOutputRequest): Promise<RouterSwapQuote>;
 }

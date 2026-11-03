@@ -1,9 +1,9 @@
 import { TransactionUtil } from "@arch-network/arch-sdk";
 import { base58, hex } from "@scure/base";
 import {
-  createRouterClient, MAINNET_AETH_USD as market, RouterSdkError,
+  compileRouterMessage, createRouterClient, MAINNET_AETH_USD as market, RouterSdkError,
   type DirectRfqQuoteProvider, type QuoteExactInRequest, type RouterDataSource,
-  type RuntimeTransaction, type ServerTransactionSwapQuote,
+  type RuntimeTransaction, type RouterSwapQuote,
 } from "../src/index.js";
 
 export interface AethUsdExampleOptions {
@@ -11,6 +11,8 @@ export interface AethUsdExampleOptions {
   readonly source: RouterDataSource;
   /** POST application/json; reject non-2xx responses and return the raw response text. */
   readonly post: (url: string, body: string) => Promise<string>;
+  /** Fetch a fresh 32-byte Arch blockhash for compiling the router transaction. */
+  readonly getRecentBlockhash: () => Promise<Uint8Array>;
   /** Use the wallet's Arch signing flow; return only the user's 64-byte signature. */
   readonly signMessage: (message: RuntimeTransaction["message"]) => Promise<Uint8Array>;
   /** Resolve on confirmed success; reject on execution failure or uncertain confirmation. */
@@ -18,7 +20,8 @@ export interface AethUsdExampleOptions {
 }
 
 export interface PreparedAethUsdSwap {
-  readonly quote: ServerTransactionSwapQuote;
+  readonly quote: RouterSwapQuote;
+  readonly transaction: RuntimeTransaction;
   /** Explicit retries reuse the signed body; a known hash only needs confirmation. */
   submitAndConfirm(): Promise<string>;
 }
@@ -124,16 +127,26 @@ export function createAethUsdRfqProvider(rfqUrl: string, post: AethUsdExampleOpt
 
 /** Quote first so the caller can review the amount before invoking the wallet. */
 export async function prepareAethUsdSwap(options: AethUsdExampleOptions, request: QuoteExactInRequest): Promise<PreparedAethUsdSwap> {
-  const buy = request.inputMint === market.quoteMint && request.outputMint === market.baseMint;
-  const sell = request.inputMint === market.baseMint && request.outputMint === market.quoteMint;
+  const input = { ...request };
+  const buy = input.inputMint === market.quoteMint && input.outputMint === market.baseMint;
+  const sell = input.inputMint === market.baseMint && input.outputMint === market.quoteMint;
   if (!buy && !sell) throw new RouterSdkError("UNSUPPORTED_PAIR", "This example supports only mainnet aUSD ↔ aETH.");
-  const { post, signMessage, confirm } = options;
+  const { post, signMessage, confirm, getRecentBlockhash } = options;
   const serverUrl = options.serverUrl.replace(/\/+$/, "");
   const provider = createAethUsdRfqProvider(`${serverUrl}/rfq`, post);
   const router = createRouterClient({ network: "mainnet", source: options.source, directRfqQuoteProvider: provider });
-  const quote = await router.quoteExactIn(request);
-  if (quote.execution !== "serverTransaction") throw new RouterSdkError("INVALID_RFQ", "Expected a direct server transaction.");
-  const { transaction, deadlineMs, rfq: { quoteId } } = quote;
+  const quote = await router.quoteExactIn(input);
+  const { deadlineMs, rfq } = quote;
+  if (!rfq) throw new RouterSdkError("INVALID_RFQ", "Expected a native aETH RFQ.");
+  const quoteId = rfq.quoteId;
+  const blockhash = await getRecentBlockhash();
+  if (!(blockhash instanceof Uint8Array) || blockhash.length !== 32) {
+    throw new RouterSdkError("INVALID_RESPONSE", "Expected a 32-byte Arch blockhash.");
+  }
+  requireFresh();
+  const transaction: RuntimeTransaction = {
+    version: 0, signatures: [], message: compileRouterMessage(quote.instructions, input.user, blockhash),
+  };
   const originalBytes = hex.encode(TransactionUtil.serialize(transaction));
   let body: string | undefined;
   let transactionHash: string | undefined;
@@ -144,7 +157,7 @@ export async function prepareAethUsdSwap(options: AethUsdExampleOptions, request
   }
   function requireUnchanged(): void {
     if (hex.encode(TransactionUtil.serialize(transaction)) !== originalBytes) {
-      throw new RouterSdkError("MESSAGE_CHANGED", "The original RFQ transaction was modified.");
+      throw new RouterSdkError("MESSAGE_CHANGED", "The prepared router transaction was modified.");
     }
   }
   async function submit(): Promise<string> {
@@ -172,7 +185,7 @@ export async function prepareAethUsdSwap(options: AethUsdExampleOptions, request
     await confirm(transactionHash);
     return transactionHash;
   }
-  return { quote, submitAndConfirm() {
+  return { quote, transaction, submitAndConfirm() {
     if (!inFlight) inFlight = submit().finally(() => { inFlight = undefined; });
     return inFlight;
   } };

@@ -160,7 +160,6 @@ describe("graph candidate evaluation", () => {
       amountIn: original.amountIn, deadlineMs: original.deadlineMs,
     });
     expect(quote.minAmountOut).toBe(quote.estimatedAmountOut * BigInt(10_000 - original.slippageBps) / 10_000n);
-    if (quote.execution === "serverTransaction") throw new Error("Expected a router quote");
     expect(quote.instructions[0]!.accounts[0]!.pubkey).toEqual(decodeAddress(original.user));
     expect(source.getAccounts).toHaveBeenCalledOnce();
   });

@@ -58,7 +58,7 @@ export function setupComposableAeth(outputMint: string = market.quoteMint) {
   const source = { getAccounts: vi.fn(async (keys: readonly string[]) => keys.map((key) => accounts.get(key) ?? null)) };
   const directRfqQuoteProvider = { quoteExactIn: vi.fn(async (_request: QuoteExactInRequest) => rfq) };
   const propAmmQuoteProvider = { quoteExactIn: vi.fn(async (): Promise<PropAmmQuote> => { throw new Error("Unexpected BTC/USD RFQ"); }) };
-  const options = { source, network: "mainnet" as const, directRfqQuoteProvider, propAmmQuoteProvider, composableAethSells: true };
+  const options = { source, network: "mainnet" as const, directRfqQuoteProvider, propAmmQuoteProvider };
   return { request, rfq, source, accounts, directRfqQuoteProvider, propAmmQuoteProvider, options, client: createRouterClient(options) };
 }
 
@@ -80,6 +80,6 @@ export function setupComposableAethBuy(inputMint: string = market.quoteMint) {
   const rfq = nativeAethBuyQuote();
   const directRfqQuoteProvider = { quoteExactIn: vi.fn(async (request: QuoteExactInRequest) =>
     nativeAethBuyQuote(request.amountIn, request.slippageBps)) };
-  const options = { ...state.options, directRfqQuoteProvider, composableAethBuys: true };
+  const options = { ...state.options, directRfqQuoteProvider };
   return { ...state, request, rfq, directRfqQuoteProvider, options, client: createRouterClient(options) };
 }
