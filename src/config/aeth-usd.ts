@@ -1,4 +1,4 @@
-// Mainnet deployment verified against /markets and Arch RPC on 2026-11-02.
+// Mainnet deployment verified against /markets, a treasury quote and Arch RPC on 2026-11-03.
 export const MAINNET_AETH_USD = Object.freeze({
   baseMint: "7g1nPCjKW7zzZ4q7mcABeFXaPSLfBQ6syrz4HnPGAVYt",
   baseDecimals: 9,
@@ -9,8 +9,8 @@ export const MAINNET_AETH_USD = Object.freeze({
   baseVault: "FAuBgc7Uc6nd3sEdmJ3k1B9q3cmeFnDnusKSxgQUTyDF",
   quoteVault: "F49WGwEHaHhq4SDpkTGX3mwpMw6axmVdLv6c7gVPXbFL",
   quoteSigner: "A97DopD3nWbcwj89Suma32AhGfGUiLYZZzKqpP3H1PiG",
-  treasuryAuthority: "G31RGX9tmr7wE43aDPBHCLigAGn1EvvFQCvayZZm8kSK",
-  bridgeProgramId: "5n1fsUDhPiaALmxpaFCJeFdyTkZkxWXecgurV6dSxMq3",
+  treasuryAuthority: "GPoZuMS41Ct92nUUqWyu8dqCY74QkfHRX8N3RsYiTCAT",
+  bridgeProgramId: "F5uRFVRuupfFgw1L5x7uWt41ug7MTZr2BfnfZiFj12fk",
   tokenProgramId: "TokenT4em53UrV4gSvZ3nCS2mZeHaqTLapwt6iZt6Mk",
   associatedTokenProgramId: "ATok9pxLsNzM5zJJ3UQpXBrMriHpZiY5Yio3GKYU4we3",
   systemProgramId: "11111111111111111111111111111111",

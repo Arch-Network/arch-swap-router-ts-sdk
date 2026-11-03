@@ -83,3 +83,24 @@ export function setupComposableAethBuy(inputMint: string = market.quoteMint) {
   const options = { ...state.options, directRfqQuoteProvider };
   return { ...state, request, rfq, directRfqQuoteProvider, options, client: createRouterClient(options) };
 }
+
+/** Original Rust payment/mint fixture, resized for the estimated prefix credit. */
+export function treasuryAethBuyQuote(amountIn = 1_000_000n, bounded = false): DirectRfqQuote {
+  const fixture = fixtures.cases.find(item => item.side === "buy")!;
+  const transaction = nativeTransaction(fixture.transaction_hex);
+  const estimatedAmountOut = amountIn * BigInt(fixture.estimated_amount_out) / BigInt(fixture.amount_in);
+  setU64(transaction.message.instructions[0]!.data, 1, amountIn);
+  setU64(transaction.message.instructions[1]!.data, 33, estimatedAmountOut);
+  return { transaction, quoteId: "treasury-aeth-buy", expiresAtMs: BigInt(fixture.expires_at_ms), estimatedAmountOut,
+    ...(bounded ? { treasuryAuthorization: { version: 1 as const,
+      minAmountIn: (amountIn * 9950n + 9999n) / 10_000n, maxAmountIn: amountIn * 10050n / 10_000n } } : {}) };
+}
+
+export function setupComposableAethTreasuryBuy(inputMint: string = market.quoteMint, bounded = false) {
+  const state = setupComposableAethBuy(inputMint);
+  const rfq = treasuryAethBuyQuote(state.request.amountIn, bounded);
+  const directRfqQuoteProvider = { quoteExactIn: vi.fn(async (request: QuoteExactInRequest) =>
+    treasuryAethBuyQuote(request.amountIn, bounded)) };
+  const options = { ...state.options, directRfqQuoteProvider };
+  return { ...state, rfq, directRfqQuoteProvider, options, client: createRouterClient(options) };
+}

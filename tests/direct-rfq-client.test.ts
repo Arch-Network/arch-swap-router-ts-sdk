@@ -107,11 +107,14 @@ describe("automatic ETH/USD router dispatch", () => {
     expect(router.mints).toBe(core.mints);
   });
 
-  it("rejects treasury packets instead of selecting a legacy direct path", async () => {
+  it("resolves a legacy treasury packet into router instructions", async () => {
     const state = setup();
     state.directRfqQuoteProvider.quoteExactIn.mockResolvedValue({ ...state.rfq,
       transaction: nativeTransaction(fixtures.cases.find(value => value.side === "buy")!.transaction_hex) });
-    await expect(state.router.quoteExactIn(state.request)).rejects.toMatchObject({ code: "INVALID_RFQ" });
+    const quote = await state.router.quoteExactIn(state.request);
+    expect(quote.hops.map(hop => hop.kind)).toEqual(["treasuryMint"]);
+    expect(quote.instructions[1]!.data[26]).toBe(4);
+    expect(quote).not.toHaveProperty("transaction");
     expectNoFallback(state);
   });
 

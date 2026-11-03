@@ -181,13 +181,14 @@ describe("composable aETH quotes", () => {
     expect(state.rfq.transaction.signatures).toEqual([]);
   });
 
-  it("rejects treasury buys without selecting a direct execution path", async () => {
+  it("resolves a legacy treasury buy using the same provider", async () => {
     const state = setup();
     const buy = fixtures.cases.find((fixture) => fixture.side === "buy")!;
     const transaction = nativeTransaction(buy.transaction_hex);
     state.directRfqQuoteProvider.quoteExactIn.mockResolvedValue({ ...state.rfq, transaction, estimatedAmountOut: BigInt(buy.estimated_amount_out) });
-    await expect(state.client.quoteExactIn({ ...state.request, inputMint: market.quoteMint, outputMint: market.baseMint }))
-      .rejects.toMatchObject({ code: "INVALID_RFQ" });
+    const quote = await state.client.quoteExactIn({ ...state.request, inputMint: market.quoteMint, outputMint: market.baseMint });
+    expect(quote.hops.map(hop => hop.kind)).toEqual(["treasuryMint"]);
+    expect(quote).not.toHaveProperty("transaction");
     expect(state.source.getAccounts).not.toHaveBeenCalled();
     expect(state.propAmmQuoteProvider.quoteExactIn).not.toHaveBeenCalled();
   });

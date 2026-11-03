@@ -1,4 +1,4 @@
-import type { Address, PropAmmQuote } from "../types.js";
+import type { Address, PropAmmQuote, TreasuryMintTerms } from "../types.js";
 
 interface VaultAccounts {
   readonly vault: Address;
@@ -25,6 +25,18 @@ export type ResolvedStep = { readonly outputMint: Address } & (
       readonly userNonce: Address;
       readonly baseVault: Address;
       readonly quoteVault: Address;
+    }
+  | {
+      readonly kind: "treasuryMint";
+      readonly terms: TreasuryMintTerms;
+      readonly bridgeProgramId: Address;
+      readonly treasuryAuthority: Address;
+      readonly bridgeConfig: Address;
+      readonly assetConfig: Address;
+      readonly issuanceReceipt: Address;
+      readonly mintAuthority: Address;
+      readonly propammConfig: Address;
+      readonly paymentVault: Address;
     }
   | {
       readonly kind: "clamm";

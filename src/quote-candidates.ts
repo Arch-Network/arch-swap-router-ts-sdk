@@ -1,12 +1,12 @@
 import type { NetworkConfig } from "./config/networks.js";
 import type { Route } from "./config/routes.js";
 import { RouterSdkError } from "./errors.js";
-import { quotePropAmm } from "./propamm.js";
+import { quotePropAmm, type RoutedRfqQuoteProvider } from "./propamm.js";
 import type { prepareQuoteState } from "./quote-state.js";
 import { buildPropAmmInstructions, buildRouterInstruction } from "./transactions/instructions.js";
 import { assertMessageLimits } from "./transactions/size.js";
 import type { ResolvedStep } from "./transactions/types.js";
-import type { PropAmmQuoteProvider, QuoteExactInRequest, RouterSwapQuote } from "./types.js";
+import type { QuoteExactInRequest, RouterSwapQuote } from "./types.js";
 import { compileRouterMessage, inputForOutput } from "./utils.js";
 
 interface CandidateQuoteInput {
@@ -16,7 +16,7 @@ interface CandidateQuoteInput {
   readonly request: Omit<QuoteExactInRequest, "amountIn">;
   readonly amount: bigint;
   readonly forOutput: boolean;
-  readonly propAmmQuoteProviders?: ReadonlyMap<string, PropAmmQuoteProvider>;
+  readonly propAmmQuoteProviders?: ReadonlyMap<string, RoutedRfqQuoteProvider>;
 }
 
 /** Evaluate graph paths against one request's prepared state, then choose a quote. */

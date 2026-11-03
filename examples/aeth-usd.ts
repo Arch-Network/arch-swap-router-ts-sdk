@@ -2,7 +2,7 @@ import { TransactionUtil } from "@arch-network/arch-sdk";
 import { base58, hex } from "@scure/base";
 import {
   compileRouterMessage, createRouterClient, MAINNET_AETH_USD as market, RouterSdkError,
-  type DirectRfqQuoteProvider, type QuoteExactInRequest, type RouterDataSource,
+  type DirectRfqQuoteProvider, type QuoteExactInRequest, type RouterDataSource, type TreasuryAuthorization,
   type RuntimeTransaction, type RouterSwapQuote,
 } from "../src/index.js";
 
@@ -59,6 +59,17 @@ function safeU64(value: unknown): bigint {
   return BigInt(value);
 }
 
+function authorizationAmount(value: unknown): bigint {
+  if (typeof value !== "string" || !/^(0|[1-9][0-9]*)$/.test(value) || value.length > 20) {
+    throw new RouterSdkError("INVALID_RFQ", "Treasury authorization amounts must be decimal u64 strings.");
+  }
+  const amount = BigInt(value);
+  if (amount === 0n || amount > (1n << 64n) - 1n) {
+    throw new RouterSdkError("INVALID_RFQ", "Treasury authorization amount is outside the positive u64 range.");
+  }
+  return amount;
+}
+
 function decodeQuote(raw: string, buy: boolean) {
   let parsed: unknown;
   try { parsed = JSON.parse(raw); }
@@ -101,7 +112,18 @@ function decodeQuote(raw: string, buy: boolean) {
       throw new RouterSdkError("INVALID_RFQ", "RFQ expiry metadata differs from the native swap.");
     }
   }
+  let treasuryAuthorization: TreasuryAuthorization | undefined;
+  if (wire.treasury_authorization !== undefined) {
+    const authorization = record(wire.treasury_authorization);
+    if (!buy || transaction.message.instructions.length !== 2 || authorization.version !== 1) {
+      throw new RouterSdkError("INVALID_RFQ", "Unexpected treasury authorization or version.");
+    }
+    treasuryAuthorization = { version: 1,
+      minAmountIn: authorizationAmount(authorization.min_amount_in),
+      maxAmountIn: authorizationAmount(authorization.max_amount_in) };
+  }
   return { transaction, quoteId: wire.quote_id, expiresAtMs,
+    ...(treasuryAuthorization === undefined ? {} : { treasuryAuthorization }),
     estimatedAmountOut: safeU64(buy ? estimate.base_amount : estimate.quote_amount) };
 }
 
@@ -137,7 +159,7 @@ export async function prepareAethUsdSwap(options: AethUsdExampleOptions, request
   const router = createRouterClient({ network: "mainnet", source: options.source, directRfqQuoteProvider: provider });
   const quote = await router.quoteExactIn(input);
   const { deadlineMs, rfq } = quote;
-  if (!rfq) throw new RouterSdkError("INVALID_RFQ", "Expected a native aETH RFQ.");
+  if (!rfq) throw new RouterSdkError("INVALID_RFQ", "Expected an aETH RFQ.");
   const quoteId = rfq.quoteId;
   const blockhash = await getRecentBlockhash();
   if (!(blockhash instanceof Uint8Array) || blockhash.length !== 32) {

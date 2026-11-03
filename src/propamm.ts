@@ -2,18 +2,24 @@ import type { PropAmmDeployment } from "./config/networks.js";
 import { RouterSdkError } from "./errors.js";
 import type { ResolvedStep } from "./transactions/types.js";
 import type { PropAmmQuote, PropAmmQuoteProvider, QuoteExactInRequest } from "./types.js";
+import { resolveTreasuryMint, type TreasuryMintQuote } from "./treasury-mint.js";
 import { decodeAddress, deriveAddress, U64_MAX } from "./utils.js";
+
+/** Internal providers also resolve validated aETH treasury templates. */
+export interface RoutedRfqQuoteProvider {
+  quoteExactIn(request: Parameters<PropAmmQuoteProvider["quoteExactIn"]>[0]): Promise<PropAmmQuote | TreasuryMintQuote>;
+}
 
 /** One bounded RFQ; the application owns HTTP transport and precision-safe decoding. */
 export async function quotePropAmm(
-  provider: PropAmmQuoteProvider,
+  provider: RoutedRfqQuoteProvider,
   request: Pick<QuoteExactInRequest, "inputMint" | "outputMint" | "amountIn" | "user" | "deadlineMs">,
   deployment: PropAmmDeployment,
 ) {
   const { inputMint, outputMint, amountIn, user } = request;
   if (request.deadlineMs <= Date.now()) throw new RouterSdkError("RFQ_EXPIRED", "PropAMM quote deadline has expired.");
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let quote: PropAmmQuote;
+  let quote: PropAmmQuote | TreasuryMintQuote;
   try {
     quote = await Promise.race([
       Promise.resolve().then(() => provider.quoteExactIn({ inputMint, outputMint, amountIn, user })),
@@ -23,6 +29,16 @@ export async function quotePropAmm(
     ]);
   } finally {
     clearTimeout(timer);
+  }
+  if (quote?.kind === "treasuryMint") {
+    const expiryBoundary = quote.terms.expiryMs / 1000n * 1000n;
+    const deadlineMs = Number(expiryBoundary < BigInt(request.deadlineMs) ? expiryBoundary : BigInt(request.deadlineMs));
+    if (deadlineMs <= Date.now()) throw new RouterSdkError("RFQ_EXPIRED", "Treasury quote deadline has expired.");
+    if (inputMint !== deployment.quoteMint || outputMint !== deployment.baseMint || quote.terms.quotedInput !== amountIn) {
+      throw new RouterSdkError("INVALID_RFQ", "Treasury quote input or direction differs from the requested swap.");
+    }
+    return { quoteId: quote.quoteId, estimatedAmountOut: quote.estimatedAmountOut, deadlineMs,
+      resolved: resolveTreasuryMint(quote, deployment) };
   }
   const terms = quote?.terms;
   const buy = inputMint === deployment.quoteMint && outputMint === deployment.baseMint;

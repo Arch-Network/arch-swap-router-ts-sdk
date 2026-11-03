@@ -13,6 +13,8 @@ import {
   type RuntimeTransaction,
   type ServerTransactionSwapQuote,
   type SwapQuote,
+  type TreasuryAuthorization,
+  type TreasuryMintTerms,
 } from "../../src/index.js";
 
 // Checked by tsc only; no wallet, server or transaction execution.
@@ -72,4 +74,15 @@ export function serverQuoteRequiresId(quote: Omit<ServerTransactionSwapQuote, "r
   // @ts-expect-error Every server transaction needs RFQ submission metadata.
   const invalid: SwapQuote = quote;
   return invalid;
+}
+
+export function boundedTreasuryResponse(quote: DirectRfqQuote): DirectRfqQuote {
+  const treasuryAuthorization: TreasuryAuthorization = { version: 1, minAmountIn: 995n, maxAmountIn: 1005n };
+  // @ts-expect-error HTTP decimal strings must be decoded before entering the SDK.
+  const invalid: TreasuryAuthorization = { version: 1, minAmountIn: "995", maxAmountIn: "1005" };
+  const terms: TreasuryMintTerms = { issuanceId: new Uint8Array(32), quotedInput: 1000n,
+    quotedOutput: 500n, minInput: treasuryAuthorization.minAmountIn, maxInput: treasuryAuthorization.maxAmountIn,
+    expiryMs: quote.expiresAtMs };
+  void invalid; void terms;
+  return { ...quote, treasuryAuthorization };
 }

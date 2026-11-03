@@ -9,7 +9,7 @@ minimum, native quote signer and no bridge instructions. Its signed size is
 
 `transactions.json` contains deterministic, unsigned buy/sell transactions built
 from prop-amm's `minting` revision
-`dfdbc9a36646066cbec067fa9e9a700232804855` using Arch SDK/program `0.12.0`:
+`de11093e3291c4d18ec211a85038c7e7c80301b3` using Arch SDK/program `0.13.0`:
 
 - Buy: `server/src/treasury_mint.rs::buy_instructions` emits an APL transfer
   (tag 3, 9 bytes, 3 accounts), then bridge `MintFromTreasury` (tag 21,
@@ -23,8 +23,11 @@ from prop-amm's `minting` revision
 bytes. The standalone exporter supplies only the server error type needed to
 compile `treasury_mint.rs` outside the server binary.
 
-Mainnet program/mint identities were refreshed against the 2026-11-02 deployment
-(aETH `7g1nPC…`, 9 decimals; bridge `5n1fsU…`). The user, blockhash, mint ID, quote
+Mainnet program/mint identities were refreshed against the 2026-11-03 deployment
+(aETH `7g1nPC…`, 9 decimals; bridge `F5uRFV…`; treasury authority `GPoZuM…`). The
+[treasury deployment evidence](../treasury-mainnet-v2/README.md) records the quote,
+on-chain asset authorization, mint authority and matching published bridge IDL.
+The user, blockhash, mint ID, quote
 amounts and time are test values. No private keys or signatures are included.
 The fixed clock is `1800000000000` ms and expiry is 30 seconds later. These
 fixtures are for offline ABI tests, not transaction submission.
@@ -45,9 +48,9 @@ JSON; the server checkout is read-only. Cargo dependencies must be cached for
 fixture_sdk="$PWD"
 fixture_propamm_repo="$HOME/Arch/prop-amm"
 fixture_build=$(mktemp -d /tmp/aeth-usd-fixtures.XXXXXX)
-fixture_source="$fixture_build/prop-amm"
+fixture_source=$(mktemp -d /tmp/aeth-usd-propamm.XXXXXX)
 mkdir -p "$fixture_build/src" "$fixture_source"
-git -C "$fixture_propamm_repo" archive dfdbc9a36646066cbec067fa9e9a700232804855 | tar -x -C "$fixture_source"
+git -C "$fixture_propamm_repo" archive de11093e3291c4d18ec211a85038c7e7c80301b3 | tar -x -C "$fixture_source"
 cp "$fixture_sdk/tests/fixtures/aeth-usd/generate.rs" "$fixture_build/src/main.rs"
 cp "$fixture_source/server/src/treasury_mint.rs" "$fixture_build/src/treasury_mint.rs"
 cat > "$fixture_build/Cargo.toml" <<EOF
@@ -57,10 +60,10 @@ version = "0.0.0"
 edition = "2021"
 [workspace]
 [dependencies]
-arch_program = "=0.12.0"
-arch_sdk = "=0.12.0"
-apl-token = { version = "=0.12.0", features = ["no-entrypoint"] }
-apl-associated-token-account = { version = "=0.12.0", features = ["no-entrypoint"] }
+arch_program = "=0.13.0"
+arch_sdk = "=0.13.0"
+apl-token = { version = "=0.13.0", features = ["no-entrypoint"] }
+apl-associated-token-account = { version = "=0.13.0", features = ["no-entrypoint"] }
 propammprogram = { path = "$fixture_source/program", features = ["no-entrypoint"] }
 serde_json = "1"
 hex = "0.4"
@@ -74,7 +77,7 @@ To regenerate the regular buy, use a fresh temporary project:
 fixture_sdk="$PWD"
 fixture_propamm_repo="$HOME/Arch/prop-amm"
 fixture_build=$(mktemp -d /tmp/aeth-native-buy.XXXXXX)
-fixture_source="$fixture_build/prop-amm"
+fixture_source=$(mktemp -d /tmp/aeth-native-buy-propamm.XXXXXX)
 mkdir -p "$fixture_build/src" "$fixture_source"
 git -C "$fixture_propamm_repo" archive 6d700698691113117252d3e896707de88574979a | tar -x -C "$fixture_source"
 cp "$fixture_sdk/tests/fixtures/aeth-usd/generate-native-buy.rs" "$fixture_build/src/main.rs"

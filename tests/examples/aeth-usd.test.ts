@@ -107,10 +107,14 @@ describe("aETH/aUSD HTTP, wallet and submission example (mocked)", () => {
     expect(prepared.quote.deadlineMs).toBe(state.request.deadlineMs);
   });
 
-  it("rejects treasury buys before fetching a blockhash or opening the wallet", async () => {
+  it("prepares legacy treasury buys for router signing", async () => {
     const state = setup("buy");
     Object.assign(state.wire, TransactionUtil.toNumberArray(nativeTransaction(fixtures.cases.find(value => value.side === "buy")!.transaction_hex)));
-    await expect(prepareAethUsdSwap(state.options, state.request)).rejects.toMatchObject({ code: "INVALID_RFQ" });
+    const prepared = await prepareAethUsdSwap(state.options, state.request);
+    expect(prepared.quote.hops[0]!.kind).toBe("treasuryMint");
+    expect(prepared.transaction.message.header).toMatchObject({ num_required_signatures: 2, num_readonly_signed_accounts: 0 });
+    expect(state.getRecentBlockhash).toHaveBeenCalledOnce();
+    expect(state.signMessage).not.toHaveBeenCalled();
   });
 
   it.each(["mismatch", "null", "truncated", "extra instruction", "wrong program", "wrong side"])("rejects invalid sell expiry source: %s", async field => {

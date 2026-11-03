@@ -26,6 +26,7 @@ export interface QuoteForOutputRequest extends Omit<QuoteExactInRequest, "amount
 
 /** Original maker terms and the execution estimate (including inventory skew). */
 export interface PropAmmQuote {
+  readonly kind?: "propamm";
   readonly quoteId: string;
   /** Quote signer from this RFQ's native instruction; may change after rotation. */
   readonly quoteSigner: Address;
@@ -39,6 +40,23 @@ export interface PropAmmQuote {
   readonly estimatedAmountOut: bigint;
 }
 
+/** Input interval issued by the server; applications must preserve it unchanged. */
+export interface TreasuryAuthorization {
+  readonly version: 1;
+  readonly minAmountIn: bigint;
+  readonly maxAmountIn: bigint;
+}
+
+/** Router tag 4 terms; all amounts are raw token units. */
+export interface TreasuryMintTerms {
+  readonly issuanceId: Uint8Array;
+  readonly quotedInput: bigint;
+  readonly quotedOutput: bigint;
+  readonly minInput: bigint;
+  readonly maxInput: bigint;
+  readonly expiryMs: bigint;
+}
+
 export interface PropAmmQuoteProvider {
   quoteExactIn(request: Pick<QuoteExactInRequest, "inputMint" | "outputMint" | "amountIn" | "user">): Promise<PropAmmQuote>;
 }
@@ -50,6 +68,8 @@ export interface DirectRfqQuote {
   /** Server expiry in Unix milliseconds. */
   readonly expiresAtMs: bigint;
   readonly estimatedAmountOut: bigint;
+  /** Present on bounded treasury quotes; omitted on native swaps and legacy direct mints. */
+  readonly treasuryAuthorization?: TreasuryAuthorization;
 }
 
 export interface DirectRfqQuoteProvider {
@@ -80,7 +100,7 @@ export interface RouterSwapQuote extends SwapQuoteBase {
   /** Existing router quotes omit this field. */
   readonly execution?: "router";
   readonly instructions: readonly Instruction[];
-  /** Present only when submission needs the RFQ server's maker signature. */
+  /** Present when submission needs the RFQ server's native quote or treasury signature. */
   readonly rfq?: { readonly quoteId: string };
 }
 
@@ -99,7 +119,7 @@ export interface RouterClientOptions {
   readonly source: RouterDataSource;
   /** Optional exact-input alternative to CLAMM; must use the selected network. Each RFQ waits at most 2s. */
   readonly propAmmQuoteProvider?: PropAmmQuoteProvider;
-  /** Native aETH/aUSD quote packets; enables all mainnet aETH buy/sell graph routes. */
+  /** aETH/aUSD native swap or treasury packets; enables all mainnet aETH graph routes. */
   readonly directRfqQuoteProvider?: DirectRfqQuoteProvider;
 }
 

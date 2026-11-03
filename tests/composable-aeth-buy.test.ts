@@ -6,7 +6,6 @@ import { NETWORKS } from "../src/config/networks.js";
 import { compileRouterMessage } from "../src/utils.js";
 import fixtures from "./fixtures/aeth-usd/transactions.json" with { type: "json" };
 import nativeBuy from "./fixtures/aeth-usd/native-buy.json" with { type: "json" };
-import { nativeTransaction } from "./fixtures/aeth-usd/transactions.js";
 import { nativeAethBuyQuote, setupComposableAethBuy as setup, setU64 } from "./fixtures/composable-aeth.js";
 
 const config = NETWORKS.mainnet;
@@ -71,7 +70,7 @@ describe("native aETH buy routing", () => {
     expect(state.directRfqQuoteProvider.quoteExactIn).not.toHaveBeenCalled();
   });
 
-  it.each(["side", "quoted input", "actual input", "minimum", "expiry", "maker", "config", "base mint", "vault", "privileges", "signed", "extra instruction", "treasury"])("rejects an invalid native buy: %s", async field => {
+  it.each(["side", "quoted input", "actual input", "minimum", "expiry", "maker", "config", "base mint", "vault", "privileges", "signed", "extra instruction"])("rejects an invalid native buy: %s", async field => {
     const state = setup();
     const message = state.rfq.transaction.message;
     const trade = message.instructions[0]!;
@@ -85,8 +84,7 @@ describe("native aETH buy routing", () => {
     if (field === "extra instruction") message.instructions.push(trade);
     const position = field === "maker" ? 1 : field === "config" ? 0 : field === "base mint" ? 8 : field === "vault" ? 4 : undefined;
     if (position !== undefined) message.account_keys[trade.accounts[position]!] = new Uint8Array(32).fill(99);
-    const transaction = field === "treasury" ? nativeTransaction(fixtures.cases.find(item => item.side === "buy")!.transaction_hex) : state.rfq.transaction;
-    state.directRfqQuoteProvider.quoteExactIn.mockResolvedValue({ ...state.rfq, transaction });
+    state.directRfqQuoteProvider.quoteExactIn.mockResolvedValue(state.rfq);
     await expect(state.client.quoteExactIn(state.request)).rejects.toMatchObject({ code: "INVALID_RFQ" });
     expect(state.directRfqQuoteProvider.quoteExactIn).toHaveBeenCalledOnce();
     expect(state.source.getAccounts).not.toHaveBeenCalled();
@@ -127,7 +125,7 @@ describe("native aETH buy routing", () => {
     await expect(state.client.quoteExactIn(state.request)).rejects.toMatchObject({ code: "RFQ_EXPIRED" });
   });
 
-  it("propagates a maker rejection without falling back to minting", async () => {
+  it("propagates a maker rejection without requesting another quote", async () => {
     const state = setup();
     const error = new Error("Insufficient aETH inventory");
     state.directRfqQuoteProvider.quoteExactIn.mockRejectedValueOnce(error);

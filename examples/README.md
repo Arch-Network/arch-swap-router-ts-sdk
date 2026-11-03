@@ -3,7 +3,7 @@
 [aeth-usd.ts](aeth-usd.ts) exports `createAethUsdRfqProvider` and
 `prepareAethUsdSwap`. It performs no work on import. HTTP, account reading,
 fresh blockhashes, wallet signing and confirmation are supplied by the app.
-Both native buys and sells use router instructions automatically.
+Native swaps and treasury buys use router instructions automatically.
 
 ## Quote routes
 
@@ -35,10 +35,13 @@ zero for direct aETH/aUSD, one for primeUSD and two for either BTC asset.
 The provider receives the native leg's amount after any prefix and the SDK
 applies slippage once to final output. It preserves the original RFQ response.
 
-Native buys need aETH vault inventory and a server issuing native Buy quotes.
-The last live check received treasury packets, which this flow rejects.
-The running server's market mode/deployment must be aligned before buys pass
-live. Treasury minting remains a future graph edge.
+The current service's treasury buys resolve into terminal `treasuryMint` steps.
+An omitted `treasury_authorization` selects fixed input bounds. When the server
+returns that field, its decimal-string amounts are decoded losslessly and carried
+into the router step. Native buy packets still resolve into ordinary swaps.
+The pending router/server upgrades are required for treasury co-signing and
+execution; those server changes remain unmerged. Fixed bounds also mean that
+prefix input changes cannot be absorbed until bounded quotes are available.
 
 ## Wire the callbacks
 
@@ -83,7 +86,7 @@ for routes to/from BTC and prime tokens.
 the complete router bundle with that hash and the validated user, and returns
 an unsigned `prepared.transaction`. `signMessage` receives that compiled Arch
 message and returns only the user's 64-byte signature. `/rfq/swap` receives the
-flat transaction with its `quote_id`, then adds the maker signature. `confirm`
+flat transaction with its `quote_id`, then adds the native quote or treasury signature. `confirm`
 must resolve on confirmed success and reject execution failures or uncertainty.
 
 ## Deadlines and retries

@@ -1,0 +1,5870 @@
+{
+  "observed_at_utc": "2026-11-03T21:33:25.466Z",
+  "service_url": "https://vaults.veloxapi.net/propamm",
+  "rpc_url": "https://rpc.mainnet.arch.network",
+  "source_revisions": {
+    "sdk_before_step1": "43dbeb8a95d742edf09beb95f9a60b6c243316ce",
+    "propamm_service": "ced1e64a5982e8897a44e23b59481615da4f2813",
+    "propamm_minting": "de11093e3291c4d18ec211a85038c7e7c80301b3",
+    "propamm_clamm_reference": "6d700698691113117252d3e896707de88574979a",
+    "router_reference": "ef7920a28b8e4bd959e1caeabb9ded0002e8903b",
+    "bridge_reference": "399375a5e76c774b06cd7063defd56dabf0c4c18",
+    "arch_network_reference": "4ce467132d6d62635bbd9bbb0099674bf1fc73ad"
+  },
+  "runtime": {
+    "version": "0.13.0",
+    "feature_set": null,
+    "max_signed_transaction_bytes": 4096,
+    "max_account_keys": 50,
+    "limits_source": "Arch SDK 0.13 constants; validator get_version confirms runtime profile; limits not probed with submitted transactions"
+  },
+  "health": {
+    "http_status": 503,
+    "body": {
+      "status": "starting",
+      "version": "0.1.0",
+      "build_sha": "ced1e64",
+      "price_feed_active": false,
+      "vault_cache_ready": true,
+      "current_price": 77799.625,
+      "program_pubkey": "5KMw4VNavLhM5wxTxyQGm8hs5ymFhqMCZ5BpkHybcEBV",
+      "program_authority_pubkey": "G31RGX9tmr7wE43aDPBHCLigAGn1EvvFQCvayZZm8kSK",
+      "quote_signer_pubkey": "A97DopD3nWbcwj89Suma32AhGfGUiLYZZzKqpP3H1PiG",
+      "onchain_config": {
+        "config_pubkey": "3jwSNH8P5tNFMY72ZwFi5z3gEkK1vVor3xcAFvr4DHzr",
+        "account_owner": "5KMw4VNavLhM5wxTxyQGm8hs5ymFhqMCZ5BpkHybcEBV",
+        "account_lamports": 486,
+        "authority": "G31RGX9tmr7wE43aDPBHCLigAGn1EvvFQCvayZZm8kSK",
+        "quote_signer": "A97DopD3nWbcwj89Suma32AhGfGUiLYZZzKqpP3H1PiG",
+        "max_quote_ttl_ms": 30000,
+        "config_id": "A97DopD3nWbcwj89Suma32AhGfGUiLYZZzKqpP3H1PiG",
+        "skew_ratio_bps": 0,
+        "max_input_shortfall_bps": 50,
+        "default_min_out_slippage_bps": 200
+      },
+      "vaults": [
+        {
+          "symbol": "aBTC",
+          "mint": "78s6DsmwRnCYiQDvAKbJoeAbGDa68zifa1cgqTb4tBbM",
+          "vault": "GXVzrCLYteNkr5smuqRYFeEDMNUmubuDwysiCpTfLGGc",
+          "account_type": "program_derived_token_account",
+          "is_associated_token_account": false,
+          "balance_base_units": 2784512,
+          "observed_at_ms": 1793741309530
+        },
+        {
+          "symbol": "aUSD",
+          "mint": "DQcBfwHu8gr8KGt3BE5BDUfBjGgFuDJYm9ByVTDsrww9",
+          "vault": "F49WGwEHaHhq4SDpkTGX3mwpMw6axmVdLv6c7gVPXbFL",
+          "account_type": "program_derived_token_account",
+          "is_associated_token_account": false,
+          "balance_base_units": 768892312,
+          "observed_at_ms": 1793741309530
+        },
+        {
+          "symbol": "aETH",
+          "mint": "7g1nPCjKW7zzZ4q7mcABeFXaPSLfBQ6syrz4HnPGAVYt",
+          "vault": "FAuBgc7Uc6nd3sEdmJ3k1B9q3cmeFnDnusKSxgQUTyDF",
+          "account_type": "program_derived_token_account",
+          "is_associated_token_account": false,
+          "balance_base_units": 86739241,
+          "observed_at_ms": 1793741309530
+        },
+        {
+          "symbol": "primeBTC",
+          "mint": "Bg138vbUo1h3cvRBQ9yRdqbGX2Cm2pwRexj1LaVVTQYj",
+          "vault": "5E6Dd3HcQoD6zQHbrCpVAXBYQ4W1hzw2tzyiFu1tqdqx",
+          "account_type": "program_derived_token_account",
+          "is_associated_token_account": false,
+          "balance_base_units": 0,
+          "observed_at_ms": 1793741309530
+        },
+        {
+          "symbol": "primeUSD",
+          "mint": "C9fDCY2oJjM3KUHGkr5TidcbJMz7Me9FHHBR2YDnGVrK",
+          "vault": "28nmA1gp11VBdmbzdrGTNHe7h2Yo5PagxeJvV6vSC6P9",
+          "account_type": "program_derived_token_account",
+          "is_associated_token_account": false,
+          "balance_base_units": 0,
+          "observed_at_ms": 1793741309530
+        },
+        {
+          "symbol": "aHYPE",
+          "mint": "e1nbE9knw6fS1TwDixC3ZuXhDJpBf874WErswvqvMes",
+          "vault": "Aqk5wABc2xUcaxeW2943Tjd3uUGvRN2M91DvcRw4pexy",
+          "account_type": "program_derived_token_account",
+          "is_associated_token_account": false,
+          "balance_base_units": 0,
+          "observed_at_ms": 1793741309530
+        }
+      ]
+    }
+  },
+  "markets": {
+    "markets": [
+      {
+        "base_symbol": "aBTC",
+        "base_mint": "78s6DsmwRnCYiQDvAKbJoeAbGDa68zifa1cgqTb4tBbM",
+        "base_decimals": 8,
+        "quote_symbol": "aUSD",
+        "quote_mint": "DQcBfwHu8gr8KGt3BE5BDUfBjGgFuDJYm9ByVTDsrww9",
+        "quote_decimals": 6,
+        "base_vault": "GXVzrCLYteNkr5smuqRYFeEDMNUmubuDwysiCpTfLGGc",
+        "quote_vault": "F49WGwEHaHhq4SDpkTGX3mwpMw6axmVdLv6c7gVPXbFL",
+        "coinbase_product_id": "BTC-USD",
+        "price": 77801.225
+      },
+      {
+        "base_symbol": "aETH",
+        "base_mint": "7g1nPCjKW7zzZ4q7mcABeFXaPSLfBQ6syrz4HnPGAVYt",
+        "base_decimals": 9,
+        "quote_symbol": "aUSD",
+        "quote_mint": "DQcBfwHu8gr8KGt3BE5BDUfBjGgFuDJYm9ByVTDsrww9",
+        "quote_decimals": 6,
+        "base_vault": "FAuBgc7Uc6nd3sEdmJ3k1B9q3cmeFnDnusKSxgQUTyDF",
+        "quote_vault": "F49WGwEHaHhq4SDpkTGX3mwpMw6axmVdLv6c7gVPXbFL",
+        "coinbase_product_id": "ETH-USD",
+        "price": 2292.685
+      },
+      {
+        "base_symbol": "primeBTC",
+        "base_mint": "Bg138vbUo1h3cvRBQ9yRdqbGX2Cm2pwRexj1LaVVTQYj",
+        "base_decimals": 8,
+        "quote_symbol": "aUSD",
+        "quote_mint": "DQcBfwHu8gr8KGt3BE5BDUfBjGgFuDJYm9ByVTDsrww9",
+        "quote_decimals": 6,
+        "base_vault": "5E6Dd3HcQoD6zQHbrCpVAXBYQ4W1hzw2tzyiFu1tqdqx",
+        "quote_vault": "F49WGwEHaHhq4SDpkTGX3mwpMw6axmVdLv6c7gVPXbFL",
+        "coinbase_product_id": "BTC-USD",
+        "price": 77801.225
+      },
+      {
+        "base_symbol": "primeUSD",
+        "base_mint": "C9fDCY2oJjM3KUHGkr5TidcbJMz7Me9FHHBR2YDnGVrK",
+        "base_decimals": 6,
+        "quote_symbol": "aUSD",
+        "quote_mint": "DQcBfwHu8gr8KGt3BE5BDUfBjGgFuDJYm9ByVTDsrww9",
+        "quote_decimals": 6,
+        "base_vault": "28nmA1gp11VBdmbzdrGTNHe7h2Yo5PagxeJvV6vSC6P9",
+        "quote_vault": "F49WGwEHaHhq4SDpkTGX3mwpMw6axmVdLv6c7gVPXbFL",
+        "coinbase_product_id": "USDT-USD",
+        "price": 0.9988250000000001
+      },
+      {
+        "base_symbol": "aHYPE",
+        "base_mint": "e1nbE9knw6fS1TwDixC3ZuXhDJpBf874WErswvqvMes",
+        "base_decimals": 9,
+        "quote_symbol": "aUSD",
+        "quote_mint": "DQcBfwHu8gr8KGt3BE5BDUfBjGgFuDJYm9ByVTDsrww9",
+        "quote_decimals": 6,
+        "base_vault": "Aqk5wABc2xUcaxeW2943Tjd3uUGvRN2M91DvcRw4pexy",
+        "quote_vault": "F49WGwEHaHhq4SDpkTGX3mwpMw6axmVdLv6c7gVPXbFL",
+        "coinbase_product_id": "HYPE-USD",
+        "price": 0
+      }
+    ]
+  },
+  "buy_quote": {
+    "http_status": 200,
+    "request": {
+      "base_mint": "6324a86882144d078e27694605059c9b4cc38549394622f0b51cde92c2f09481",
+      "quote_mint": "b8586267326264db356ca4c92b61dee74b4510cb95488897191d18520b3b18a4",
+      "side": "buy",
+      "amount": 1000000,
+      "user_pubkey": "0101010101010101010101010101010101010101010101010101010101010101",
+      "slippage_bps": 50
+    },
+    "response": {
+      "quote_id": "37636630363831663331363130373966393835653664636666373134343063363464623166343464363063346263343932366333643162313862616131636436",
+      "expires_at_ms": 1793741405000,
+      "version": 0,
+      "signatures": [],
+      "message": {
+        "header": {
+          "num_required_signatures": 2,
+          "num_readonly_signed_accounts": 0,
+          "num_readonly_unsigned_accounts": 7
+        },
+        "account_keys": [
+          [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          [
+            228,
+            182,
+            188,
+            73,
+            82,
+            129,
+            176,
+            214,
+            209,
+            5,
+            238,
+            17,
+            176,
+            203,
+            140,
+            71,
+            111,
+            219,
+            216,
+            223,
+            100,
+            229,
+            66,
+            105,
+            99,
+            141,
+            111,
+            204,
+            27,
+            73,
+            149,
+            48
+          ],
+          [
+            45,
+            236,
+            248,
+            14,
+            60,
+            146,
+            142,
+            181,
+            59,
+            117,
+            35,
+            160,
+            255,
+            171,
+            2,
+            11,
+            53,
+            98,
+            26,
+            221,
+            223,
+            131,
+            202,
+            113,
+            8,
+            91,
+            159,
+            9,
+            73,
+            115,
+            161,
+            17
+          ],
+          [
+            99,
+            36,
+            168,
+            104,
+            130,
+            20,
+            77,
+            7,
+            142,
+            39,
+            105,
+            70,
+            5,
+            5,
+            156,
+            155,
+            76,
+            195,
+            133,
+            73,
+            57,
+            70,
+            34,
+            240,
+            181,
+            28,
+            222,
+            146,
+            194,
+            240,
+            148,
+            129
+          ],
+          [
+            187,
+            236,
+            122,
+            16,
+            103,
+            186,
+            135,
+            213,
+            168,
+            15,
+            81,
+            164,
+            123,
+            81,
+            153,
+            240,
+            78,
+            37,
+            150,
+            46,
+            83,
+            6,
+            249,
+            243,
+            88,
+            185,
+            101,
+            121,
+            246,
+            186,
+            206,
+            115
+          ],
+          [
+            208,
+            209,
+            249,
+            201,
+            160,
+            183,
+            238,
+            180,
+            74,
+            154,
+            95,
+            116,
+            26,
+            197,
+            155,
+            160,
+            253,
+            139,
+            67,
+            57,
+            208,
+            13,
+            191,
+            81,
+            86,
+            56,
+            141,
+            76,
+            187,
+            158,
+            51,
+            87
+          ],
+          [
+            252,
+            218,
+            185,
+            149,
+            48,
+            56,
+            178,
+            60,
+            103,
+            33,
+            197,
+            27,
+            78,
+            46,
+            179,
+            76,
+            12,
+            244,
+            118,
+            116,
+            125,
+            24,
+            39,
+            80,
+            89,
+            15,
+            15,
+            85,
+            1,
+            73,
+            111,
+            239
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            6,
+            221,
+            246,
+            225,
+            185,
+            234,
+            132,
+            65,
+            44,
+            16,
+            184,
+            223,
+            2,
+            28,
+            16,
+            15,
+            200,
+            135,
+            25,
+            7,
+            195,
+            9,
+            195,
+            53,
+            53,
+            222,
+            32,
+            156,
+            52,
+            23,
+            99,
+            191
+          ],
+          [
+            31,
+            76,
+            216,
+            151,
+            51,
+            126,
+            191,
+            222,
+            71,
+            172,
+            209,
+            73,
+            203,
+            153,
+            126,
+            27,
+            247,
+            202,
+            96,
+            197,
+            150,
+            42,
+            134,
+            118,
+            8,
+            26,
+            189,
+            93,
+            240,
+            231,
+            12,
+            61
+          ],
+          [
+            80,
+            93,
+            15,
+            228,
+            1,
+            108,
+            149,
+            71,
+            116,
+            102,
+            72,
+            224,
+            125,
+            233,
+            52,
+            47,
+            129,
+            19,
+            0,
+            1,
+            173,
+            89,
+            118,
+            230,
+            40,
+            209,
+            203,
+            233,
+            64,
+            213,
+            207,
+            104
+          ],
+          [
+            140,
+            151,
+            35,
+            17,
+            132,
+            146,
+            123,
+            119,
+            181,
+            241,
+            128,
+            17,
+            143,
+            204,
+            104,
+            52,
+            20,
+            183,
+            124,
+            82,
+            30,
+            90,
+            119,
+            8,
+            28,
+            247,
+            29,
+            95,
+            96,
+            106,
+            83,
+            132
+          ],
+          [
+            162,
+            231,
+            16,
+            231,
+            182,
+            220,
+            13,
+            100,
+            186,
+            55,
+            119,
+            152,
+            92,
+            187,
+            162,
+            221,
+            82,
+            60,
+            109,
+            178,
+            44,
+            102,
+            129,
+            249,
+            96,
+            70,
+            66,
+            113,
+            208,
+            46,
+            201,
+            253
+          ],
+          [
+            209,
+            69,
+            53,
+            164,
+            113,
+            100,
+            124,
+            114,
+            70,
+            201,
+            255,
+            13,
+            121,
+            9,
+            126,
+            190,
+            243,
+            249,
+            20,
+            185,
+            220,
+            226,
+            191,
+            108,
+            238,
+            66,
+            136,
+            147,
+            178,
+            181,
+            201,
+            139
+          ]
+        ],
+        "recent_blockhash": [
+          209,
+          8,
+          38,
+          221,
+          222,
+          80,
+          35,
+          156,
+          3,
+          215,
+          183,
+          37,
+          96,
+          26,
+          30,
+          41,
+          239,
+          30,
+          6,
+          160,
+          194,
+          248,
+          140,
+          180,
+          7,
+          190,
+          8,
+          202,
+          23,
+          224,
+          150,
+          70
+        ],
+        "instructions": [
+          {
+            "program_id_index": 8,
+            "accounts": [
+              2,
+              5,
+              0
+            ],
+            "data": [
+              3,
+              64,
+              66,
+              15,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "program_id_index": 13,
+            "accounts": [
+              1,
+              9,
+              12,
+              4,
+              3,
+              10,
+              0,
+              6,
+              8,
+              11,
+              7
+            ],
+            "data": [
+              21,
+              162,
+              234,
+              38,
+              175,
+              225,
+              56,
+              35,
+              129,
+              22,
+              150,
+              75,
+              125,
+              149,
+              1,
+              13,
+              63,
+              185,
+              55,
+              44,
+              102,
+              224,
+              141,
+              221,
+              191,
+              45,
+              186,
+              209,
+              73,
+              10,
+              6,
+              234,
+              108,
+              158,
+              165,
+              6,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1
+            ]
+          }
+        ]
+      },
+      "estimated_quote": {
+        "base_amount": 435614,
+        "quote_amount": 1000000,
+        "adjustment_fp": 1000000,
+        "vault_observed_at_ms": 1793741374530
+      }
+    },
+    "fully_signed_size": 738,
+    "account_keys": 14
+  },
+  "accounts": {
+    "aETH": {
+      "address": "7g1nPCjKW7zzZ4q7mcABeFXaPSLfBQ6syrz4HnPGAVYt",
+      "owner": "TokenT4em53UrV4gSvZ3nCS2mZeHaqTLapwt6iZt6Mk",
+      "lamports": "420",
+      "is_executable": false,
+      "data_hex": "01000000505d0fe4016c9547746648e07de9342f81130001ad5976e628d1cbe940d5cf680b0cd805000000000901000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "aUSD": {
+      "address": "DQcBfwHu8gr8KGt3BE5BDUfBjGgFuDJYm9ByVTDsrww9",
+      "owner": "TokenT4em53UrV4gSvZ3nCS2mZeHaqTLapwt6iZt6Mk",
+      "lamports": "420",
+      "is_executable": false,
+      "data_hex": "01000000a226652ea817a31472ad571d8bfa0ad656798ad53d3ac2e52c872cf4d121f83cf30ffc87060000000601000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "propammConfig": {
+      "address": "3jwSNH8P5tNFMY72ZwFi5z3gEkK1vVor3xcAFvr4DHzr",
+      "owner": "5KMw4VNavLhM5wxTxyQGm8hs5ymFhqMCZ5BpkHybcEBV",
+      "lamports": "486",
+      "is_executable": false,
+      "data_hex": "50524f50414d4d3203df62f04891a6b72edba2b36eff7ad741210608f94c15a0f98a08b7029a4cffa087ccdcda3e1873a8ab74fc01db68c2a0b2ad70613b3c1a176507e6d97ecae5b187ccdcda3e1873a8ab74fc01db68c2a0b2ad70613b3c1a176507e6d97ecae5b130750000000000000000"
+    },
+    "quoteVault": {
+      "address": "F49WGwEHaHhq4SDpkTGX3mwpMw6axmVdLv6c7gVPXbFL",
+      "owner": "TokenT4em53UrV4gSvZ3nCS2mZeHaqTLapwt6iZt6Mk",
+      "lamports": "586",
+      "is_executable": false,
+      "data_hex": "b8586267326264db356ca4c92b61dee74b4510cb95488897191d18520b3b18a428b75202a29e677e20f2f32ade170a82eea56ae324dd5915809029e352ca554b985dd42d00000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "baseVault": {
+      "address": "FAuBgc7Uc6nd3sEdmJ3k1B9q3cmeFnDnusKSxgQUTyDF",
+      "owner": "TokenT4em53UrV4gSvZ3nCS2mZeHaqTLapwt6iZt6Mk",
+      "lamports": "586",
+      "is_executable": false,
+      "data_hex": "6324a86882144d078e27694605059c9b4cc38549394622f0b51cde92c2f0948128b75202a29e677e20f2f32ade170a82eea56ae324dd5915809029e352ca554b29892b0500000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "bridgeConfig": {
+      "address": "37Bbu2eEudSUi5YpEtZiCn4kj2h29QbCNE9AYQNLgctU",
+      "owner": "F5uRFVRuupfFgw1L5x7uWt41ug7MTZr2BfnfZiFj12fk",
+      "lamports": "974",
+      "is_executable": false,
+      "data_hex": "07ffa0e02bfc0eb29c760b85f1249d65daab1703d9cb496b0788f679d0669645978900a0e02bfc0eb29c760b85f1249d65daab1703d9cb496b0788f679d066964597894c94af0950feb241cec3b949c02a687b50188c2deb159ab091170b155b0c19d40101deb9682074d46118981d94a93217bdafbb1e67d8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b64a5ce4414c91d78c62e5022fcea6e8dfc1a6efee6cc82c789a4da5aae3c3fc0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "bridgeAsset": {
+      "address": "BxuQNjDHJV8JZfiL576Ps1F6d9f2YS6qmZR2MqfUTTXA",
+      "owner": "F5uRFVRuupfFgw1L5x7uWt41ug7MTZr2BfnfZiFj12fk",
+      "lamports": "410",
+      "is_executable": false,
+      "data_hex": "0bff6324a86882144d078e27694605059c9b4cc38549394622f0b51cde92c2f0948109ff005039278c04000001e4b6bc495281b0d6d105ee11b0cb8c476fdbd8df64e54269638d6fcc1b499530"
+    },
+    "bridgeMintAuthority": {
+      "address": "6QhvPC7TYAurSnQgQ2cmeBpJNzDRkNTnwHSjmEGmkHA7",
+      "exists": false
+    },
+    "treasuryAuthority": {
+      "address": "GPoZuMS41Ct92nUUqWyu8dqCY74QkfHRX8N3RsYiTCAT",
+      "owner": "11111111111111111111111111111111",
+      "lamports": "4976636",
+      "is_executable": false,
+      "data_hex": ""
+    },
+    "oldBridgeConfig": {
+      "address": "9swUv7Vb8YReHKntBARpLJCpjCDYysPjCR5JsT1FzMRQ",
+      "exists": false
+    },
+    "oldBridgeAsset": {
+      "address": "8FpwA9KJMhHicyfaBuuUpU9etCjyjoiLNfatBf4FXSDk",
+      "exists": false
+    }
+  },
+  "programs": {
+    "bridge": {
+      "address": "F5uRFVRuupfFgw1L5x7uWt41ug7MTZr2BfnfZiFj12fk",
+      "owner": "BpfLoader1111111111111111111111111111111111",
+      "executable": true,
+      "loader_authority": "5piVEuw4aoA8LdAGWgAChKxDoLpBPHPtwZbbLKmLtMbL",
+      "loader_status": "deployed",
+      "elf_bytes": 505968,
+      "elf_sha256": "e66fa3dd810e0d3e6040de739e92bab4a1cd5334856009c9ccfa33b70d15ae2c"
+    },
+    "oldBridge": {
+      "address": "5n1fsUDhPiaALmxpaFCJeFdyTkZkxWXecgurV6dSxMq3",
+      "owner": "BpfLoader1111111111111111111111111111111111",
+      "executable": true,
+      "loader_authority": "GEThxEXyRxbc4ZcGBUPZfHvZJSHfBeXDvUjCocEic5q1",
+      "loader_status": "deployed",
+      "elf_bytes": 501520,
+      "elf_sha256": "aeeefd742c07ae4123924144500f9bdaaef15eddd876e68f8480e44bd633db15"
+    },
+    "propamm": {
+      "address": "5KMw4VNavLhM5wxTxyQGm8hs5ymFhqMCZ5BpkHybcEBV",
+      "owner": "BpfLoader1111111111111111111111111111111111",
+      "executable": true,
+      "loader_authority": "7QyWhgm2NLuYpnAf8WCnVK5v562rdcFxM85E9DZfCz4z",
+      "loader_status": "deployed",
+      "elf_bytes": 303448,
+      "elf_sha256": "d4ab25a9191e42658fa6f0f190f7d6084815259c6a9fea98f2eb8acedc8ee9db"
+    },
+    "router": {
+      "address": "Bu8JuhykFEtJmUqYV98zJDtPr2J7LBMbEJX8DeT7XSeT",
+      "owner": "BpfLoader1111111111111111111111111111111111",
+      "executable": true,
+      "loader_authority": "4PrJgvKANMqKYaa557shP4i1rtrF6jc1GUAjQmzXf5eA",
+      "loader_status": "deployed",
+      "elf_bytes": 305904,
+      "elf_sha256": "ffe87de1c29126a77309a131d1afa20a4782b634bdd0f54f3f078b5c49c7fec9"
+    },
+    "vault": {
+      "address": "BtPdgu3v6ruKYbhiuGLEx7Fa4rU6f15maftGhNRTP32L",
+      "owner": "BpfLoader1111111111111111111111111111111111",
+      "executable": true,
+      "loader_authority": "H4jKPJpBF35Pgsm4oNiXMEFxTDqEtonYpc2FKakxN8Vc",
+      "loader_status": "deployed",
+      "elf_bytes": 729448,
+      "elf_sha256": "a32047c5e659140470d5750499d0181d900bec0bdf3d14de2381acb34eefc12c"
+    },
+    "clamm": {
+      "address": "AzvVQ4qV2DnokUgtxskJ2V11BP5M5Fvx51G3aUgnZm7A",
+      "owner": "BpfLoader1111111111111111111111111111111111",
+      "executable": true,
+      "loader_authority": "8UCu3WeXvWhJxHG6NCWks4fn3U7XyejTnQF2Gs1U6DqT",
+      "loader_status": "deployed",
+      "elf_bytes": 1194160,
+      "elf_sha256": "f11116f44fec05be8c66f7f8769e5f968c1791845301fe150345be9cb1776af3"
+    },
+    "token": {
+      "address": "TokenT4em53UrV4gSvZ3nCS2mZeHaqTLapwt6iZt6Mk",
+      "owner": "BpfLoader1111111111111111111111111111111111",
+      "executable": true,
+      "loader_authority": "11111111111111111111111111111111",
+      "loader_status": "deployed",
+      "elf_bytes": 165920,
+      "elf_sha256": "0277a8fe0e70387843ab7176e65165a9594a4767577f42b51f022445f5b158e9"
+    },
+    "ata": {
+      "address": "ATok9pxLsNzM5zJJ3UQpXBrMriHpZiY5Yio3GKYU4we3",
+      "owner": "BpfLoader1111111111111111111111111111111111",
+      "executable": true,
+      "loader_authority": "11111111111111111111111111111111",
+      "loader_status": "deployed",
+      "elf_bytes": 143528,
+      "elf_sha256": "b341bee13ef56959ac668f5ec45ff1790768bd6565a62115700c40e0b52f04ab"
+    }
+  },
+  "idls": {
+    "bridge": {
+      "address": "6QUKnTJnHpqmXf2NvuoNV4PAddgVXDXp8dANcDkxaZM9",
+      "owner": "F5uRFVRuupfFgw1L5x7uWt41ug7MTZr2BfnfZiFj12fk",
+      "authority": "5piVEuw4aoA8LdAGWgAChKxDoLpBPHPtwZbbLKmLtMbL",
+      "compressed_payload_sha256": "568af6bf1e9d44dfd9145d88be40f532d884eb273fe31c0e99bdeb48db3db472",
+      "json": {
+        "accounts": [
+          {
+            "discriminator": [
+              7
+            ],
+            "name": "Config"
+          },
+          {
+            "discriminator": [
+              8
+            ],
+            "name": "DepositReceipt"
+          },
+          {
+            "discriminator": [
+              9
+            ],
+            "name": "Withdrawal"
+          },
+          {
+            "discriminator": [
+              10
+            ],
+            "name": "RouteConfig"
+          },
+          {
+            "discriminator": [
+              11
+            ],
+            "name": "AssetConfig"
+          },
+          {
+            "discriminator": [
+              12
+            ],
+            "name": "TreasuryMintReceipt"
+          }
+        ],
+        "address": "d14535a471647c7246c9ff0d79097ebef3f914b9dce2bf6cee428893b2b5c98b",
+        "constants": [
+          {
+            "name": "CONFIG_SEED",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            },
+            "value": "[99,111,110,102,105,103]"
+          },
+          {
+            "name": "ROUTE_CONFIG_SEED",
+            "type": {
+              "array": [
+                "u8",
+                5
+              ]
+            },
+            "value": "[114,111,117,116,101]"
+          },
+          {
+            "name": "ASSET_CONFIG_SEED",
+            "type": {
+              "array": [
+                "u8",
+                5
+              ]
+            },
+            "value": "[97,115,115,101,116]"
+          },
+          {
+            "name": "MINT_AUTHORITY_SEED",
+            "type": {
+              "array": [
+                "u8",
+                14
+              ]
+            },
+            "value": "[109,105,110,116,45,97,117,116,104,111,114,105,116,121]"
+          },
+          {
+            "name": "DEPOSIT_RECEIPT_SEED",
+            "type": {
+              "array": [
+                "u8",
+                7
+              ]
+            },
+            "value": "[100,101,112,111,115,105,116]"
+          },
+          {
+            "name": "WITHDRAWAL_SEED",
+            "type": {
+              "array": [
+                "u8",
+                10
+              ]
+            },
+            "value": "[119,105,116,104,100,114,97,119,97,108]"
+          },
+          {
+            "name": "WITHDRAWAL_ESCROW_SEED",
+            "type": {
+              "array": [
+                "u8",
+                17
+              ]
+            },
+            "value": "[119,105,116,104,100,114,97,119,97,108,45,101,115,99,114,111,119]"
+          },
+          {
+            "name": "TREASURY_MINT_RECEIPT_SEED",
+            "type": {
+              "array": [
+                "u8",
+                13
+              ]
+            },
+            "value": "[116,114,101,97,115,117,114,121,95,109,105,110,116]"
+          },
+          {
+            "name": "LEND_STAGING_SEED",
+            "type": {
+              "array": [
+                "u8",
+                12
+              ]
+            },
+            "value": "[108,101,110,100,45,115,116,97,103,105,110,103]"
+          },
+          {
+            "name": "LEND_ACCOUNT_SEED",
+            "type": {
+              "array": [
+                "u8",
+                13
+              ]
+            },
+            "value": "[99,108,101,110,100,95,97,99,99,111,117,110,116]"
+          },
+          {
+            "name": "PAUSE_MINT",
+            "type": "u8",
+            "value": "1"
+          },
+          {
+            "name": "PAUSE_WITHDRAWAL_REQUEST",
+            "type": "u8",
+            "value": "2"
+          },
+          {
+            "name": "PAUSE_SETTLE",
+            "type": "u8",
+            "value": "4"
+          },
+          {
+            "name": "INIT_PAUSE_FLAGS",
+            "type": "u8",
+            "value": "7"
+          },
+          {
+            "name": "N_MAX_ATTESTERS",
+            "type": "u64",
+            "value": "8"
+          },
+          {
+            "name": "MAX_ATTESTER_THRESHOLD",
+            "type": "u64",
+            "value": "6"
+          },
+          {
+            "name": "MAX_DESTINATION_LEN",
+            "type": "u64",
+            "value": "64"
+          },
+          {
+            "name": "MAX_RECEIPT_DECIMALS",
+            "type": "u8",
+            "value": "9"
+          },
+          {
+            "name": "MAX_SCALE_EXPONENT",
+            "type": "u8",
+            "value": "19"
+          },
+          {
+            "name": "SOURCE_ASSET_ID_DOMAIN",
+            "type": {
+              "array": [
+                "u8",
+                17
+              ]
+            },
+            "value": "[65,82,67,72,45,66,82,73,68,71,69,45,65,83,83,69,84]"
+          },
+          {
+            "name": "CREDIT_ID_DOMAIN",
+            "type": {
+              "array": [
+                "u8",
+                18
+              ]
+            },
+            "value": "[65,82,67,72,45,66,82,73,68,71,69,45,67,82,69,68,73,84]"
+          },
+          {
+            "name": "ATTESTATION_DOMAIN",
+            "type": {
+              "array": [
+                "u8",
+                23
+              ]
+            },
+            "value": "[65,82,67,72,45,66,82,73,68,71,69,45,65,84,84,69,83,84,65,84,73,79,78]"
+          },
+          {
+            "name": "ATTESTATION_VERSION",
+            "type": "u8",
+            "value": "3"
+          },
+          {
+            "name": "ATTESTATION_MESSAGE_LEN",
+            "type": "u64",
+            "value": "253"
+          },
+          {
+            "name": "LEND_ATTESTATION_MESSAGE_LEN",
+            "type": "u64",
+            "value": "317"
+          },
+          {
+            "description": "public protocol constant checksum",
+            "name": "SECP256K1_HALF_N_HEX",
+            "type": "string",
+            "value": "\"7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0\""
+          },
+          {
+            "name": "APL_TOKEN_ID",
+            "type": "string",
+            "value": "\"TokenT4em53UrV4gSvZ3nCS2mZeHaqTLapwt6iZt6Mk\""
+          },
+          {
+            "name": "APL_ATA_ID",
+            "type": "string",
+            "value": "\"ATok9pxLsNzM5zJJ3UQpXBrMriHpZiY5Yio3GKYU4we3\""
+          }
+        ],
+        "docs": [
+          "Instruction data is the Borsh BridgeInstruction enum: one-byte discriminant followed by fields in declaration order.",
+          "Account state begins with a one-byte BridgeAccount discriminator followed by its derived inner payload; fixed allocation padding is not a logical field.",
+          "Retired numbers are never reused: discriminants 0-3 and 10-13, account tags 1-6 and event tags 1-3 and 10-12 belong to the legacy program and are absent here.",
+          "A route binds one source asset to one registered receipt mint under a nonzero u32 route id. Withdrawals escrow the route's receipt mint until an authorized finalize or reject transition.",
+          "A bare amount, min_withdrawal_amount, withdrawal_fee or supply_limit is in receipt base units; source_amount is in source base units.",
+          "Events are bounded observability hints; canonical PDAs are authoritative."
+        ],
+        "errors": [
+          {
+            "code": 0,
+            "name": "InvalidInstructionData"
+          },
+          {
+            "code": 1,
+            "name": "InvalidConfigAccount"
+          },
+          {
+            "code": 2,
+            "name": "WrongAccountVersion"
+          },
+          {
+            "code": 3,
+            "name": "AlreadyInitialized"
+          },
+          {
+            "code": 4,
+            "name": "UnauthorizedInitializer"
+          },
+          {
+            "code": 5,
+            "name": "WrongMintDecimals"
+          },
+          {
+            "code": 6,
+            "name": "MintSupplyNotZero"
+          },
+          {
+            "code": 7,
+            "name": "InvalidConfigParam"
+          },
+          {
+            "code": 8,
+            "name": "BridgePaused"
+          },
+          {
+            "code": 9,
+            "name": "ZeroAmount"
+          },
+          {
+            "code": 10,
+            "name": "RouteDisabled"
+          },
+          {
+            "code": 11,
+            "name": "ReceiptMintMismatch"
+          },
+          {
+            "code": 12,
+            "name": "AttestationExpired"
+          },
+          {
+            "code": 13,
+            "name": "SignatureCountMismatch"
+          },
+          {
+            "code": 14,
+            "name": "InvalidRecoveryId"
+          },
+          {
+            "code": 15,
+            "name": "MalleableSignature"
+          },
+          {
+            "code": 16,
+            "name": "InvalidAttestationSignature"
+          },
+          {
+            "code": 17,
+            "name": "UnsortedOrDuplicateSignature"
+          },
+          {
+            "code": 18,
+            "name": "UnknownAttester"
+          },
+          {
+            "code": 19,
+            "name": "InvalidDepositReceiptAccount"
+          },
+          {
+            "code": 20,
+            "name": "DepositAlreadyMinted"
+          },
+          {
+            "code": 21,
+            "name": "InvalidRecipientTokenAccount"
+          },
+          {
+            "code": 22,
+            "name": "CounterOverflow"
+          },
+          {
+            "code": 23,
+            "name": "MissingRequesterSignature"
+          },
+          {
+            "code": 24,
+            "name": "AmountBelowMinimum"
+          },
+          {
+            "code": 25,
+            "name": "MalformedDestinationAddress"
+          },
+          {
+            "code": 26,
+            "name": "ZeroDestinationAddress"
+          },
+          {
+            "code": 27,
+            "name": "InvalidWithdrawalAccount"
+          },
+          {
+            "code": 28,
+            "name": "WithdrawalAlreadyExists"
+          },
+          {
+            "code": 29,
+            "name": "UnauthorizedBridgeAuthority"
+          },
+          {
+            "code": 30,
+            "name": "WithdrawalNotPending"
+          },
+          {
+            "code": 31,
+            "name": "UnauthorizedPauseAuthority"
+          },
+          {
+            "code": 32,
+            "name": "PauseAuthorityCannotUnpause"
+          },
+          {
+            "code": 33,
+            "name": "UnauthorizedAdmin"
+          },
+          {
+            "code": 34,
+            "name": "InvalidRouteConfigAccount"
+          },
+          {
+            "code": 35,
+            "name": "RouteConfigAlreadyExists"
+          },
+          {
+            "code": 36,
+            "name": "InvalidRequesterTokenAccount"
+          },
+          {
+            "code": 37,
+            "name": "InvalidEscrowAccount"
+          },
+          {
+            "code": 38,
+            "name": "InvalidRefundTokenAccount"
+          },
+          {
+            "code": 39,
+            "name": "WrongMintAuthority"
+          },
+          {
+            "code": 40,
+            "name": "MintFreezeAuthorityPresent"
+          },
+          {
+            "code": 41,
+            "name": "InvalidMetadataAccount"
+          },
+          {
+            "code": 42,
+            "name": "InvalidMetadataFields"
+          },
+          {
+            "code": 43,
+            "name": "InvalidLegacyTreasuryConfigAccount"
+          },
+          {
+            "code": 44,
+            "name": "UnauthorizedTreasuryAuthority"
+          },
+          {
+            "code": 45,
+            "name": "TreasuryMintDisabled"
+          },
+          {
+            "code": 46,
+            "name": "InvalidTreasuryMintReceiptAccount"
+          },
+          {
+            "code": 47,
+            "name": "TreasuryMintAlreadyMinted"
+          },
+          {
+            "code": 48,
+            "name": "InvalidLendProgram"
+          },
+          {
+            "code": 49,
+            "name": "InvalidLendGroup"
+          },
+          {
+            "code": 50,
+            "name": "InvalidLendBank"
+          },
+          {
+            "code": 51,
+            "name": "InvalidLendAccount"
+          },
+          {
+            "code": 52,
+            "name": "InvalidLendStagingAccount"
+          },
+          {
+            "code": 53,
+            "name": "LendDeliveryIncomplete"
+          },
+          {
+            "code": 54,
+            "name": "InvalidAssetConfigAccount"
+          },
+          {
+            "code": 55,
+            "name": "SupplyLimitExceeded"
+          },
+          {
+            "code": 56,
+            "name": "LegacyConfigNotFound"
+          }
+        ],
+        "events": [
+          {
+            "discriminator": [
+              4
+            ],
+            "name": "EvtWithdrawalFinalizedPayload"
+          },
+          {
+            "discriminator": [
+              5
+            ],
+            "name": "EvtWithdrawalRejectedPayload"
+          },
+          {
+            "discriminator": [
+              6
+            ],
+            "name": "EvtPauseChangedPayload"
+          },
+          {
+            "discriminator": [
+              7
+            ],
+            "name": "EvtConfigChangedPayload"
+          },
+          {
+            "discriminator": [
+              8
+            ],
+            "name": "EvtAdminProposedPayload"
+          },
+          {
+            "discriminator": [
+              9
+            ],
+            "name": "EvtAdminChangedPayload"
+          },
+          {
+            "discriminator": [
+              13
+            ],
+            "name": "EvtInitializedPayload"
+          },
+          {
+            "discriminator": [
+              14
+            ],
+            "name": "EvtMintedPayload"
+          },
+          {
+            "discriminator": [
+              15
+            ],
+            "name": "EvtWithdrawalRequestedPayload"
+          },
+          {
+            "discriminator": [
+              16
+            ],
+            "name": "EvtTreasuryMintedPayload"
+          },
+          {
+            "discriminator": [
+              17
+            ],
+            "name": "EvtLendDeliveredPayload"
+          },
+          {
+            "discriminator": [
+              18
+            ],
+            "name": "EvtAssetConfigChangedPayload"
+          },
+          {
+            "discriminator": [
+              19
+            ],
+            "name": "EvtRouteConfigChangedPayload"
+          },
+          {
+            "discriminator": [
+              20
+            ],
+            "name": "EvtLegacyConfigMigratedPayload"
+          }
+        ],
+        "instructions": [
+          {
+            "accounts": [
+              {
+                "name": "bridge_authority",
+                "signer": true,
+                "writable": false
+              },
+              {
+                "name": "config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "withdrawal",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "escrow",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "receipt_mint",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "rent_payer",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "token_program",
+                "signer": false,
+                "writable": false
+              }
+            ],
+            "args": [
+              {
+                "name": "settlement_reference",
+                "type": {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                }
+              }
+            ],
+            "discriminator": [
+              4
+            ],
+            "name": "finalize_withdrawal"
+          },
+          {
+            "accounts": [
+              {
+                "name": "bridge_authority",
+                "signer": true,
+                "writable": false
+              },
+              {
+                "name": "config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "withdrawal",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "escrow",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "receipt_mint",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "refund_token_account",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "rent_payer",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "token_program",
+                "signer": false,
+                "writable": false
+              }
+            ],
+            "args": [
+              {
+                "name": "reason_code",
+                "type": "u32"
+              }
+            ],
+            "discriminator": [
+              5
+            ],
+            "name": "reject_withdrawal"
+          },
+          {
+            "accounts": [
+              {
+                "name": "authority",
+                "signer": true,
+                "writable": false
+              },
+              {
+                "name": "config",
+                "signer": false,
+                "writable": true
+              }
+            ],
+            "args": [
+              {
+                "name": "pause_flags",
+                "type": "u8"
+              }
+            ],
+            "discriminator": [
+              6
+            ],
+            "name": "set_pause"
+          },
+          {
+            "accounts": [
+              {
+                "name": "admin",
+                "signer": true,
+                "writable": false
+              },
+              {
+                "name": "config",
+                "signer": false,
+                "writable": true
+              }
+            ],
+            "args": [
+              {
+                "name": "new_bridge_authority",
+                "type": {
+                  "option": "pubkey"
+                }
+              },
+              {
+                "name": "new_pause_authority",
+                "type": {
+                  "option": "pubkey"
+                }
+              },
+              {
+                "name": "new_attesters",
+                "type": {
+                  "option": {
+                    "defined": {
+                      "name": "AttesterSet"
+                    }
+                  }
+                }
+              }
+            ],
+            "discriminator": [
+              7
+            ],
+            "name": "set_config"
+          },
+          {
+            "accounts": [
+              {
+                "name": "admin",
+                "signer": true,
+                "writable": false
+              },
+              {
+                "name": "config",
+                "signer": false,
+                "writable": true
+              }
+            ],
+            "args": [
+              {
+                "name": "new_admin",
+                "type": "pubkey"
+              }
+            ],
+            "discriminator": [
+              8
+            ],
+            "name": "propose_admin"
+          },
+          {
+            "accounts": [
+              {
+                "name": "pending_admin",
+                "signer": true,
+                "writable": false
+              },
+              {
+                "name": "config",
+                "signer": false,
+                "writable": true
+              }
+            ],
+            "args": [],
+            "discriminator": [
+              9
+            ],
+            "name": "accept_admin"
+          },
+          {
+            "accounts": [
+              {
+                "name": "initializer",
+                "signer": true,
+                "writable": true
+              },
+              {
+                "name": "config",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "system_program",
+                "signer": false,
+                "writable": false
+              }
+            ],
+            "args": [
+              {
+                "name": "admin",
+                "type": "pubkey"
+              },
+              {
+                "name": "pause_authority",
+                "type": "pubkey"
+              },
+              {
+                "name": "bridge_authority",
+                "type": "pubkey"
+              },
+              {
+                "name": "attester_threshold",
+                "type": "u8"
+              },
+              {
+                "name": "attesters",
+                "type": {
+                  "vec": {
+                    "array": [
+                      "u8",
+                      20
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "bridge_instance_id",
+                "type": {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                }
+              }
+            ],
+            "discriminator": [
+              14
+            ],
+            "name": "initialize"
+          },
+          {
+            "accounts": [
+              {
+                "name": "admin",
+                "signer": true,
+                "writable": true
+              },
+              {
+                "name": "config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "asset_config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "route_config",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "system_program",
+                "signer": false,
+                "writable": false
+              }
+            ],
+            "args": [
+              {
+                "name": "route_id",
+                "type": "u32"
+              },
+              {
+                "name": "receipt_mint",
+                "type": "pubkey"
+              },
+              {
+                "name": "source_asset_id",
+                "type": {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                }
+              },
+              {
+                "name": "source_decimals",
+                "type": "u8"
+              },
+              {
+                "name": "destination_len",
+                "type": "u8"
+              },
+              {
+                "name": "min_withdrawal_amount",
+                "type": "u64"
+              },
+              {
+                "name": "withdrawal_fee",
+                "type": "u64"
+              },
+              {
+                "name": "deposits_enabled",
+                "type": "bool"
+              },
+              {
+                "name": "withdrawals_enabled",
+                "type": "bool"
+              }
+            ],
+            "discriminator": [
+              15
+            ],
+            "name": "set_route_config"
+          },
+          {
+            "accounts": [
+              {
+                "name": "payer",
+                "signer": true,
+                "writable": true
+              },
+              {
+                "name": "config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "route_config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "asset_config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "deposit_receipt",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "receipt_mint",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "mint_authority",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "recipient",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "recipient_token_account",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "token_program",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "associated_token_program",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "system_program",
+                "signer": false,
+                "writable": false
+              }
+            ],
+            "args": [
+              {
+                "name": "route_id",
+                "type": "u32"
+              },
+              {
+                "name": "source_reference",
+                "type": {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                }
+              },
+              {
+                "name": "source_amount",
+                "type": "u128"
+              },
+              {
+                "name": "expires_at_unix",
+                "type": "i64"
+              },
+              {
+                "name": "signatures",
+                "type": {
+                  "vec": {
+                    "array": [
+                      "u8",
+                      65
+                    ]
+                  }
+                }
+              }
+            ],
+            "discriminator": [
+              16
+            ],
+            "name": "mint_from_deposit"
+          },
+          {
+            "accounts": [
+              {
+                "name": "payer",
+                "signer": true,
+                "writable": true
+              },
+              {
+                "name": "config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "route_config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "asset_config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "deposit_receipt",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "receipt_mint",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "mint_authority",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "lend_staging",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "lend_staging_token_account",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "owner",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "lend_account",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "lend_program",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "lend_group",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "bank",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "bank_liquidity_vault",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "token_program",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "associated_token_program",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "system_program",
+                "signer": false,
+                "writable": false
+              }
+            ],
+            "args": [
+              {
+                "name": "route_id",
+                "type": "u32"
+              },
+              {
+                "name": "source_reference",
+                "type": {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                }
+              },
+              {
+                "name": "source_amount",
+                "type": "u128"
+              },
+              {
+                "name": "expires_at_unix",
+                "type": "i64"
+              },
+              {
+                "name": "signatures",
+                "type": {
+                  "vec": {
+                    "array": [
+                      "u8",
+                      65
+                    ]
+                  }
+                }
+              }
+            ],
+            "discriminator": [
+              17
+            ],
+            "name": "mint_from_deposit_to_lend"
+          },
+          {
+            "accounts": [
+              {
+                "name": "admin",
+                "signer": true,
+                "writable": true
+              },
+              {
+                "name": "config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "asset_config",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "receipt_mint",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "system_program",
+                "signer": false,
+                "writable": false
+              }
+            ],
+            "args": [
+              {
+                "name": "decimals",
+                "type": "u8"
+              },
+              {
+                "name": "supply_limit",
+                "type": "u64"
+              },
+              {
+                "name": "treasury_authority",
+                "type": {
+                  "option": "pubkey"
+                }
+              }
+            ],
+            "discriminator": [
+              18
+            ],
+            "name": "set_asset_config"
+          },
+          {
+            "accounts": [
+              {
+                "name": "payer",
+                "signer": true,
+                "writable": true
+              },
+              {
+                "name": "requester",
+                "signer": true,
+                "writable": false
+              },
+              {
+                "name": "config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "route_config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "asset_config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "withdrawal",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "escrow",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "receipt_mint",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "requester_token_account",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "token_program",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "system_program",
+                "signer": false,
+                "writable": false
+              }
+            ],
+            "args": [
+              {
+                "name": "amount",
+                "type": "u64"
+              },
+              {
+                "name": "route_id",
+                "type": "u32"
+              },
+              {
+                "name": "destination_len",
+                "type": "u8"
+              },
+              {
+                "name": "destination",
+                "type": {
+                  "array": [
+                    "u8",
+                    64
+                  ]
+                }
+              },
+              {
+                "name": "nonce",
+                "type": "u64"
+              }
+            ],
+            "discriminator": [
+              19
+            ],
+            "name": "request_withdrawal"
+          },
+          {
+            "accounts": [
+              {
+                "name": "admin_payer",
+                "signer": true,
+                "writable": true
+              },
+              {
+                "name": "config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "asset_config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "receipt_mint",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "metadata",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "mint_authority",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "metadata_program",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "system_program",
+                "signer": false,
+                "writable": false
+              }
+            ],
+            "args": [
+              {
+                "name": "name",
+                "type": "string"
+              },
+              {
+                "name": "symbol",
+                "type": "string"
+              },
+              {
+                "name": "image",
+                "type": "string"
+              },
+              {
+                "name": "description",
+                "type": "string"
+              }
+            ],
+            "discriminator": [
+              20
+            ],
+            "name": "set_mint_metadata"
+          },
+          {
+            "accounts": [
+              {
+                "name": "treasury_authority",
+                "signer": true,
+                "writable": true
+              },
+              {
+                "name": "config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "asset_config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "treasury_mint_receipt",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "receipt_mint",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "mint_authority",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "recipient",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "recipient_token_account",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "token_program",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "associated_token_program",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "system_program",
+                "signer": false,
+                "writable": false
+              }
+            ],
+            "args": [
+              {
+                "name": "issuance_id",
+                "type": {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                }
+              },
+              {
+                "name": "amount",
+                "type": "u64"
+              },
+              {
+                "name": "recipient",
+                "type": "pubkey"
+              }
+            ],
+            "discriminator": [
+              21
+            ],
+            "name": "mint_from_treasury"
+          },
+          {
+            "accounts": [
+              {
+                "name": "authority",
+                "signer": true,
+                "writable": false
+              },
+              {
+                "name": "config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "route_config",
+                "signer": false,
+                "writable": true
+              }
+            ],
+            "args": [
+              {
+                "name": "route_id",
+                "type": "u32"
+              },
+              {
+                "name": "disable_deposits",
+                "type": "bool"
+              },
+              {
+                "name": "disable_withdrawals",
+                "type": "bool"
+              }
+            ],
+            "discriminator": [
+              22
+            ],
+            "name": "disable_route"
+          },
+          {
+            "accounts": [
+              {
+                "name": "admin",
+                "signer": true,
+                "writable": true
+              },
+              {
+                "name": "config",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "legacy_treasury_config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "asset_config",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "receipt_mint",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "legacy_mint_authority",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "metadata",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "token_program",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "metadata_program",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "system_program",
+                "signer": false,
+                "writable": false
+              }
+            ],
+            "args": [
+              {
+                "name": "supply_limit",
+                "type": "u64"
+              }
+            ],
+            "discriminator": [
+              23
+            ],
+            "name": "migrate_legacy_config"
+          }
+        ],
+        "metadata": {
+          "description": "Multi-asset custodial bridge ABI for Arch Network.",
+          "name": "Arch Bridge",
+          "spec": "0.1.0",
+          "version": "0.4.3"
+        },
+        "types": [
+          {
+            "name": "AssetConfig",
+            "type": {
+              "fields": [
+                {
+                  "name": "bump",
+                  "type": "u8"
+                },
+                {
+                  "name": "receipt_mint",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "decimals",
+                  "type": "u8"
+                },
+                {
+                  "name": "mint_authority_bump",
+                  "type": "u8"
+                },
+                {
+                  "name": "supply_limit",
+                  "type": "u64"
+                },
+                {
+                  "name": "treasury_authority",
+                  "type": {
+                    "option": "pubkey"
+                  }
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "AttesterSet",
+            "type": {
+              "fields": [
+                {
+                  "name": "threshold",
+                  "type": "u8"
+                },
+                {
+                  "name": "addresses",
+                  "type": {
+                    "vec": {
+                      "array": [
+                        "u8",
+                        20
+                      ]
+                    }
+                  }
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "Config",
+            "type": {
+              "fields": [
+                {
+                  "name": "config_bump",
+                  "type": "u8"
+                },
+                {
+                  "name": "admin",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "pending_admin",
+                  "type": {
+                    "option": "pubkey"
+                  }
+                },
+                {
+                  "name": "pause_authority",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "bridge_authority",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "attester_threshold",
+                  "type": "u8"
+                },
+                {
+                  "name": "attester_count",
+                  "type": "u8"
+                },
+                {
+                  "name": "attesters",
+                  "type": {
+                    "array": [
+                      {
+                        "array": [
+                          "u8",
+                          20
+                        ]
+                      },
+                      8
+                    ]
+                  }
+                },
+                {
+                  "name": "pause_flags",
+                  "type": "u8"
+                },
+                {
+                  "name": "bridge_instance_id",
+                  "type": {
+                    "array": [
+                      "u8",
+                      32
+                    ]
+                  }
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "DepositDelivery",
+            "type": {
+              "kind": "enum",
+              "variants": [
+                {
+                  "name": "Wallet"
+                },
+                {
+                  "fields": [
+                    {
+                      "name": "lend_program",
+                      "type": "pubkey"
+                    },
+                    {
+                      "name": "lend_group",
+                      "type": "pubkey"
+                    }
+                  ],
+                  "name": "Lend"
+                }
+              ]
+            }
+          },
+          {
+            "name": "DepositReceipt",
+            "type": {
+              "fields": [
+                {
+                  "name": "bump",
+                  "type": "u8"
+                },
+                {
+                  "name": "route_id",
+                  "type": "u32"
+                },
+                {
+                  "name": "receipt_mint",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "source_asset_id",
+                  "type": {
+                    "array": [
+                      "u8",
+                      32
+                    ]
+                  }
+                },
+                {
+                  "name": "source_reference",
+                  "type": {
+                    "array": [
+                      "u8",
+                      32
+                    ]
+                  }
+                },
+                {
+                  "name": "source_amount",
+                  "type": "u128"
+                },
+                {
+                  "name": "amount",
+                  "type": "u64"
+                },
+                {
+                  "name": "recipient",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "minted_at_slot",
+                  "type": "u64"
+                },
+                {
+                  "name": "attester_bitmap",
+                  "type": "u8"
+                },
+                {
+                  "name": "delivery",
+                  "type": {
+                    "defined": {
+                      "name": "DepositDelivery"
+                    }
+                  }
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "EvtAdminChangedPayload",
+            "type": {
+              "fields": [
+                {
+                  "name": "old",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "new",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "by",
+                  "type": "pubkey"
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "EvtAdminProposedPayload",
+            "type": {
+              "fields": [
+                {
+                  "name": "old",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "new",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "by",
+                  "type": "pubkey"
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "EvtAssetConfigChangedPayload",
+            "type": {
+              "fields": [
+                {
+                  "name": "receipt_mint",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "decimals",
+                  "type": "u8"
+                },
+                {
+                  "name": "supply_limit",
+                  "type": "u64"
+                },
+                {
+                  "name": "treasury_authority",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "by",
+                  "type": "pubkey"
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "EvtConfigChangedPayload",
+            "type": {
+              "fields": [
+                {
+                  "name": "field_mask",
+                  "type": "u8"
+                },
+                {
+                  "name": "bridge_authority",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "pause_authority_count",
+                  "type": "u8"
+                },
+                {
+                  "name": "pause_authorities",
+                  "type": {
+                    "array": [
+                      "pubkey",
+                      4
+                    ]
+                  }
+                },
+                {
+                  "name": "attester_threshold",
+                  "type": "u8"
+                },
+                {
+                  "name": "attester_count",
+                  "type": "u8"
+                },
+                {
+                  "name": "attesters",
+                  "type": {
+                    "array": [
+                      {
+                        "array": [
+                          "u8",
+                          20
+                        ]
+                      },
+                      8
+                    ]
+                  }
+                },
+                {
+                  "name": "by",
+                  "type": "pubkey"
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "EvtInitializedPayload",
+            "type": {
+              "fields": [
+                {
+                  "name": "admin",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "pause_authority",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "bridge_authority",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "attester_threshold",
+                  "type": "u8"
+                },
+                {
+                  "name": "attester_count",
+                  "type": "u8"
+                },
+                {
+                  "name": "attesters",
+                  "type": {
+                    "array": [
+                      {
+                        "array": [
+                          "u8",
+                          20
+                        ]
+                      },
+                      8
+                    ]
+                  }
+                },
+                {
+                  "name": "bridge_instance_id",
+                  "type": {
+                    "array": [
+                      "u8",
+                      32
+                    ]
+                  }
+                },
+                {
+                  "name": "config_bump",
+                  "type": "u8"
+                },
+                {
+                  "name": "pause_flags",
+                  "type": "u8"
+                },
+                {
+                  "name": "by",
+                  "type": "pubkey"
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "EvtLegacyConfigMigratedPayload",
+            "type": {
+              "fields": [
+                {
+                  "name": "receipt_mint",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "supply",
+                  "type": "u64"
+                },
+                {
+                  "name": "supply_limit",
+                  "type": "u64"
+                },
+                {
+                  "name": "treasury_authority",
+                  "type": "pubkey"
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "EvtLendDeliveredPayload",
+            "type": {
+              "fields": [
+                {
+                  "name": "route_id",
+                  "type": "u32"
+                },
+                {
+                  "name": "receipt_mint",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "credit_id",
+                  "type": {
+                    "array": [
+                      "u8",
+                      32
+                    ]
+                  }
+                },
+                {
+                  "name": "amount",
+                  "type": "u64"
+                },
+                {
+                  "name": "owner",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "lend_program",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "lend_group",
+                  "type": "pubkey"
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "EvtMintedPayload",
+            "type": {
+              "fields": [
+                {
+                  "name": "route_id",
+                  "type": "u32"
+                },
+                {
+                  "name": "receipt_mint",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "credit_id",
+                  "type": {
+                    "array": [
+                      "u8",
+                      32
+                    ]
+                  }
+                },
+                {
+                  "name": "source_reference",
+                  "type": {
+                    "array": [
+                      "u8",
+                      32
+                    ]
+                  }
+                },
+                {
+                  "name": "source_amount",
+                  "type": "u128"
+                },
+                {
+                  "name": "amount",
+                  "type": "u64"
+                },
+                {
+                  "name": "recipient",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "attester_bitmap",
+                  "type": "u8"
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "EvtPauseChangedPayload",
+            "type": {
+              "fields": [
+                {
+                  "name": "old",
+                  "type": "u8"
+                },
+                {
+                  "name": "new",
+                  "type": "u8"
+                },
+                {
+                  "name": "by",
+                  "type": "pubkey"
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "EvtRouteConfigChangedPayload",
+            "type": {
+              "fields": [
+                {
+                  "name": "route_id",
+                  "type": "u32"
+                },
+                {
+                  "name": "receipt_mint",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "source_asset_id",
+                  "type": {
+                    "array": [
+                      "u8",
+                      32
+                    ]
+                  }
+                },
+                {
+                  "name": "source_decimals",
+                  "type": "u8"
+                },
+                {
+                  "name": "destination_len",
+                  "type": "u8"
+                },
+                {
+                  "name": "min_withdrawal_amount",
+                  "type": "u64"
+                },
+                {
+                  "name": "withdrawal_fee",
+                  "type": "u64"
+                },
+                {
+                  "name": "deposits_enabled",
+                  "type": "bool"
+                },
+                {
+                  "name": "withdrawals_enabled",
+                  "type": "bool"
+                },
+                {
+                  "name": "by",
+                  "type": "pubkey"
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "EvtTreasuryMintedPayload",
+            "type": {
+              "fields": [
+                {
+                  "name": "receipt_mint",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "issuance_id",
+                  "type": {
+                    "array": [
+                      "u8",
+                      32
+                    ]
+                  }
+                },
+                {
+                  "name": "amount",
+                  "type": "u64"
+                },
+                {
+                  "name": "recipient",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "authority",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "minted_at_slot",
+                  "type": "u64"
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "EvtWithdrawalFinalizedPayload",
+            "type": {
+              "fields": [
+                {
+                  "name": "withdrawal",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "burned_amount",
+                  "type": "u64"
+                },
+                {
+                  "name": "settlement_reference",
+                  "type": {
+                    "array": [
+                      "u8",
+                      32
+                    ]
+                  }
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "EvtWithdrawalRejectedPayload",
+            "type": {
+              "fields": [
+                {
+                  "name": "withdrawal",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "refunded_amount",
+                  "type": "u64"
+                },
+                {
+                  "name": "reason_code",
+                  "type": "u32"
+                },
+                {
+                  "name": "refund_token_account",
+                  "type": "pubkey"
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "EvtWithdrawalRequestedPayload",
+            "type": {
+              "fields": [
+                {
+                  "name": "requester",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "receipt_mint",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "nonce",
+                  "type": "u64"
+                },
+                {
+                  "name": "amount",
+                  "type": "u64"
+                },
+                {
+                  "name": "fee",
+                  "type": "u64"
+                },
+                {
+                  "name": "route_id",
+                  "type": "u32"
+                },
+                {
+                  "name": "destination_len",
+                  "type": "u8"
+                },
+                {
+                  "name": "destination",
+                  "type": {
+                    "array": [
+                      "u8",
+                      64
+                    ]
+                  }
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "RouteConfig",
+            "type": {
+              "fields": [
+                {
+                  "name": "bump",
+                  "type": "u8"
+                },
+                {
+                  "name": "route_id",
+                  "type": "u32"
+                },
+                {
+                  "name": "receipt_mint",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "source_asset_id",
+                  "type": {
+                    "array": [
+                      "u8",
+                      32
+                    ]
+                  }
+                },
+                {
+                  "name": "source_decimals",
+                  "type": "u8"
+                },
+                {
+                  "name": "destination_len",
+                  "type": "u8"
+                },
+                {
+                  "name": "min_withdrawal_amount",
+                  "type": "u64"
+                },
+                {
+                  "name": "withdrawal_fee",
+                  "type": "u64"
+                },
+                {
+                  "name": "deposits_enabled",
+                  "type": "bool"
+                },
+                {
+                  "name": "withdrawals_enabled",
+                  "type": "bool"
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "TreasuryMintReceipt",
+            "type": {
+              "fields": [
+                {
+                  "name": "bump",
+                  "type": "u8"
+                },
+                {
+                  "name": "receipt_mint",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "issuance_id",
+                  "type": {
+                    "array": [
+                      "u8",
+                      32
+                    ]
+                  }
+                },
+                {
+                  "name": "amount",
+                  "type": "u64"
+                },
+                {
+                  "name": "recipient",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "authority",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "minted_at_slot",
+                  "type": "u64"
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "Withdrawal",
+            "type": {
+              "fields": [
+                {
+                  "name": "bump",
+                  "type": "u8"
+                },
+                {
+                  "name": "escrow_bump",
+                  "type": "u8"
+                },
+                {
+                  "name": "receipt_mint",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "requester",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "rent_payer",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "nonce",
+                  "type": "u64"
+                },
+                {
+                  "name": "amount",
+                  "type": "u64"
+                },
+                {
+                  "name": "route_id",
+                  "type": "u32"
+                },
+                {
+                  "name": "fee",
+                  "type": "u64"
+                },
+                {
+                  "name": "destination_len",
+                  "type": "u8"
+                },
+                {
+                  "name": "destination",
+                  "type": {
+                    "array": [
+                      "u8",
+                      64
+                    ]
+                  }
+                },
+                {
+                  "name": "requested_at_slot",
+                  "type": "u64"
+                },
+                {
+                  "name": "state",
+                  "type": {
+                    "defined": {
+                      "name": "WithdrawalState"
+                    }
+                  }
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "name": "WithdrawalState",
+            "type": {
+              "kind": "enum",
+              "variants": [
+                {
+                  "name": "Pending"
+                },
+                {
+                  "fields": [
+                    {
+                      "name": "finalized_at_slot",
+                      "type": "u64"
+                    },
+                    {
+                      "name": "burned_amount",
+                      "type": "u64"
+                    },
+                    {
+                      "name": "settlement_reference",
+                      "type": {
+                        "array": [
+                          "u8",
+                          32
+                        ]
+                      }
+                    }
+                  ],
+                  "name": "Finalized"
+                },
+                {
+                  "fields": [
+                    {
+                      "name": "rejected_at_slot",
+                      "type": "u64"
+                    },
+                    {
+                      "name": "refunded_amount",
+                      "type": "u64"
+                    },
+                    {
+                      "name": "reason_code",
+                      "type": "u32"
+                    },
+                    {
+                      "name": "refund_token_account",
+                      "type": "pubkey"
+                    }
+                  ],
+                  "name": "Rejected"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "propamm": {
+      "address": "EXhUxhGdEhboLyeeW1Wymcp6FG4fkxqrNnirkViieYB8",
+      "owner": "5KMw4VNavLhM5wxTxyQGm8hs5ymFhqMCZ5BpkHybcEBV",
+      "authority": "7QyWhgm2NLuYpnAf8WCnVK5v562rdcFxM85E9DZfCz4z",
+      "compressed_payload_sha256": "d40c95c0bb34f5e8eb004d570b4b9af8602acf5112d65f6ff53ab72387858148",
+      "json": {
+        "accounts": [
+          {
+            "discriminator": [
+              80,
+              82,
+              79,
+              80,
+              65,
+              77,
+              77,
+              50
+            ],
+            "name": "Config"
+          }
+        ],
+        "address": "4022dec7e57f757682712b45ddf13a8f324710f4637cefc0ebacc6343caab24c",
+        "errors": [
+          {
+            "code": 0,
+            "msg": "Quote signer signature is missing",
+            "name": "QuoteSignerAccountNotSigner"
+          },
+          {
+            "code": 1,
+            "msg": "User signature is missing",
+            "name": "UserAccountNotSigner"
+          },
+          {
+            "code": 2,
+            "msg": "Quote user does not match",
+            "name": "UserPubkeyMismatch"
+          },
+          {
+            "code": 3,
+            "msg": "Quote signer does not match",
+            "name": "QuoteSignerPubkeyMismatch"
+          },
+          {
+            "code": 4,
+            "msg": "Quote has expired",
+            "name": "QuoteExpired"
+          },
+          {
+            "code": 5,
+            "msg": "Quote lifetime is too long",
+            "name": "QuoteTtlExceeded"
+          },
+          {
+            "code": 6,
+            "msg": "Token mints do not match",
+            "name": "TokenMintsMismatch"
+          },
+          {
+            "code": 7,
+            "msg": "Token amounts do not match",
+            "name": "TokenAmountsMismatch"
+          },
+          {
+            "code": 8,
+            "msg": "Quote has already been used",
+            "name": "NonceReplay"
+          },
+          {
+            "code": 9,
+            "msg": "Base and quote tokens must differ",
+            "name": "BaseQuoteMintsSame"
+          },
+          {
+            "code": 100,
+            "msg": "Trade amounts must be greater than zero",
+            "name": "ZeroAmounts"
+          },
+          {
+            "code": 101,
+            "msg": "Vault inventory is empty",
+            "name": "ZeroInventory"
+          },
+          {
+            "code": 102,
+            "msg": "Calculation divided by zero",
+            "name": "DivisionByZero"
+          },
+          {
+            "code": 103,
+            "msg": "Calculation overflowed",
+            "name": "Overflow"
+          },
+          {
+            "code": 104,
+            "msg": "Numeric conversion failed",
+            "name": "Conversion"
+          },
+          {
+            "code": 200,
+            "msg": "Instruction data is invalid",
+            "name": "InstructionDecodeFailed"
+          },
+          {
+            "code": 201,
+            "msg": "Initialize instruction encoding failed",
+            "name": "InitializeInstructionSerializeFailed"
+          },
+          {
+            "code": 202,
+            "msg": "Create-vault instruction encoding failed",
+            "name": "CreateVaultInstructionSerializeFailed"
+          },
+          {
+            "code": 203,
+            "msg": "Trade instruction encoding failed",
+            "name": "ExecuteTradeInstructionSerializeFailed"
+          },
+          {
+            "code": 204,
+            "msg": "Program address derivation failed",
+            "name": "PdaDerivationFailed"
+          },
+          {
+            "code": 205,
+            "msg": "Token account address derivation failed",
+            "name": "AssociatedTokenAddressDerivationFailed"
+          },
+          {
+            "code": 206,
+            "msg": "Config address derivation failed",
+            "name": "ConfigPdaDerivationFailed"
+          },
+          {
+            "code": 207,
+            "msg": "Vault address derivation failed",
+            "name": "VaultPdaDerivationFailed"
+          },
+          {
+            "code": 208,
+            "msg": "Nonce address derivation failed",
+            "name": "UserNoncePdaDerivationFailed"
+          },
+          {
+            "code": 210,
+            "msg": "Initialization config account is missing",
+            "name": "InitializeConfigAccountMissing"
+          },
+          {
+            "code": 211,
+            "msg": "Initialization authority account is missing",
+            "name": "InitializeAuthorityAccountMissing"
+          },
+          {
+            "code": 212,
+            "msg": "Initialization quote signer is missing",
+            "name": "InitializeQuoteSignerAccountMissing"
+          },
+          {
+            "code": 213,
+            "msg": "Initialization system program is missing",
+            "name": "InitializeSystemProgramAccountMissing"
+          },
+          {
+            "code": 220,
+            "msg": "Vault config account is missing",
+            "name": "CreateVaultConfigAccountMissing"
+          },
+          {
+            "code": 221,
+            "msg": "Vault quote signer is missing",
+            "name": "CreateVaultQuoteSignerAccountMissing"
+          },
+          {
+            "code": 222,
+            "msg": "Vault token mint is missing",
+            "name": "CreateVaultMintAccountMissing"
+          },
+          {
+            "code": 223,
+            "msg": "Vault account is missing",
+            "name": "CreateVaultAccountMissing"
+          },
+          {
+            "code": 224,
+            "msg": "Vault system program is missing",
+            "name": "CreateVaultSystemProgramAccountMissing"
+          },
+          {
+            "code": 225,
+            "msg": "Vault token program is missing",
+            "name": "CreateVaultTokenProgramAccountMissing"
+          },
+          {
+            "code": 230,
+            "msg": "Trade config account is missing",
+            "name": "TradeConfigAccountMissing"
+          },
+          {
+            "code": 231,
+            "msg": "Trade quote signer is missing",
+            "name": "TradeQuoteSignerAccountMissing"
+          },
+          {
+            "code": 232,
+            "msg": "Trade user account is missing",
+            "name": "TradeUserAccountMissing"
+          },
+          {
+            "code": 233,
+            "msg": "Trade nonce account is missing",
+            "name": "TradeUserNonceAccountMissing"
+          },
+          {
+            "code": 234,
+            "msg": "Base vault account is missing",
+            "name": "TradeBaseVaultAccountMissing"
+          },
+          {
+            "code": 235,
+            "msg": "Quote vault account is missing",
+            "name": "TradeQuoteVaultAccountMissing"
+          },
+          {
+            "code": 236,
+            "msg": "Your base-token account is missing",
+            "name": "TradeBaseUserAccountMissing"
+          },
+          {
+            "code": 237,
+            "msg": "Your quote-token account is missing",
+            "name": "TradeQuoteUserAccountMissing"
+          },
+          {
+            "code": 238,
+            "msg": "Base mint account is missing",
+            "name": "TradeBaseMintAccountMissing"
+          },
+          {
+            "code": 239,
+            "msg": "Quote mint account is missing",
+            "name": "TradeQuoteMintAccountMissing"
+          },
+          {
+            "code": 240,
+            "msg": "Trade system program is missing",
+            "name": "TradeSystemProgramAccountMissing"
+          },
+          {
+            "code": 241,
+            "msg": "Trade token program is missing",
+            "name": "TradeTokenProgramAccountMissing"
+          },
+          {
+            "code": 300,
+            "msg": "Initialization system program is invalid",
+            "name": "InitializeSystemProgramMismatch"
+          },
+          {
+            "code": 301,
+            "msg": "Initialization authority signature is missing",
+            "name": "InitializeAuthorityNotSigner"
+          },
+          {
+            "code": 302,
+            "msg": "Initialization quote signer signature is missing",
+            "name": "InitializeQuoteSignerNotSigner"
+          },
+          {
+            "code": 303,
+            "msg": "Initialization config address is invalid",
+            "name": "InitializeConfigPdaMismatch"
+          },
+          {
+            "code": 304,
+            "msg": "Config is already initialized",
+            "name": "InitializeConfigAlreadyInitialized"
+          },
+          {
+            "code": 305,
+            "msg": "Config encoding failed",
+            "name": "InitializeConfigSerializeFailed"
+          },
+          {
+            "code": 306,
+            "msg": "Config account creation failed",
+            "name": "InitializeConfigCreateCpiFailed"
+          },
+          {
+            "code": 307,
+            "msg": "Config data access failed during initialization",
+            "name": "InitializeConfigDataBorrowFailed"
+          },
+          {
+            "code": 308,
+            "msg": "Config data length is invalid",
+            "name": "InitializeConfigDataLengthMismatch"
+          },
+          {
+            "code": 309,
+            "msg": "Existing config data access failed",
+            "name": "InitializeConfigExistingDataBorrowFailed"
+          },
+          {
+            "code": 400,
+            "msg": "Vault system program is invalid",
+            "name": "CreateVaultSystemProgramMismatch"
+          },
+          {
+            "code": 401,
+            "msg": "Vault token program is invalid",
+            "name": "CreateVaultTokenProgramMismatch"
+          },
+          {
+            "code": 402,
+            "msg": "Vault config owner is invalid",
+            "name": "CreateVaultConfigOwnerMismatch"
+          },
+          {
+            "code": 403,
+            "msg": "Vault config address is invalid",
+            "name": "CreateVaultConfigPdaMismatch"
+          },
+          {
+            "code": 404,
+            "msg": "Vault config data access failed",
+            "name": "CreateVaultConfigBorrowFailed"
+          },
+          {
+            "code": 405,
+            "msg": "Vault config data is invalid",
+            "name": "CreateVaultConfigDecodeFailed"
+          },
+          {
+            "code": 406,
+            "msg": "Vault quote signer does not match",
+            "name": "CreateVaultQuoteSignerMismatch"
+          },
+          {
+            "code": 407,
+            "msg": "Vault quote signer signature is missing",
+            "name": "CreateVaultQuoteSignerNotSigner"
+          },
+          {
+            "code": 408,
+            "msg": "Vault address is invalid",
+            "name": "CreateVaultPdaMismatch"
+          },
+          {
+            "code": 409,
+            "msg": "Vault account creation failed",
+            "name": "CreateVaultAccountCpiFailed"
+          },
+          {
+            "code": 410,
+            "msg": "Vault initialization instruction failed",
+            "name": "CreateVaultInitializeInstructionFailed"
+          },
+          {
+            "code": 411,
+            "msg": "Vault initialization failed",
+            "name": "CreateVaultInitializeCpiFailed"
+          },
+          {
+            "code": 412,
+            "msg": "Vault mint owner is invalid",
+            "name": "CreateVaultMintOwnerMismatch"
+          },
+          {
+            "code": 413,
+            "msg": "Vault mint data access failed",
+            "name": "CreateVaultMintDataBorrowFailed"
+          },
+          {
+            "code": 414,
+            "msg": "Vault mint data is invalid",
+            "name": "CreateVaultMintDataInvalid"
+          },
+          {
+            "code": 500,
+            "msg": "Trade system program is invalid",
+            "name": "TradeSystemProgramMismatch"
+          },
+          {
+            "code": 501,
+            "msg": "Trade token program is invalid",
+            "name": "TradeTokenProgramMismatch"
+          },
+          {
+            "code": 502,
+            "msg": "Trade config owner is invalid",
+            "name": "TradeConfigOwnerMismatch"
+          },
+          {
+            "code": 503,
+            "msg": "Trade config address is invalid",
+            "name": "TradeConfigPdaMismatch"
+          },
+          {
+            "code": 504,
+            "msg": "Trade config data access failed",
+            "name": "TradeConfigBorrowFailed"
+          },
+          {
+            "code": 505,
+            "msg": "Trade config data is invalid",
+            "name": "TradeConfigDecodeFailed"
+          },
+          {
+            "code": 506,
+            "msg": "Trade base and quote tokens must differ",
+            "name": "TradeBaseMintEqualsQuoteMint"
+          },
+          {
+            "code": 507,
+            "msg": "Base mint does not match the quote",
+            "name": "TradeQuoteBaseMintMismatch"
+          },
+          {
+            "code": 508,
+            "msg": "Quote mint does not match the quote",
+            "name": "TradeQuoteQuoteMintMismatch"
+          },
+          {
+            "code": 509,
+            "msg": "Base mint owner is invalid",
+            "name": "TradeBaseMintOwnerMismatch"
+          },
+          {
+            "code": 510,
+            "msg": "Quote mint owner is invalid",
+            "name": "TradeQuoteMintOwnerMismatch"
+          },
+          {
+            "code": 511,
+            "msg": "Base mint data is invalid",
+            "name": "TradeBaseMintDataInvalid"
+          },
+          {
+            "code": 512,
+            "msg": "Quote mint data is invalid",
+            "name": "TradeQuoteMintDataInvalid"
+          },
+          {
+            "code": 513,
+            "msg": "Base vault address is invalid",
+            "name": "TradeBaseVaultPdaMismatch"
+          },
+          {
+            "code": 514,
+            "msg": "Quote vault address is invalid",
+            "name": "TradeQuoteVaultPdaMismatch"
+          },
+          {
+            "code": 515,
+            "msg": "Your base-token account address is invalid",
+            "name": "TradeBaseUserAtaMismatch"
+          },
+          {
+            "code": 516,
+            "msg": "Your quote-token account address is invalid",
+            "name": "TradeQuoteUserAtaMismatch"
+          },
+          {
+            "code": 517,
+            "msg": "Base vault owner is invalid",
+            "name": "TradeBaseVaultProgramOwnerMismatch"
+          },
+          {
+            "code": 518,
+            "msg": "Quote vault owner is invalid",
+            "name": "TradeQuoteVaultProgramOwnerMismatch"
+          },
+          {
+            "code": 519,
+            "msg": "Your base-token account owner is invalid",
+            "name": "TradeBaseUserProgramOwnerMismatch"
+          },
+          {
+            "code": 520,
+            "msg": "Your quote-token account owner is invalid",
+            "name": "TradeQuoteUserProgramOwnerMismatch"
+          },
+          {
+            "code": 521,
+            "msg": "Base vault data access failed",
+            "name": "TradeBaseVaultDataBorrowFailed"
+          },
+          {
+            "code": 522,
+            "msg": "Quote vault data access failed",
+            "name": "TradeQuoteVaultDataBorrowFailed"
+          },
+          {
+            "code": 523,
+            "msg": "Your base-token account data access failed",
+            "name": "TradeBaseUserDataBorrowFailed"
+          },
+          {
+            "code": 524,
+            "msg": "Your quote-token account data access failed",
+            "name": "TradeQuoteUserDataBorrowFailed"
+          },
+          {
+            "code": 525,
+            "msg": "Base vault data is invalid",
+            "name": "TradeBaseVaultDataInvalid"
+          },
+          {
+            "code": 526,
+            "msg": "Quote vault data is invalid",
+            "name": "TradeQuoteVaultDataInvalid"
+          },
+          {
+            "code": 527,
+            "msg": "Your base-token account data is invalid",
+            "name": "TradeBaseUserDataInvalid"
+          },
+          {
+            "code": 528,
+            "msg": "Your quote-token account data is invalid",
+            "name": "TradeQuoteUserDataInvalid"
+          },
+          {
+            "code": 529,
+            "msg": "Base vault mint does not match",
+            "name": "TradeBaseVaultMintMismatch"
+          },
+          {
+            "code": 530,
+            "msg": "Quote vault mint does not match",
+            "name": "TradeQuoteVaultMintMismatch"
+          },
+          {
+            "code": 531,
+            "msg": "Your base-token account mint does not match",
+            "name": "TradeBaseUserMintMismatch"
+          },
+          {
+            "code": 532,
+            "msg": "Your quote-token account mint does not match",
+            "name": "TradeQuoteUserMintMismatch"
+          },
+          {
+            "code": 533,
+            "msg": "Base vault authority does not match",
+            "name": "TradeBaseVaultAuthorityMismatch"
+          },
+          {
+            "code": 534,
+            "msg": "Quote vault authority does not match",
+            "name": "TradeQuoteVaultAuthorityMismatch"
+          },
+          {
+            "code": 535,
+            "msg": "Your base-token account authority does not match",
+            "name": "TradeBaseUserAuthorityMismatch"
+          },
+          {
+            "code": 536,
+            "msg": "Your quote-token account authority does not match",
+            "name": "TradeQuoteUserAuthorityMismatch"
+          },
+          {
+            "code": 537,
+            "msg": "Nonce address is invalid",
+            "name": "TradeUserNoncePdaMismatch"
+          },
+          {
+            "code": 538,
+            "msg": "Nonce creation encoding failed",
+            "name": "TradeUserNonceSerializeCreateFailed"
+          },
+          {
+            "code": 539,
+            "msg": "Nonce account creation failed",
+            "name": "TradeUserNonceCreateCpiFailed"
+          },
+          {
+            "code": 540,
+            "msg": "Nonce data access failed during creation",
+            "name": "TradeUserNonceDataBorrowFailed"
+          },
+          {
+            "code": 541,
+            "msg": "Nonce length is invalid after creation",
+            "name": "TradeUserNonceDataLengthMismatch"
+          },
+          {
+            "code": 542,
+            "msg": "Nonce account owner is invalid",
+            "name": "TradeUserNonceOwnerMismatch"
+          },
+          {
+            "code": 543,
+            "msg": "Nonce account data is invalid",
+            "name": "TradeUserNonceDecodeFailed"
+          },
+          {
+            "code": 544,
+            "msg": "Nonce account user does not match",
+            "name": "TradeUserNonceUserMismatch"
+          },
+          {
+            "code": 545,
+            "msg": "Nonce overflowed",
+            "name": "TradeNonceIncrementOverflow"
+          },
+          {
+            "code": 546,
+            "msg": "Nonce update encoding failed",
+            "name": "TradeUserNonceSerializeUpdateFailed"
+          },
+          {
+            "code": 547,
+            "msg": "Nonce account resize failed",
+            "name": "TradeUserNonceReallocFailed"
+          },
+          {
+            "code": 548,
+            "msg": "Nonce data access failed during update",
+            "name": "TradeUserNonceUpdateBorrowFailed"
+          },
+          {
+            "code": 549,
+            "msg": "Nonce length is invalid after update",
+            "name": "TradeUserNonceUpdateLengthMismatch"
+          },
+          {
+            "code": 550,
+            "msg": "Your quote-token balance is too low",
+            "name": "TradeBuyUserQuoteInsufficientFunds"
+          },
+          {
+            "code": 551,
+            "msg": "Base vault liquidity is too low",
+            "name": "TradeBuyBaseVaultInsufficientFunds"
+          },
+          {
+            "code": 552,
+            "msg": "Your base-token balance is too low",
+            "name": "TradeSellUserBaseInsufficientFunds"
+          },
+          {
+            "code": 553,
+            "msg": "Quote vault liquidity is too low",
+            "name": "TradeSellQuoteVaultInsufficientFunds"
+          },
+          {
+            "code": 554,
+            "msg": "Network clock is invalid",
+            "name": "TradeClockBeforeUnixEpoch"
+          },
+          {
+            "code": 555,
+            "msg": "Base mint data access failed",
+            "name": "TradeBaseMintDataBorrowFailed"
+          },
+          {
+            "code": 556,
+            "msg": "Quote mint data access failed",
+            "name": "TradeQuoteMintDataBorrowFailed"
+          },
+          {
+            "code": 557,
+            "msg": "Quote expiry is before its issue time",
+            "name": "QuoteExpiryBeforeNonce"
+          },
+          {
+            "code": 558,
+            "msg": "Nonce empty-state check failed",
+            "name": "TradeUserNonceEmptyCheckBorrowFailed"
+          },
+          {
+            "code": 559,
+            "msg": "Existing nonce data access failed",
+            "name": "TradeUserNonceExistingDataBorrowFailed"
+          },
+          {
+            "code": 560,
+            "msg": "Nonce length read failed",
+            "name": "TradeUserNonceLengthReadBorrowFailed"
+          },
+          {
+            "code": 561,
+            "msg": "Nonce length conversion failed",
+            "name": "TradeUserNonceCreateLengthConversionFailed"
+          },
+          {
+            "code": 562,
+            "msg": "Base-token account derivation failed",
+            "name": "TradeBaseUserAtaDerivationFailed"
+          },
+          {
+            "code": 563,
+            "msg": "Quote-token account derivation failed",
+            "name": "TradeQuoteUserAtaDerivationFailed"
+          },
+          {
+            "code": 564,
+            "msg": "Trade output is below your minimum",
+            "name": "TradeMinimumOutputNotMet"
+          },
+          {
+            "code": 565,
+            "msg": "Unexpected associated-token program",
+            "name": "TradeAssociatedTokenProgramMismatch"
+          },
+          {
+            "code": 566,
+            "msg": "Base-token account creation failed",
+            "name": "TradeBaseUserAtaCreateCpiFailed"
+          },
+          {
+            "code": 567,
+            "msg": "Quote-token account creation failed",
+            "name": "TradeQuoteUserAtaCreateCpiFailed"
+          },
+          {
+            "code": 568,
+            "msg": "Input must be within 50 bps below quoted amount",
+            "name": "TradeInputOutOfRange"
+          },
+          {
+            "code": 700,
+            "msg": "Buy base-transfer instruction failed",
+            "name": "TradeBuyBaseTransferBuildFailed"
+          },
+          {
+            "code": 701,
+            "msg": "Buy quote-transfer instruction failed",
+            "name": "TradeBuyQuoteTransferBuildFailed"
+          },
+          {
+            "code": 702,
+            "msg": "Buy base-token transfer failed",
+            "name": "TradeBuyBaseTransferCpiFailed"
+          },
+          {
+            "code": 703,
+            "msg": "Buy quote-token transfer failed",
+            "name": "TradeBuyQuoteTransferCpiFailed"
+          },
+          {
+            "code": 704,
+            "msg": "Sell base-transfer instruction failed",
+            "name": "TradeSellBaseTransferBuildFailed"
+          },
+          {
+            "code": 705,
+            "msg": "Sell quote-transfer instruction failed",
+            "name": "TradeSellQuoteTransferBuildFailed"
+          },
+          {
+            "code": 706,
+            "msg": "Sell base-token transfer failed",
+            "name": "TradeSellBaseTransferCpiFailed"
+          },
+          {
+            "code": 707,
+            "msg": "Sell quote-token transfer failed",
+            "name": "TradeSellQuoteTransferCpiFailed"
+          },
+          {
+            "code": 800,
+            "msg": "Price multiplication overflowed",
+            "name": "AdjustmentPriceMultiplyOverflow"
+          },
+          {
+            "code": 801,
+            "msg": "Price division failed",
+            "name": "AdjustmentPriceDivisionFailed"
+          },
+          {
+            "code": 802,
+            "msg": "Base-value multiplication overflowed",
+            "name": "AdjustmentBaseValueMultiplyOverflow"
+          },
+          {
+            "code": 803,
+            "msg": "Base-value division failed",
+            "name": "AdjustmentBaseValueDivisionFailed"
+          },
+          {
+            "code": 804,
+            "msg": "Base-delta multiplication overflowed",
+            "name": "AdjustmentBaseDeltaMultiplyOverflow"
+          },
+          {
+            "code": 805,
+            "msg": "Base-delta division failed",
+            "name": "AdjustmentBaseDeltaDivisionFailed"
+          },
+          {
+            "code": 806,
+            "msg": "Base vault inventory is too low for this buy",
+            "name": "AdjustmentBuyBaseUnderflow"
+          },
+          {
+            "code": 807,
+            "msg": "Projected quote inventory overflowed",
+            "name": "AdjustmentBuyQuoteOverflow"
+          },
+          {
+            "code": 808,
+            "msg": "Projected base inventory overflowed",
+            "name": "AdjustmentSellBaseOverflow"
+          },
+          {
+            "code": 809,
+            "msg": "Quote vault inventory is too low for this sale",
+            "name": "AdjustmentSellQuoteUnderflow"
+          },
+          {
+            "code": 810,
+            "msg": "Total inventory overflowed",
+            "name": "AdjustmentInventoryTotalOverflow"
+          },
+          {
+            "code": 811,
+            "msg": "Base inventory conversion failed",
+            "name": "AdjustmentBaseValueConversionFailed"
+          },
+          {
+            "code": 812,
+            "msg": "Quote inventory conversion failed",
+            "name": "AdjustmentQuoteValueConversionFailed"
+          },
+          {
+            "code": 813,
+            "msg": "Inventory denominator conversion failed",
+            "name": "AdjustmentDenominatorConversionFailed"
+          },
+          {
+            "code": 814,
+            "msg": "Inventory difference overflowed",
+            "name": "AdjustmentDifferenceOverflow"
+          },
+          {
+            "code": 815,
+            "msg": "Skew multiplication overflowed",
+            "name": "AdjustmentSkewMultiplyOverflow"
+          },
+          {
+            "code": 816,
+            "msg": "Skew division failed",
+            "name": "AdjustmentSkewDivisionFailed"
+          },
+          {
+            "code": 817,
+            "msg": "Adjustment multiplication overflowed",
+            "name": "AdjustmentTermMultiplyOverflow"
+          },
+          {
+            "code": 818,
+            "msg": "Adjustment division failed",
+            "name": "AdjustmentTermDivisionFailed"
+          },
+          {
+            "code": 819,
+            "msg": "Adjustment subtraction overflowed",
+            "name": "AdjustmentSubtractOverflow"
+          },
+          {
+            "code": 820,
+            "msg": "Adjustment conversion failed",
+            "name": "AdjustmentConversionFailed"
+          },
+          {
+            "code": 821,
+            "msg": "Buy payout multiplication overflowed",
+            "name": "BuyPayoutMultiplyOverflow"
+          },
+          {
+            "code": 822,
+            "msg": "Buy payout division failed",
+            "name": "BuyPayoutDivisionFailed"
+          },
+          {
+            "code": 823,
+            "msg": "Buy payout conversion failed",
+            "name": "BuyPayoutConversionFailed"
+          },
+          {
+            "code": 824,
+            "msg": "Sell payout multiplication overflowed",
+            "name": "SellPayoutMultiplyOverflow"
+          },
+          {
+            "code": 825,
+            "msg": "Sell payout division failed",
+            "name": "SellPayoutDivisionFailed"
+          },
+          {
+            "code": 826,
+            "msg": "Sell payout conversion failed",
+            "name": "SellPayoutConversionFailed"
+          },
+          {
+            "code": 1000,
+            "msg": "IDL base address derivation failed",
+            "name": "IdlBasePdaDerivationFailed"
+          },
+          {
+            "code": 1100,
+            "msg": "Config data invalid",
+            "name": "ConfigDataInvalid"
+          },
+          {
+            "code": 1101,
+            "msg": "Config owner mismatch",
+            "name": "ConfigOwnerMismatch"
+          },
+          {
+            "code": 1102,
+            "msg": "Config executable",
+            "name": "ConfigExecutable"
+          },
+          {
+            "code": 1103,
+            "msg": "Config pda mismatch",
+            "name": "ConfigPdaMismatch"
+          },
+          {
+            "code": 1104,
+            "msg": "Config borrow failed",
+            "name": "ConfigBorrowFailed"
+          },
+          {
+            "code": 1105,
+            "msg": "Account not writable",
+            "name": "AccountNotWritable"
+          },
+          {
+            "code": 1106,
+            "msg": "Admin not signer",
+            "name": "AdminNotSigner"
+          },
+          {
+            "code": 1107,
+            "msg": "Admin mismatch",
+            "name": "AdminMismatch"
+          },
+          {
+            "code": 1108,
+            "msg": "Quote signer invalid",
+            "name": "QuoteSignerInvalid"
+          },
+          {
+            "code": 1113,
+            "msg": "Vault policy invalid",
+            "name": "VaultPolicyInvalid"
+          },
+          {
+            "code": 1114,
+            "msg": "Admin instruction account missing",
+            "name": "AdminInstructionAccountMissing"
+          },
+          {
+            "code": 1115,
+            "msg": "Admin instruction serialize failed",
+            "name": "AdminInstructionSerializeFailed"
+          },
+          {
+            "code": 1116,
+            "msg": "Withdrawal token program mismatch",
+            "name": "WithdrawalTokenProgramMismatch"
+          },
+          {
+            "code": 1117,
+            "msg": "Withdrawal mint invalid",
+            "name": "WithdrawalMintInvalid"
+          },
+          {
+            "code": 1118,
+            "msg": "Withdrawal vault invalid",
+            "name": "WithdrawalVaultInvalid"
+          },
+          {
+            "code": 1119,
+            "msg": "Withdrawal destination invalid",
+            "name": "WithdrawalDestinationInvalid"
+          },
+          {
+            "code": 1120,
+            "msg": "Withdrawal amount invalid",
+            "name": "WithdrawalAmountInvalid"
+          },
+          {
+            "code": 1121,
+            "msg": "Withdrawal insufficient funds",
+            "name": "WithdrawalInsufficientFunds"
+          },
+          {
+            "code": 1122,
+            "msg": "Withdrawal transfer failed",
+            "name": "WithdrawalTransferFailed"
+          },
+          {
+            "code": 1123,
+            "msg": "Withdrawal self transfer",
+            "name": "WithdrawalSelfTransfer"
+          },
+          {
+            "code": 1124,
+            "msg": "Withdrawal overflow",
+            "name": "WithdrawalOverflow"
+          },
+          {
+            "code": 1125,
+            "msg": "Config update system program mismatch",
+            "name": "ConfigUpdateSystemProgramMismatch"
+          }
+        ],
+        "instructions": [
+          {
+            "accounts": [
+              {
+                "name": "config",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "authority",
+                "signer": true,
+                "writable": true
+              },
+              {
+                "name": "quote_signer",
+                "signer": true,
+                "writable": true
+              },
+              {
+                "name": "system_program",
+                "signer": false,
+                "writable": false
+              }
+            ],
+            "args": [
+              {
+                "name": "max_quote_ttl_ms",
+                "type": "u64"
+              }
+            ],
+            "discriminator": [
+              0
+            ],
+            "name": "initialize_config"
+          },
+          {
+            "accounts": [
+              {
+                "name": "config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "quote_signer",
+                "signer": true,
+                "writable": true
+              },
+              {
+                "name": "token_mint",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "vault_token_account",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "system_program",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "apl_token_program",
+                "signer": false,
+                "writable": false
+              }
+            ],
+            "args": [],
+            "discriminator": [
+              1
+            ],
+            "name": "create_vault"
+          },
+          {
+            "accounts": [
+              {
+                "name": "config",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "quote_signer",
+                "signer": true,
+                "writable": true
+              },
+              {
+                "name": "user",
+                "signer": true,
+                "writable": true
+              },
+              {
+                "name": "user_nonce",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "base_mint_vault_token_account",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "quote_mint_vault_token_account",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "base_mint_user_token_account",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "quote_mint_user_token_account",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "base_mint_account",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "quote_mint_account",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "apl_token_program"
+              },
+              {
+                "docs": [
+                  "Required when creating the user nonce or when associated_token_program is present. Omit both trailing programs when the nonce and both ATAs already exist."
+                ],
+                "name": "system_program",
+                "optional": true
+              },
+              {
+                "docs": [
+                  "When present, ExecuteTrade creates both user ATAs idempotently via CPI and requires system_program. Omit when both ATAs already exist."
+                ],
+                "name": "associated_token_program",
+                "optional": true
+              }
+            ],
+            "args": [
+              {
+                "name": "quote",
+                "type": {
+                  "defined": {
+                    "name": "CompactQuote"
+                  }
+                }
+              },
+              {
+                "docs": [
+                  "Actual input in token units: 99.5% to 100% of quote.quote_amount for Buy or quote.base_amount for Sell, rounded up at the lower bound."
+                ],
+                "name": "amount_in",
+                "type": "u64"
+              },
+              {
+                "name": "min_out",
+                "type": "u64"
+              }
+            ],
+            "discriminator": [
+              2
+            ],
+            "docs": [
+              "User, base mint, and quote mint are resolved from instruction accounts 2, 8, and 9. Data is 42 bytes without min_out or 50 bytes with it. The required amount_in follows the compact quote. Omitting min_out applies 98% of the full quote's nominal output."
+            ],
+            "name": "execute_trade"
+          },
+          {
+            "accounts": [
+              {
+                "name": "config",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "authority",
+                "signer": true,
+                "writable": false
+              }
+            ],
+            "args": [
+              {
+                "name": "new_quote_signer",
+                "type": "pubkey"
+              }
+            ],
+            "discriminator": [
+              3
+            ],
+            "name": "update_quote_signer"
+          },
+          {
+            "accounts": [
+              {
+                "name": "config",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "authority",
+                "signer": true,
+                "writable": false
+              },
+              {
+                "name": "token_mint",
+                "signer": false,
+                "writable": false
+              },
+              {
+                "name": "vault_token_account",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "destination_token_account",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "apl_token_program",
+                "signer": false,
+                "writable": false
+              }
+            ],
+            "args": [
+              {
+                "name": "amount",
+                "type": "u64"
+              }
+            ],
+            "discriminator": [
+              4
+            ],
+            "name": "withdraw_vault"
+          },
+          {
+            "accounts": [
+              {
+                "name": "config",
+                "signer": false,
+                "writable": true
+              },
+              {
+                "name": "authority",
+                "signer": true,
+                "writable": true
+              },
+              {
+                "name": "system_program",
+                "signer": false,
+                "writable": false
+              }
+            ],
+            "args": [
+              {
+                "name": "skew_ratio_bps",
+                "type": "u16"
+              }
+            ],
+            "discriminator": [
+              5
+            ],
+            "docs": [
+              "Admin-only skew multiplier update: 0 disables skew, 10000 preserves existing behavior, up to 65535 amplifies it. Migrates a 113-byte v2 config to 115-byte v3 at the same address, with any additional rent paid by authority. Operators must stop quote serving, expire outstanding quotes, update, and restart all servers using this config."
+            ],
+            "name": "update_skew_ratio"
+          }
+        ],
+        "metadata": {
+          "description": "PropAMM signed-quote AMM with config-PDA vault custody. Native Borsh tags: InitializeConfig=0, CreateVault=1, ExecuteTrade=2, UpdateQuoteSigner=3, WithdrawVault=4, UpdateSkewRatio=5. ExecuteTrade carries compact quote terms, actual input amount, and optional taker minimum output; user and mint keys come from signed instruction accounts. Config v3 appends a skew multiplier; v2 defaults to 10000 bps and migrates in place on UpdateSkewRatio.",
+          "name": "PropAMM",
+          "spec": "0.1.0",
+          "version": "0.2.0"
+        },
+        "types": [
+          {
+            "name": "Side",
+            "type": {
+              "kind": "enum",
+              "variants": [
+                {
+                  "name": "Buy"
+                },
+                {
+                  "name": "Sell"
+                }
+              ]
+            }
+          },
+          {
+            "name": "CompactQuote",
+            "type": {
+              "fields": [
+                {
+                  "name": "side",
+                  "type": {
+                    "defined": {
+                      "name": "Side"
+                    }
+                  }
+                },
+                {
+                  "name": "base_amount",
+                  "type": "u64"
+                },
+                {
+                  "name": "quote_amount",
+                  "type": "u64"
+                },
+                {
+                  "name": "expiry_ts",
+                  "type": "u64"
+                },
+                {
+                  "name": "nonce",
+                  "type": "u64"
+                }
+              ],
+              "kind": "struct"
+            }
+          },
+          {
+            "docs": [
+              "Version 3 is 115 bytes including the unchanged 8-byte account discriminator. Version 2 is 113 bytes, omits skew_ratio_bps and defaults to 10000. config_id is the immutable initial quote signer, used only for config PDA derivation."
+            ],
+            "name": "Config",
+            "type": {
+              "fields": [
+                {
+                  "name": "version",
+                  "type": "u8"
+                },
+                {
+                  "name": "authority",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "quote_signer",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "config_id",
+                  "type": "pubkey"
+                },
+                {
+                  "name": "max_quote_ttl_ms",
+                  "type": "u64"
+                },
+                {
+                  "name": "skew_ratio_bps",
+                  "type": "u16"
+                }
+              ],
+              "kind": "struct"
+            }
+          }
+        ]
+      }
+    },
+    "router": {
+      "address": "CrthVRWoYUbUkhwj5JWXA5iHZLTRY7oVwhfJbNbJBB8Y",
+      "owner": "Bu8JuhykFEtJmUqYV98zJDtPr2J7LBMbEJX8DeT7XSeT",
+      "authority": "4PrJgvKANMqKYaa557shP4i1rtrF6jc1GUAjQmzXf5eA",
+      "compressed_payload_sha256": "aada6a213c2eff854cde5c31f11ce96c6c68aa5d21fd7d4f6fa46e2ce58b50cc",
+      "json": {
+        "address": "a1ef55dc1509784c6c9228ac602d411f762a4fd857df8855a1813fc303afe690",
+        "errors": [
+          {
+            "code": 1,
+            "msg": "Invalid instruction encoding",
+            "name": "InvalidInstruction"
+          },
+          {
+            "code": 2,
+            "msg": "Invalid or unsupported route",
+            "name": "InvalidRoute"
+          },
+          {
+            "code": 3,
+            "msg": "Unexpected program ID",
+            "name": "UnsupportedProgram"
+          },
+          {
+            "code": 4,
+            "msg": "Invalid route accounts",
+            "name": "InvalidAccounts"
+          },
+          {
+            "code": 5,
+            "msg": "Invalid mint or token account",
+            "name": "InvalidToken"
+          },
+          {
+            "code": 6,
+            "msg": "Missing required signature",
+            "name": "MissingSignature"
+          },
+          {
+            "code": 7,
+            "msg": "Route deadline has passed",
+            "name": "RouteExpired"
+          },
+          {
+            "code": 8,
+            "msg": "Route accounts must be distinct",
+            "name": "AccountAlias"
+          },
+          {
+            "code": 9,
+            "msg": "Insufficient input token balance",
+            "name": "InsufficientInput"
+          },
+          {
+            "code": 10,
+            "msg": "Hop did not fully consume input and credit output",
+            "name": "IncompleteFill"
+          },
+          {
+            "code": 11,
+            "msg": "Final output is below the signed minimum",
+            "name": "MinimumOutputNotMet"
+          },
+          {
+            "code": 12,
+            "msg": "Invalid RFQ terms",
+            "name": "InvalidRfqTerms"
+          },
+          {
+            "code": 13,
+            "msg": "RFQ quote has expired",
+            "name": "RfqExpired"
+          },
+          {
+            "code": 14,
+            "msg": "Redemption did not fill immediately",
+            "name": "NonImmediateRedemption"
+          },
+          {
+            "code": 15,
+            "msg": "Arithmetic overflow",
+            "name": "ArithmeticOverflow"
+          },
+          {
+            "code": 16,
+            "msg": "Operation is not implemented",
+            "name": "NotImplemented"
+          }
+        ],
+        "instructions": [
+          {
+            "accounts": [
+              {
+                "name": "user",
+                "signer": true,
+                "writable": true
+              },
+              {
+                "address": "TokenT4em53UrV4gSvZ3nCS2mZeHaqTLapwt6iZt6Mk",
+                "name": "token_program"
+              }
+            ],
+            "args": [
+              {
+                "name": "amount_in",
+                "type": "u64"
+              },
+              {
+                "name": "min_amount_out",
+                "type": "u64"
+              },
+              {
+                "name": "deadline_ms",
+                "type": "u64"
+              },
+              {
+                "name": "steps",
+                "type": {
+                  "defined": {
+                    "name": "RouteStepsV1"
+                  }
+                }
+              }
+            ],
+            "discriminator": [
+              0
+            ],
+            "docs": [
+              "One to three sequential steps; each hop consumes only the previous hop credit. The minimum is net final output since the route began.",
+              "RouteStepsV1 encodes the one-byte step count as an enum tag, followed by a fixed array. There is no u32 vector length.",
+              "After user and token_program, remaining accounts are step_count + 1 (mint, writable user ATA) pairs, then one venue group per step. All route mints and user ATAs must be distinct.",
+              "VaultMint group (6): vault_program, vault, reserve, protocol_fee_recipient_ata, manager_fee_recipient_ata, event_authority. The output share mint must be writable.",
+              "VaultRedeem group (9): vault_program, vault, reserve, escrow, redeem_entry, protocol_fee_recipient_ata, manager_fee_recipient_ata, event_authority, system_program. The input share mint must be writable.",
+              "ClammSwap group (8 + supplemental count): clamm_program, pool, pool_token_vault_a, pool_token_vault_b, tick_array_0, tick_array_1, tick_array_2, oracle, followed by supplemental tick arrays.",
+              "PropAmmSwap group (7): propamm_program, config, signing maker, writable user_nonce, writable base_vault, writable quote_vault, system_program. Buy spends quote and receives base; Sell spends base and receives quote. The native CPI receives the unchanged quote, measured hop input, and explicit min_out = 0; the router enforces the final minimum.",
+              "After all venue groups, optional trailer (2): associated_token_program, system_program, both read-only. When supplied, the user pays for idempotent creation of missing canonical user ATAs before balance snapshots. Existing valid ATAs are preserved; without the trailer all user ATAs must already exist. Venue accounts are not created by the router.",
+              "Mint and Redeem must fill immediately; amounts, minimum and deadline are checked by the program. Successful return data is RouteResultV1 with version 1."
+            ],
+            "name": "route_exact_in_v1",
+            "returns": {
+              "defined": {
+                "name": "RouteResultV1"
+              }
+            }
+          }
+        ],
+        "metadata": {
+          "description": "Native Arch exact-input router for vault Mint, immediate Redeem, CLAMM and PropAMM swaps. Integers are little-endian; token amounts are raw atomic units.",
+          "name": "arch_swap_router",
+          "spec": "0.1.0",
+          "version": "0.1.0"
+        },
+        "types": [
+          {
+            "docs": [
+              "Enum tags 1, 2 and 3 are the native step count. Reserved tag 0 is rejected by the program."
+            ],
+            "name": "RouteStepsV1",
+            "type": {
+              "kind": "enum",
+              "variants": [
+                {
+                  "name": "Reserved"
+                },
+                {
+                  "fields": [
+                    {
+                      "name": "steps",
+                      "type": {
+                        "array": [
+                          {
+                            "defined": {
+                              "name": "StepV1"
+                            }
+                          },
+                          1
+                        ]
+                      }
+                    }
+                  ],
+                  "name": "One"
+                },
+                {
+                  "fields": [
+                    {
+                      "name": "steps",
+                      "type": {
+                        "array": [
+                          {
+                            "defined": {
+                              "name": "StepV1"
+                            }
+                          },
+                          2
+                        ]
+                      }
+                    }
+                  ],
+                  "name": "Two"
+                },
+                {
+                  "fields": [
+                    {
+                      "name": "steps",
+                      "type": {
+                        "array": [
+                          {
+                            "defined": {
+                              "name": "StepV1"
+                            }
+                          },
+                          3
+                        ]
+                      }
+                    }
+                  ],
+                  "name": "Three"
+                }
+              ]
+            }
+          },
+          {
+            "docs": [
+              "Native one-byte step tags: Mint=0, Redeem=1, CLAMM=2, PropAMM=3. At most one PropAMM step per route; both user and maker signatures are required."
+            ],
+            "name": "StepV1",
+            "type": {
+              "kind": "enum",
+              "variants": [
+                {
+                  "name": "VaultMint"
+                },
+                {
+                  "name": "VaultRedeem"
+                },
+                {
+                  "fields": [
+                    {
+                      "name": "a_to_b",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "sqrt_price_limit",
+                      "type": "u128"
+                    },
+                    {
+                      "name": "supplemental_tick_array_count",
+                      "type": "u8"
+                    }
+                  ],
+                  "name": "ClammSwap"
+                },
+                {
+                  "fields": [
+                    {
+                      "name": "side",
+                      "type": {
+                        "defined": {
+                          "name": "Side"
+                        }
+                      }
+                    },
+                    {
+                      "name": "quoted_base_amount",
+                      "type": "u64"
+                    },
+                    {
+                      "name": "quoted_quote_amount",
+                      "type": "u64"
+                    },
+                    {
+                      "name": "expiry_ms",
+                      "type": "u64"
+                    },
+                    {
+                      "name": "nonce",
+                      "type": "u64"
+                    }
+                  ],
+                  "name": "PropAmmSwap"
+                }
+              ]
+            }
+          },
+          {
+            "name": "Side",
+            "type": {
+              "kind": "enum",
+              "variants": [
+                {
+                  "name": "Buy"
+                },
+                {
+                  "name": "Sell"
+                }
+              ]
+            }
+          },
+          {
+            "docs": [
+              "17-byte successful return data. Check transaction success, return-data program ID and version == 1 before using the amounts."
+            ],
+            "name": "RouteResultV1",
+            "type": {
+              "fields": [
+                {
+                  "name": "version",
+                  "type": "u8"
+                },
+                {
+                  "name": "amount_in",
+                  "type": "u64"
+                },
+                {
+                  "name": "amount_out",
+                  "type": "u64"
+                }
+              ],
+              "kind": "struct"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "receipts": [
+    {
+      "address": "2ufqXr62aXNx6Ar79fZ2d6nNY3HheiwRdkJjmj5Nonyz",
+      "owner": "F5uRFVRuupfFgw1L5x7uWt41ug7MTZr2BfnfZiFj12fk",
+      "lamports": "548",
+      "is_executable": false,
+      "data_hex": "0cff097b60f32490d480c17e47528d6531d2ab01a1812ef8024036abd37cb33e144c78369073f67c8e2d7900ee42596ff2ca983fb8d1f51fcdbe3ee4bebcce02d8430100000000000000ca1c04c82d57f8ec5bf9f8f6ae4558f8ca6ee1d93d1c2c29eb5414ca0a0bd9f4e4b6bc495281b0d6d105ee11b0cb8c476fdbd8df64e54269638d6fcc1b499530910fa90000000000",
+      "decoded": {
+        "mint": "e1nbE9knw6fS1TwDixC3ZuXhDJpBf874WErswvqvMes",
+        "issuance_id_hex": "78369073f67c8e2d7900ee42596ff2ca983fb8d1f51fcdbe3ee4bebcce02d843",
+        "amount": "1",
+        "recipient": "Ebx8pW2yEgy9QKA5aSQtFAff38i8gDRCeJ7Esp4sJY1q",
+        "authority": "GPoZuMS41Ct92nUUqWyu8dqCY74QkfHRX8N3RsYiTCAT",
+        "minted_at_slot": "11079569"
+      }
+    },
+    {
+      "address": "3jdmF9CfPutKwAfw5sfakrBqQQfq8EFpAgdC2psvcC99",
+      "owner": "F5uRFVRuupfFgw1L5x7uWt41ug7MTZr2BfnfZiFj12fk",
+      "lamports": "548",
+      "is_executable": false,
+      "data_hex": "0cffb8586267326264db356ca4c92b61dee74b4510cb95488897191d18520b3b18a4dc9fd060b78b4afebdf9bd0d14c463fe16b9e92da86712efbe3d7943ca63f1ea0100000000000000ca1c04c82d57f8ec5bf9f8f6ae4558f8ca6ee1d93d1c2c29eb5414ca0a0bd9f4e4b6bc495281b0d6d105ee11b0cb8c476fdbd8df64e54269638d6fcc1b4995301612a90000000000",
+      "decoded": {
+        "mint": "DQcBfwHu8gr8KGt3BE5BDUfBjGgFuDJYm9ByVTDsrww9",
+        "issuance_id_hex": "dc9fd060b78b4afebdf9bd0d14c463fe16b9e92da86712efbe3d7943ca63f1ea",
+        "amount": "1",
+        "recipient": "Ebx8pW2yEgy9QKA5aSQtFAff38i8gDRCeJ7Esp4sJY1q",
+        "authority": "GPoZuMS41Ct92nUUqWyu8dqCY74QkfHRX8N3RsYiTCAT",
+        "minted_at_slot": "11080214"
+      }
+    },
+    {
+      "address": "54kVsm7obb6jHwrf4fYStaUoi9qS8EmPmJ5jHb6u9eK3",
+      "owner": "F5uRFVRuupfFgw1L5x7uWt41ug7MTZr2BfnfZiFj12fk",
+      "lamports": "548",
+      "is_executable": false,
+      "data_hex": "0cff6324a86882144d078e27694605059c9b4cc38549394622f0b51cde92c2f09481df188c9c07ad311fd3ea7d1ab564f9e4b00149b9d847f14f257789d90e01287e6207cb0000000000ca1c04c82d57f8ec5bf9f8f6ae4558f8ca6ee1d93d1c2c29eb5414ca0a0bd9f4e4b6bc495281b0d6d105ee11b0cb8c476fdbd8df64e54269638d6fcc1b4995306d3aa10000000000",
+      "decoded": {
+        "mint": "7g1nPCjKW7zzZ4q7mcABeFXaPSLfBQ6syrz4HnPGAVYt",
+        "issuance_id_hex": "df188c9c07ad311fd3ea7d1ab564f9e4b00149b9d847f14f257789d90e01287e",
+        "amount": "13305698",
+        "recipient": "Ebx8pW2yEgy9QKA5aSQtFAff38i8gDRCeJ7Esp4sJY1q",
+        "authority": "GPoZuMS41Ct92nUUqWyu8dqCY74QkfHRX8N3RsYiTCAT",
+        "minted_at_slot": "10566253"
+      }
+    },
+    {
+      "address": "J4B7wUPMjvowGstVpTLAPM4R8xTdKQXd29PAJivCgnV4",
+      "owner": "F5uRFVRuupfFgw1L5x7uWt41ug7MTZr2BfnfZiFj12fk",
+      "lamports": "548",
+      "is_executable": false,
+      "data_hex": "0cff6324a86882144d078e27694605059c9b4cc38549394622f0b51cde92c2f09481c13693f2f7c037fd7d8f9f992fbe92e3c761f9a878249813989189aad2633d6929892b0500000000883227efa21392d05b1583acfcd5413cbbbe8b38133a89a151b9553a58aff7f6e4b6bc495281b0d6d105ee11b0cb8c476fdbd8df64e54269638d6fcc1b4995306dc9a90000000000",
+      "decoded": {
+        "mint": "7g1nPCjKW7zzZ4q7mcABeFXaPSLfBQ6syrz4HnPGAVYt",
+        "issuance_id_hex": "c13693f2f7c037fd7d8f9f992fbe92e3c761f9a878249813989189aad2633d69",
+        "amount": "86739241",
+        "recipient": "AAeohQskcog129irgFzTepxW6Zsgy5d4mkfTYAGAt7im",
+        "authority": "GPoZuMS41Ct92nUUqWyu8dqCY74QkfHRX8N3RsYiTCAT",
+        "minted_at_slot": "11127149"
+      }
+    }
+  ],
+  "checks": [
+    "quote matches canonical payment, bridge ABI, recipient and derived accounts",
+    "bridge asset, mint authority, quote signer and quote vault match on-chain state",
+    "bridge minting is unpaused and quoted mint stays within supply limit",
+    "full canonical deployed bridge IDL equals normalized local v0.4.3 template",
+    "bridge loader and canonical IDL share the configured deployment authority",
+    "existing aETH treasury receipts use the deployed authority and global issuance PDA namespace",
+    "mainnet reports Arch 0.13.0 and direct quote fits SDK 0.13 limits",
+    "live sell remains native ExecuteTrade with the health/on-chain quote signer"
+  ],
+  "decoded": {
+    "bridge_pause_flags": 0,
+    "asset_supply_limit": "5000000000000",
+    "aeth_supply": "98044939",
+    "treasury_lamports": "4976636",
+    "asset_treasury_authority": "GPoZuMS41Ct92nUUqWyu8dqCY74QkfHRX8N3RsYiTCAT",
+    "mint_authority": "6QhvPC7TYAurSnQgQ2cmeBpJNzDRkNTnwHSjmEGmkHA7"
+  },
+  "limitations": [
+    "Service health/config is its public effective view; raw TOML path, key filename, pricing-engine URL and enabled router bindings are not exposed.",
+    "Published IDL equality is ABI evidence, not an ELF-to-source reproducible-build attestation. ELF hashes record observed deployed binaries.",
+    "Existing receipt state is read-only evidence; no fresh signing, co-signing, swap submission or replay attempt was performed."
+  ],
+  "sell_quote": {
+    "http_status": 200,
+    "request": {
+      "base_mint": "6324a86882144d078e27694605059c9b4cc38549394622f0b51cde92c2f09481",
+      "quote_mint": "b8586267326264db356ca4c92b61dee74b4510cb95488897191d18520b3b18a4",
+      "side": "sell",
+      "amount": 1000000,
+      "user_pubkey": "0101010101010101010101010101010101010101010101010101010101010101",
+      "slippage_bps": 50
+    },
+    "response": {
+      "quote_id": "38663261663766663765386365636238316439623939613733613664346430346437373934346164343433653235303738323331386135613132663764306336",
+      "expires_at_ms": 1793741698000,
+      "version": 0,
+      "signatures": [],
+      "message": {
+        "header": {
+          "num_required_signatures": 2,
+          "num_readonly_signed_accounts": 0,
+          "num_readonly_unsigned_accounts": 2
+        },
+        "account_keys": [
+          [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          [
+            135,
+            204,
+            220,
+            218,
+            62,
+            24,
+            115,
+            168,
+            171,
+            116,
+            252,
+            1,
+            219,
+            104,
+            194,
+            160,
+            178,
+            173,
+            112,
+            97,
+            59,
+            60,
+            26,
+            23,
+            101,
+            7,
+            230,
+            217,
+            126,
+            202,
+            229,
+            177
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            6,
+            221,
+            246,
+            225,
+            185,
+            234,
+            132,
+            65,
+            44,
+            16,
+            184,
+            223,
+            2,
+            28,
+            16,
+            15,
+            200,
+            135,
+            25,
+            7,
+            195,
+            9,
+            195,
+            53,
+            53,
+            222,
+            32,
+            156,
+            52,
+            23,
+            99,
+            191
+          ],
+          [
+            34,
+            101,
+            240,
+            131,
+            175,
+            198,
+            179,
+            205,
+            196,
+            201,
+            138,
+            197,
+            204,
+            254,
+            214,
+            143,
+            200,
+            30,
+            48,
+            222,
+            91,
+            226,
+            161,
+            59,
+            188,
+            236,
+            173,
+            217,
+            70,
+            204,
+            147,
+            173
+          ],
+          [
+            40,
+            183,
+            82,
+            2,
+            162,
+            158,
+            103,
+            126,
+            32,
+            242,
+            243,
+            42,
+            222,
+            23,
+            10,
+            130,
+            238,
+            165,
+            106,
+            227,
+            36,
+            221,
+            89,
+            21,
+            128,
+            144,
+            41,
+            227,
+            82,
+            202,
+            85,
+            75
+          ],
+          [
+            45,
+            236,
+            248,
+            14,
+            60,
+            146,
+            142,
+            181,
+            59,
+            117,
+            35,
+            160,
+            255,
+            171,
+            2,
+            11,
+            53,
+            98,
+            26,
+            221,
+            223,
+            131,
+            202,
+            113,
+            8,
+            91,
+            159,
+            9,
+            73,
+            115,
+            161,
+            17
+          ],
+          [
+            99,
+            36,
+            168,
+            104,
+            130,
+            20,
+            77,
+            7,
+            142,
+            39,
+            105,
+            70,
+            5,
+            5,
+            156,
+            155,
+            76,
+            195,
+            133,
+            73,
+            57,
+            70,
+            34,
+            240,
+            181,
+            28,
+            222,
+            146,
+            194,
+            240,
+            148,
+            129
+          ],
+          [
+            184,
+            88,
+            98,
+            103,
+            50,
+            98,
+            100,
+            219,
+            53,
+            108,
+            164,
+            201,
+            43,
+            97,
+            222,
+            231,
+            75,
+            69,
+            16,
+            203,
+            149,
+            72,
+            136,
+            151,
+            25,
+            29,
+            24,
+            82,
+            11,
+            59,
+            24,
+            164
+          ],
+          [
+            208,
+            209,
+            249,
+            201,
+            160,
+            183,
+            238,
+            180,
+            74,
+            154,
+            95,
+            116,
+            26,
+            197,
+            155,
+            160,
+            253,
+            139,
+            67,
+            57,
+            208,
+            13,
+            191,
+            81,
+            86,
+            56,
+            141,
+            76,
+            187,
+            158,
+            51,
+            87
+          ],
+          [
+            210,
+            140,
+            217,
+            94,
+            142,
+            97,
+            93,
+            93,
+            35,
+            205,
+            172,
+            165,
+            181,
+            49,
+            186,
+            253,
+            247,
+            58,
+            46,
+            61,
+            28,
+            181,
+            13,
+            66,
+            14,
+            93,
+            80,
+            62,
+            166,
+            255,
+            215,
+            6
+          ],
+          [
+            252,
+            218,
+            185,
+            149,
+            48,
+            56,
+            178,
+            60,
+            103,
+            33,
+            197,
+            27,
+            78,
+            46,
+            179,
+            76,
+            12,
+            244,
+            118,
+            116,
+            125,
+            24,
+            39,
+            80,
+            89,
+            15,
+            15,
+            85,
+            1,
+            73,
+            111,
+            239
+          ],
+          [
+            64,
+            34,
+            222,
+            199,
+            229,
+            127,
+            117,
+            118,
+            130,
+            113,
+            43,
+            69,
+            221,
+            241,
+            58,
+            143,
+            50,
+            71,
+            16,
+            244,
+            99,
+            124,
+            239,
+            192,
+            235,
+            172,
+            198,
+            52,
+            60,
+            170,
+            178,
+            76
+          ],
+          [
+            140,
+            151,
+            35,
+            17,
+            132,
+            146,
+            123,
+            119,
+            181,
+            241,
+            128,
+            17,
+            143,
+            204,
+            104,
+            52,
+            20,
+            183,
+            124,
+            82,
+            30,
+            90,
+            119,
+            8,
+            28,
+            247,
+            29,
+            95,
+            96,
+            106,
+            83,
+            132
+          ]
+        ],
+        "recent_blockhash": [
+          181,
+          192,
+          242,
+          192,
+          133,
+          82,
+          45,
+          113,
+          216,
+          80,
+          23,
+          239,
+          140,
+          93,
+          35,
+          210,
+          176,
+          44,
+          64,
+          40,
+          220,
+          16,
+          69,
+          139,
+          78,
+          121,
+          219,
+          103,
+          29,
+          167,
+          102,
+          90
+        ],
+        "instructions": [
+          {
+            "program_id_index": 12,
+            "accounts": [
+              5,
+              1,
+              0,
+              4,
+              10,
+              9,
+              11,
+              6,
+              7,
+              8,
+              3,
+              2,
+              13
+            ],
+            "data": [
+              2,
+              1,
+              64,
+              66,
+              15,
+              0,
+              0,
+              0,
+              0,
+              0,
+              3,
+              1,
+              35,
+              0,
+              0,
+              0,
+              0,
+              0,
+              208,
+              51,
+              86,
+              163,
+              161,
+              1,
+              0,
+              0,
+              14,
+              192,
+              85,
+              163,
+              161,
+              1,
+              0,
+              0,
+              64,
+              66,
+              15,
+              0,
+              0,
+              0,
+              0,
+              0,
+              52,
+              212,
+              34,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "estimated_quote": {
+        "base_amount": 1000000,
+        "quote_amount": 2294019,
+        "adjustment_fp": 1000000,
+        "vault_observed_at_ms": 1793741664530
+      }
+    }
+  }
+}

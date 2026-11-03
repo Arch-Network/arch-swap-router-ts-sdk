@@ -3,9 +3,10 @@ import { NETWORKS, type NetworkConfig } from "./config/networks.js";
 import { MAINNET_AETH_USD as ethUsd } from "./config/aeth-usd.js";
 import { composableAethSwap } from "./direct-rfq.js";
 import { RouterSdkError } from "./errors.js";
+import type { RoutedRfqQuoteProvider } from "./propamm.js";
 import { quoteCandidates } from "./quote-candidates.js";
 import { prepareQuoteState } from "./quote-state.js";
-import type { PropAmmQuoteProvider, QuoteExactInRequest, QuoteForOutputRequest, RouterClient, RouterClientOptions, RouterSwapQuote } from "./types.js";
+import type { QuoteExactInRequest, QuoteForOutputRequest, RouterClient, RouterClientOptions, RouterSwapQuote } from "./types.js";
 import { decodeAddress, U64_MAX } from "./utils.js";
 
 function validateRequest(request: QuoteExactInRequest | QuoteForOutputRequest, amount: bigint, forOutput: boolean): void {
@@ -44,7 +45,7 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
       throw new RouterSdkError("RFQ_EXPIRED", "Composable aETH swap deadline has expired.");
     }
     const state = await prepareQuoteState(source, config, candidates);
-    const providers = new Map<string, PropAmmQuoteProvider>();
+    const providers = new Map<string, RoutedRfqQuoteProvider>();
     if (propAmmQuoteProvider) providers.set("btc-usd", propAmmQuoteProvider);
     if (directProvider) providers.set("aeth-usd", {
       async quoteExactIn(input) {
