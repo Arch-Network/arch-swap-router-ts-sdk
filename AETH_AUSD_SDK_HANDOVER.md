@@ -130,15 +130,25 @@ signer roles are pinned there. A signer/deployment change requires reviewing
 these pins; this path does not perform discovery.
 
 Deployment identities were refreshed on 2026-11-02 against
-`https://vaults.veloxapi.net/propamm/markets` and Arch mainnet RPC. The bridge
-is `5n1fsUDhPiaALmxpaFCJeFdyTkZkxWXecgurV6dSxMq3`. The supplied config
-`3jwSNH8P5tNFMY72ZwFi5z3gEkK1vVor3xcAFvr4DHzr` was still v3/115 bytes
-at verification. A sell quote passed the SDK validator. Buy quotes returned
-`422 quote_not_executable: adjustment_buy_base_underflow` with an empty aETH
-vault, so live treasury-buy verification is pending a server-side resolution.
-Offline buy fixtures verify the pinned Rust builder layout with the new pins;
-they do not establish that the new bridge's deployed buy path has executed.
-No funded transactions were signed or submitted.
+`https://vaults.veloxapi.net/propamm/markets` and Arch mainnet RPC. The supplied
+config `3jwSNH8P5tNFMY72ZwFi5z3gEkK1vVor3xcAFvr4DHzr` was still v3/115 bytes
+at verification. A sell quote passed the SDK validator.
+
+The buy pins were corrected on 2026-11-03. The bridge is
+`F5uRFVRuupfFgw1L5x7uWt41ug7MTZr2BfnfZiFj12fk`: the aETH mint's authority on
+mainnet is `6QhvPC7TYAurSnQgQ2cmeBpJNzDRkNTnwHSjmEGmkHA7`, its
+`["mint-authority", aETH]` PDA, while `5n1fsUDhPiaALmxpaFCJeFdyTkZkxWXecgurV6dSxMq3`,
+pinned before, derives `3EkU9crUbcE6o2FErJ8qY73Tz8eMrBj34DBkRRW2jvVb`, which
+cannot mint aETH. The treasury authority is
+`GPoZuMS41Ct92nUUqWyu8dqCY74QkfHRX8N3RsYiTCAT`, the second signer of the live
+server's buy messages; `G31RGX9tmr7wE43aDPBHCLigAGn1EvvFQCvayZZm8kSK`, pinned
+before, is the PropAMM config's authority (`/health`). With the earlier pins
+every live buy quote was refused `INVALID_RFQ` ("Unexpected RFQ fee payer or
+server signer"); with these, live buy and sell quotes from
+`https://propamm.veloxapi.net` and `https://vaults.veloxapi.net/propamm/rfq`
+pass the SDK validators, and `tests/quote.e2e.test.ts` passes all 14 directions.
+Offline buy fixtures are regenerated with these pins. No funded transactions
+were signed or submitted.
 
 Fixtures and the HTTP/layout mappings above use PropAMM `minting` revision
 [`dfdbc9a36646066cbec067fa9e9a700232804855`](https://github.com/Arch-Network/prop-amm/commit/dfdbc9a36646066cbec067fa9e9a700232804855).
