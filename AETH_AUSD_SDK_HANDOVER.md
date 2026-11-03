@@ -1,5 +1,12 @@
 # aETH/aUSD SDK handoff
 
+The default direct flow below remains available. The later
+`composableAethSells: true` option reuses this provider for aETH → aUSD/primeUSD
+router quotes, with 15 unique mainnet pairs when enabled. See
+[composable sell usage](README.md#composable-aeth-sells) for result handling,
+account reads, and compilation/submission of the new router message. Buys and
+the direct example retain their original behavior.
+
 The SDK supports the fixed mainnet aUSD ↔ aETH market through an injected direct
 RFQ provider. Both directions spend a fixed input and return the original unsigned
 server transaction. They bypass the on-chain swap router. This completes SDK-1

@@ -1,7 +1,7 @@
 import { TransactionUtil, type AccountInfoResult } from "@arch-network/arch-sdk";
 import { base58, hex } from "@scure/base";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createRouterClient, MAINNET_AETH_USD as market, type DirectRfqQuote, type QuoteExactInRequest } from "../src/index.js";
+import { createRouterClient, MAINNET_AETH_USD as market, type DirectRfqQuote, type PropAmmQuote, type QuoteExactInRequest } from "../src/index.js";
 import { NETWORKS, TESTNET_MINTS } from "../src/config/networks.js";
 import { buildRouteGraph, findRoutes, supportedPairs } from "../src/config/routes.js";
 import { compileRouterMessage, decodeAddress, deriveAddress } from "../src/utils.js";
@@ -48,7 +48,7 @@ function setup(outputMint: string = market.quoteMint) {
     [usd.shareMint, info(shares)], [reserve, info(tokens)]]);
   const source = { getAccounts: vi.fn(async (keys: readonly string[]) => keys.map((key) => accounts.get(key) ?? null)) };
   const directRfqQuoteProvider = { quoteExactIn: vi.fn(async (_request: QuoteExactInRequest) => rfq) };
-  const propAmmQuoteProvider = { quoteExactIn: vi.fn(async () => { throw new Error("Unexpected BTC/USD RFQ"); }) };
+  const propAmmQuoteProvider = { quoteExactIn: vi.fn(async (): Promise<PropAmmQuote> => { throw new Error("Unexpected BTC/USD RFQ"); }) };
   const options = { source, network: "mainnet" as const, directRfqQuoteProvider, propAmmQuoteProvider, composableAethSells: true };
   return { request, rfq, source, accounts, directRfqQuoteProvider, propAmmQuoteProvider, options, client: createRouterClient(options) };
 }
@@ -160,6 +160,22 @@ describe("composable aETH quotes", () => {
     expect(quote.hops[0]!.kind).toBe("treasuryMint");
     expect(state.source.getAccounts).not.toHaveBeenCalled();
     expect(state.propAmmQuoteProvider.quoteExactIn).not.toHaveBeenCalled();
+  });
+
+  it("keeps BTC RFQs bound to their own provider when composable aETH sells are enabled", async () => {
+    const state = setup();
+    const request = { ...state.request, inputMint: config.mints.aBTC, amountIn: 1_000n };
+    state.propAmmQuoteProvider.quoteExactIn.mockResolvedValue({
+      quoteId: "btc-sell", quoteSigner: market.quoteSigner, estimatedAmountOut: 1_000_000n,
+      terms: { side: "sell", baseAmount: request.amountIn, quoteAmount: 1_000_000n,
+        expiryMs: state.rfq.expiresAtMs, nonce: 42n },
+    });
+    const quote = await state.client.quoteExactIn(request);
+    expect(quote).toMatchObject({ inputMint: config.mints.aBTC, rfq: { quoteId: "btc-sell" } });
+    expect(state.propAmmQuoteProvider.quoteExactIn).toHaveBeenCalledExactlyOnceWith({
+      inputMint: request.inputMint, outputMint: request.outputMint, amountIn: request.amountIn, user: request.user,
+    });
+    expect(state.directRfqQuoteProvider.quoteExactIn).not.toHaveBeenCalled();
   });
 
   it("preserves u64-scale native inputs without number conversion", async () => {

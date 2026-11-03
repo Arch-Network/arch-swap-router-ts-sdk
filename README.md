@@ -20,8 +20,10 @@ With `composableAethSells: true`, mainnet exposes 15 unique directed pairs:
 aETH → aUSD uses the router and aETH → primeUSD becomes available. Buys retain
 the original direct treasury transaction.
 
-**Latest offline validation (2026-11-03):** typecheck, build, and 881 tests pass,
-including composable aETH sells and the two-call account-loading budget. Earlier live quote-only tests
+**Latest offline validation (2026-11-03):** typecheck, build, and 882 tests pass,
+including composable aETH sells and the two-call account-loading budget. Both
+new composable sell cases also pass live, using zero/one reader calls and
+756/989 bytes with signatures reserved. Earlier live quote-only tests
 passed 13/14 directions, before the batching follow-up: all twelve core pairs and
 aETH → aUSD. aUSD → aETH rejects because the server's treasury authority and
 bridge program differ from the SDK's pinned deployment. The existing validator

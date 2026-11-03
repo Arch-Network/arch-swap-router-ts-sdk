@@ -1,7 +1,8 @@
 # Minimal TypeScript graph routing: implementation plan and handoff
 
 Status: All six steps and the two-call follow-up have been implemented and tested
-offline. The composable aETH sell follow-up also passes 881 offline tests. The last full live run, before
+offline. The composable aETH sell follow-up also passes 882 offline tests and
+both new quote-only live sell cases. The last full live run, before
 the batching follow-up, passed 13/14 directions; aUSD → aETH remains blocked
 by a mismatch between the server's deployment and the SDK's pinned registry.
 See the Step 6 results below for evidence and the remaining external action.
@@ -158,7 +159,8 @@ including overlapping concurrent loads or confirmed absence. If an entire
 initial batch fails transport or framing with RFQ enabled, use the second call
 only to recover required vault accounts, retaining the CLAMM failure without
 loading ticks. Confirmed invalid shared accounts fail without recovery. The two
-ETH directions still perform no SDK account reads.
+default direct ETH directions still perform no SDK account reads. Opted-in
+composable sells use zero reads for aUSD or one USD-vault batch for primeUSD.
 
 ### 3. Evaluate paths and select the winning quote
 
@@ -249,7 +251,7 @@ bytes and the complete account list are counted for all execution modes.
 - [x] Retain receive-sizing coverage for all twelve core directions, bigint
   precision, unreachable targets, and absence of RFQ calls.
 - [x] Assert deduplicated per-request reads, current batch budgets, fresh state
-  on later calls, and no SDK account reads on the ETH path. Cover overlapping
+  on later calls, and no SDK account reads on the default direct ETH path. Cover overlapping
   in-flight reads, confirmed absence, one captured vault-pricing timestamp, and
   independent fresh RFQ-expiry checks.
 - [x] Cover 4,096/4,097 bytes with one and two signatures and 50/51 unique
@@ -730,3 +732,66 @@ Logs and the offline JSON report are in `/tmp/arch-router-two-call/`. The prior
 tests were not rerun for this follow-up. No public interfaces, deployment pins,
 RFQ terms, native fixtures, or dependencies changed. No signing, submission,
 deployment, publishing, or commits performed.
+
+### Composable aETH sell follow-up (2026-11-03)
+
+The user authorized the first composable aETH increment after reviewing the
+PropAMM and router source. Scope: aETH → aUSD and aETH → aUSD → primeUSD,
+using native sell terms. BTC/CLAMM compositions and graph-based treasury buys
+remain excluded because the current signing server does not support them.
+
+- Added optional `RouterClientOptions.composableAethSells` (default false),
+  requiring mainnet and the existing `directRfqQuoteProvider`. No new HTTP
+  provider contract or transport dependency is needed. The direct provider sees
+  an aETH → aUSD request even when the route's final output is primeUSD.
+- Replaced the internal singleton PropAMM deployment with a market registry.
+  Each graph RFQ edge carries a market ID, allowed composition capability, and
+  an identity including program/config/mints/side. BTC and ETH can share one
+  config without edge collisions. Providers and deployment resolution are
+  selected per market; BTC quotes continue using `propAmmQuoteProvider`.
+- Added only the aETH sell edge. The graph excludes mixed CLAMM/RFQ routes for
+  these signer capabilities, so unsupported BTC and reverse routes are absent
+  from metadata and reject before I/O. Existing three-hop/one-RFQ bounds remain.
+- The composable provider reuses `normalizeAethUsdSell` before extracting native
+  bigint compact terms and the original quote ID. It does not mutate or append
+  instructions to the server transaction. The standard builder emits the new
+  `[input ATA, router]` bundle with a read-only maker signer. The final router
+  minimum protects output after any USD-vault fees/rounding; the native direct
+  minimum is validated but is not copied as an extra per-hop floor.
+- Opted-in sells take precedence over direct sell dispatch; buys retain the
+  original treasury message. Provider requests are copied before dispatch to
+  preserve validation snapshots. Metadata deduplicates the sell pair, giving
+  **15** unique mainnet directions; defaults still expose 12/14 directions.
+- Direct composable sells make **zero** SDK account reads; primeUSD output uses
+  **one four-account USD-vault batch**. Both use one RFQ call and no CLAMM reads.
+  Sole RFQ/vault failures propagate without repeating the same vault batch or
+  falling back to a direct transaction. The existing two-call maximum remains.
+
+Validation:
+
+| Command / check | Result |
+| --- | --- |
+| `corepack pnpm typecheck` | Passed, including positive/negative public consumer checks for the new boolean opt-in. |
+| `env -u ARCH_RPC_URL -u ARCH_RFQ_URL corepack pnpm test --reporter=default --reporter=json --outputFile=/tmp/arch-router-composable-aeth/offline.json` | Passed: **882 offline tests across 21 files**; 16 live cases skipped. Includes 36 new composable-sell tests and unchanged direct/BTC/native fixture regressions. |
+| `corepack pnpm build` | Passed. |
+| `node_modules/.bin/tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --strict --noUncheckedIndexedAccess --exactOptionalPropertyTypes --skipLibCheck --resolveJsonModule tests/composable-aeth.test.ts tests/config/routes.test.ts tests/quote-candidates.test.ts tests/quote-state.test.ts` | Passed: additional strict checking of changed quote/graph tests. |
+| `node /tmp/arch-router-composable-aeth/export.mjs` | Generated unsigned messages from the built SDK using the independent native aETH sell fixture and mainnet vault-layout snapshots, with synthetic fresh vault pricing state. Sizes: **756/989 bytes** with both signatures reserved; reads: **0/1**. |
+| `cargo run --offline --manifest-path /tmp/arch-router-composable-aeth/native/Cargo.toml --target-dir /tmp/arch-router-composable-aeth/target` | Passed: the unmodified Rust `server/src/router_transaction.rs` accepts both generated messages and rejects modified quote terms. The temporary harness supplies minimal quote/error containers; it does not co-sign, submit, simulate or execute transactions. |
+| `env -u ARCH_RFQ_URL ARCH_RPC_URL=https://rpc.mainnet.arch.network corepack pnpm exec vitest run tests/quote.e2e.test.ts -t 'composable aETH' --reporter=default --reporter=json --outputFile=/tmp/arch-router-composable-aeth/live-network.json` | **Both targeted live cases passed**, starting `2026-11-03T03:14:14.178Z`: aETH → aUSD uses 0 reads/756 signed bytes; aETH → primeUSD uses 1 read/989 signed bytes. The other 14 cases were excluded by the test-name filter. |
+| `git diff --check` | Passed. |
+
+The native validator file is identical at PropAMM `bfe34e2` and the SDK fixture's
+minting revision `dfdbc9a36646066cbec067fa9e9a700232804855` (Git blob
+`6191b94e41b27037338282299eecc73dc45bbd2d`). Thus these two route shapes do not
+require a server validator or on-chain router change. Actual deployment must
+still enable the trusted router and matching vault program for primeUSD.
+The initial restricted live attempt failed DNS and was superseded by the
+network-enabled run; no timeout or assertion changes were made for the retry.
+
+All reports, logs, the native harness, and generated messages are under
+`/tmp/arch-router-composable-aeth/`. The full sixteen-case live suite was not
+rerun, and the earlier direct treasury-buy deployment mismatch remains separate.
+No deployment pins, native fixture JSON, dependencies, or Rust/server source
+were changed. No transactions were signed/submitted, no deployments or package
+publication performed, and no commits created by the assistant. Funded execution
+and real server co-signing remain to be verified separately.
