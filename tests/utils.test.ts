@@ -6,6 +6,7 @@ import {
   deriveProgramAddress,
   decodeMint,
   decodeTokenAccount,
+  createAccountLoader,
   readAccounts,
   inputForOutput,
   U64_MAX,
@@ -102,6 +103,67 @@ describe("batched account reads", () => {
   ].map((response) => ({ response })))("rejects malformed response %# rather than treating it as absence", async ({ response }) => {
     const source = { getAccounts: vi.fn(async () => response) } as unknown as RouterDataSource;
     await expect(readAccounts(source, [TESTNET_MINTS.aBTC])).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
+
+  it("shares overlapping in-flight reads while batching only the new addresses", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const source = { getAccounts: vi.fn(async (keys: readonly string[]) => keys.map(() => info as AccountInfoResult | null)) };
+    source.getAccounts.mockImplementationOnce(async () => { await gate; return [info, null]; });
+    const load = createAccountLoader(source);
+    const first = load([TESTNET_MINTS.aBTC, TESTNET_MINTS.aUSD, TESTNET_MINTS.aBTC]);
+    const second = load([TESTNET_MINTS.aUSD, TESTNET_MINTS.primeBTC]);
+    expect(source.getAccounts.mock.calls).toEqual([
+      [[TESTNET_MINTS.aBTC, TESTNET_MINTS.aUSD]], [[TESTNET_MINTS.primeBTC]],
+    ]);
+    release();
+    expect([...await first]).toEqual([[TESTNET_MINTS.aBTC, info], [TESTNET_MINTS.aUSD, null]]);
+    expect([...await second]).toEqual([[TESTNET_MINTS.aUSD, null], [TESTNET_MINTS.primeBTC, info]]);
+    expect([...await load([TESTNET_MINTS.primeBTC, TESTNET_MINTS.aUSD])])
+      .toEqual([[TESTNET_MINTS.primeBTC, info], [TESTNET_MINTS.aUSD, null]]);
+    expect(source.getAccounts).toHaveBeenCalledTimes(2);
+  });
+
+  it("caches confirmed absence only within the request and skips empty batches", async () => {
+    const source = { getAccounts: vi.fn(async (): Promise<readonly (AccountInfoResult | null)[]> => [null]) };
+    const load = createAccountLoader(source);
+    expect([...await load([])]).toEqual([]);
+    expect(source.getAccounts).not.toHaveBeenCalled();
+    expect((await load([TESTNET_MINTS.aBTC])).get(TESTNET_MINTS.aBTC)).toBeNull();
+    source.getAccounts.mockResolvedValue([info]);
+    expect((await load([TESTNET_MINTS.aBTC])).get(TESTNET_MINTS.aBTC)).toBeNull();
+    expect((await createAccountLoader(source)([TESTNET_MINTS.aBTC])).get(TESTNET_MINTS.aBTC)).toBe(info);
+    expect(source.getAccounts).toHaveBeenCalledTimes(2);
+  });
+
+  it("retains valid accounts when another account in the same batch is malformed", async () => {
+    const source = { getAccounts: vi.fn(async () => [info, { ...info, data: [] as unknown as Uint8Array }]) };
+    const load = createAccountLoader(source);
+    const keys = [TESTNET_MINTS.aBTC, TESTNET_MINTS.aUSD];
+    const error: unknown = await load(keys).catch((error: unknown) => error);
+    expect(error).toMatchObject({ code: "INVALID_RESPONSE" });
+    expect((await load([keys[0]!])).get(keys[0]!)).toBe(info);
+    await expect(load([keys[1]!])).rejects.toBe(error);
+    expect(source.getAccounts).toHaveBeenCalledExactlyOnceWith(keys);
+  });
+
+  it.each(["transport", "malformed"])("shares a %s failure without retrying or caching it in the next request", async (failure) => {
+    const error = new Error("RPC unavailable");
+    const source = { getAccounts: vi.fn(async (): Promise<readonly (AccountInfoResult | null)[]> => {
+      if (failure === "transport") throw error;
+      return []; // Invalid response length must reject, never become confirmed absence.
+    }) };
+    const load = createAccountLoader(source);
+    const results = await Promise.allSettled([load([TESTNET_MINTS.aBTC]), load([TESTNET_MINTS.aBTC])]);
+    const reason = results[0].status === "rejected" ? results[0].reason : undefined;
+    if (failure === "transport") expect(reason).toBe(error);
+    else expect(reason).toMatchObject({ code: "INVALID_RESPONSE" });
+    expect(results[1]).toEqual({ status: "rejected", reason });
+    source.getAccounts.mockResolvedValue([info]);
+    await expect(load([TESTNET_MINTS.aBTC])).rejects.toBe(reason);
+    expect(source.getAccounts).toHaveBeenCalledOnce();
+    expect((await createAccountLoader(source)([TESTNET_MINTS.aBTC])).get(TESTNET_MINTS.aBTC)).toBe(info);
+    expect(source.getAccounts).toHaveBeenCalledTimes(2);
   });
 });
 

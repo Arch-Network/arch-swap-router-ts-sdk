@@ -154,26 +154,48 @@ export function deriveAssociatedTokenAddress(owner: Address, mint: Address, prog
   );
 }
 
-/** One ordered batch, deduplicated for this call only. Transport errors propagate. */
-export async function readAccounts(source: RouterDataSource, addresses: readonly Address[]) {
-  const keys = [...new Set(addresses)];
+async function readAccountBatch(source: RouterDataSource, keys: readonly Address[]) {
   const results = await source.getAccounts(keys);
   if (!Array.isArray(results) || results.length !== keys.length) {
     throw new RouterSdkError("INVALID_RESPONSE", "Account response must match the requested batch length.");
   }
-  const accounts = new Map<Address, AccountInfoResult | null>();
-  for (const [index, key] of keys.entries()) {
-    const info = results[index];
-    if (info !== null && (
-      !info || !(info.data instanceof Uint8Array) || !(info.owner instanceof Uint8Array)
-      || info.owner.length !== 32 || !Number.isInteger(info.lamports) || info.lamports < 0
-      || typeof info.utxo !== "string" || typeof info.is_executable !== "boolean"
-    )) {
-      throw new RouterSdkError("INVALID_RESPONSE", `Malformed account response for ${key}.`);
-    }
-    accounts.set(key, info);
+  return results;
+}
+
+function validateAccount(info: AccountInfoResult | null | undefined, key: Address): AccountInfoResult | null {
+  if (info !== null && (
+    !info || !(info.data instanceof Uint8Array) || !(info.owner instanceof Uint8Array)
+    || info.owner.length !== 32 || !Number.isInteger(info.lamports) || info.lamports < 0
+    || typeof info.utxo !== "string" || typeof info.is_executable !== "boolean"
+  )) {
+    throw new RouterSdkError("INVALID_RESPONSE", `Malformed account response for ${key}.`);
   }
-  return accounts;
+  return info;
+}
+
+/** One ordered batch, deduplicated for this call only. Transport errors propagate. */
+export async function readAccounts(source: RouterDataSource, addresses: readonly Address[]) {
+  const keys = [...new Set(addresses)];
+  const results = await readAccountBatch(source, keys);
+  return new Map(keys.map((key, index) => [key, validateAccount(results[index], key)]));
+}
+
+/** One quote's ordered batches, sharing pending reads, confirmed absence, and failures. */
+export function createAccountLoader(source: RouterDataSource) {
+  const pending = new Map<Address, Promise<AccountInfoResult | null>>();
+  return async (addresses: readonly Address[]): Promise<AccountMap> => {
+    const keys = [...new Set(addresses)];
+    const missing = keys.filter((key) => !pending.has(key));
+    if (missing.length) {
+      const batch = readAccountBatch(source, missing);
+      for (const [index, key] of missing.entries()) {
+        // A malformed optional account must not discard valid shared accounts.
+        pending.set(key, batch.then((results) => validateAccount(results[index], key)));
+      }
+    }
+    const results = await Promise.all(keys.map((key) => pending.get(key)!));
+    return new Map(keys.map((key, index) => [key, results[index]!]));
+  };
 }
 
 export function accountData(

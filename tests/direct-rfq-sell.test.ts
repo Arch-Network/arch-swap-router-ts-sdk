@@ -9,6 +9,7 @@ import type { DirectRfqQuote, QuoteExactInRequest } from "../src/types.js";
 import { decodeAddress, U64_MAX } from "../src/utils.js";
 import fixtures from "./fixtures/aeth-usd/transactions.json" with { type: "json" };
 import { nativeTransaction } from "./fixtures/aeth-usd/transactions.js";
+import { withAccountCount } from "./helpers/transaction-limits.js";
 
 const fixture = fixtures.cases.find(value => value.side === "sell")!;
 
@@ -201,5 +202,16 @@ describe("aETH → aUSD direct-sell normalization", () => {
     expect(TransactionUtil.serializedSize({ ...quote.transaction, signatures: [new Uint8Array(64), new Uint8Array(64)] }))
       .toBeGreaterThan(TRANSACTION_SIZE_LIMIT);
     expect(() => normalizeAethUsdSell(request, quote)).toThrow(expect.objectContaining({ code: "TRANSACTION_TOO_LARGE" }));
+  });
+
+  it("rejects 51 original message keys below the byte limit without modifying the server transaction", () => {
+    const { request, quote } = setup();
+    quote.transaction.message = withAccountCount(quote.transaction.message, 51);
+    const before = TransactionUtil.serialize(quote.transaction);
+    expect(TransactionUtil.serializedSize({ ...quote.transaction, signatures: [new Uint8Array(64), new Uint8Array(64)] }))
+      .toBeLessThan(TRANSACTION_SIZE_LIMIT);
+    expect(() => normalizeAethUsdSell(request, quote)).toThrow(expect.objectContaining({ code: "TRANSACTION_TOO_MANY_ACCOUNTS" }));
+    expect(TransactionUtil.serialize(quote.transaction)).toEqual(before);
+    expect(quote.transaction.signatures).toEqual([]);
   });
 });

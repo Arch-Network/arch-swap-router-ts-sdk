@@ -5,7 +5,7 @@ import { RouterSdkError } from "../errors.js";
 import type { Address } from "../types.js";
 import { account, compileRouterMessage, decodeAddress, deriveAssociatedTokenAddress } from "../utils.js";
 import type { BuildSwapInput, ResolvedStep } from "./types.js";
-import { assertTransactionSize } from "./size.js";
+import { assertMessageLimits } from "./size.js";
 
 function venueAccounts(step: ResolvedStep, programs: ProgramIds): AccountMeta[] {
   if (step.kind === "propamm") {
@@ -99,6 +99,6 @@ export function buildPropAmmInstructions(input: BuildSwapInput, programs: Progra
     || message.header.num_readonly_signed_accounts !== 1) {
     throw new RouterSdkError("INVALID_RFQ", "RFQ requires a writable user and a read-only maker signer.");
   }
-  assertTransactionSize({ version: 0, message, signatures: [new Uint8Array(64), new Uint8Array(64)] }, "PropAMM transaction");
+  assertMessageLimits(message, "PropAMM transaction");
   return instructions;
 }

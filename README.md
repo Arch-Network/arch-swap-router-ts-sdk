@@ -1,24 +1,43 @@
 # Arch swap router TypeScript SDK
 
-A compact, browser-oriented SDK for fixed-pair swap estimates and router
+A compact, browser-oriented SDK for configured-pair swap estimates and router
 instructions on Arch. Testnet and mainnet-v2 swaps, vaults and prime tokens
 are configured.
 One quote call returns one estimate with its
 instructions, sized from either a fixed input or an approximate receive amount.
-Supported pairs use explicit one-to-three-hop routes
+Supported pairs use graph-generated one-to-three-hop paths
 through the two vaults and the aBTC/aUSD CLAMM, with optional PropAMM RFQs for
 exact-input swaps on either network. An optional mainnet direct RFQ provider adds
 aUSD ↔ aETH exact-input swaps using the original server transactions.
 
-**Current status:** all 12 fixed directions have estimates and instructions,
-including direct CLAMM and two-/three-hop routes. Unsupported or identical mint
-pairs reject with `UNSUPPORTED_PAIR` before reads. Frontend/package verification
-is the remaining implementation checkpoint.
+**Current status:** all 12 core directions support exact-input quotes and receive
+sizing. An opted-in mainnet direct RFQ provider adds the two aETH/aUSD exact-input
+directions. Unsupported or identical mint pairs reject with `UNSUPPORTED_PAIR`
+before account or provider calls.
 
-See [SIMPLIFICATION_PLAN.md](SIMPLIFICATION_PLAN.md) for the agreed scope,
-[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for progress, and
-[HANDOVER.md](HANDOVER.md) for implementation references. The narrower PropAMM
-extension is specified in [PROPAMM_ROUTER_SDK_HANDOVER.md](PROPAMM_ROUTER_SDK_HANDOVER.md).
+**Latest offline validation (2026-11-03):** typecheck, build, and 846 tests pass,
+including the two-call account-loading budget. Earlier live quote-only tests
+passed 13/14 directions, before the batching follow-up: all twelve core pairs and
+aETH → aUSD. aUSD → aETH rejects because the server's treasury authority and
+bridge program differ from the SDK's pinned deployment. The existing validator
+also rejects that response; deployment alignment remains outstanding.
+
+Current routing scope, progress, and validation are recorded in
+[DYNAMIC_ROUTING_IMPLEMENTATION_PLAN.md](DYNAMIC_ROUTING_IMPLEMENTATION_PLAN.md).
+[SIMPLIFICATION_PLAN.md](SIMPLIFICATION_PLAN.md),
+[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), [HANDOVER.md](HANDOVER.md), and
+[PROPAMM_ROUTER_SDK_HANDOVER.md](PROPAMM_ROUTER_SDK_HANDOVER.md) describe earlier
+implementation stages; current source and the dynamic routing plan govern this
+migration.
+Path discovery and quote evaluation now use graph candidates with shared state
+within each request. Exact-input quotes select the highest final estimated
+output, with CLAMM winning ties; receive sizing selects the smallest valid input
+using only local vault/CLAMM estimates. Every returned bundle fits the dependency's
+transaction byte and account limits.
+The internal graph uses the selected registry, simple paths of at most three
+hops, and at most one PropAMM step. It adds no markets, automatic discovery, or
+public graph configuration. aETH server transactions stay on their separate
+dispatch path and cannot be composed into other routes.
 
 ## Frontend API
 
@@ -63,13 +82,18 @@ reader when switching networks. The SDK does not choose RPC/indexer endpoints.
 Use readonly `router.network`, `router.mints`, and `router.supportedPairs` for
 frontend metadata. Existing `TESTNET_MINTS` and `SUPPORTED_PAIRS` exports remain
 testnet-only aliases.
+Pair metadata is frozen and derived from bounded graph reachability. It describes
+configured capabilities; a quote still depends on valid state and liquidity.
+Match pairs by their mint addresses; list order follows deterministic graph node
+order and is not an application identifier.
 
 Mainnet's router, CLAMM pool/program, PropAMM deployment and aBTC/aUSD mints are
 configured in [src/config/networks.ts](src/config/networks.ts). Its CLAMM pool
 orders aBTC as token A and aUSD as token B. Its vaults and prime-token mints
 match the mainnet-v2 deployment. The BTC RFQ and aETH market use the same
-PropAMM program and config. The client still exposes all
-12 fixed pairs. Supply a reader and optional RFQ provider for the selected
+PropAMM program and config. The client exposes all 12 core pairs, plus the two
+optional mainnet aETH/aUSD directions when `directRfqQuoteProvider` is configured.
+Supply a reader and optional RFQ providers for the selected
 network; there is no testnet fallback.
 Account validation, PDA/ATA derivation and instructions use the selected deployment.
 
@@ -85,7 +109,7 @@ addresses use base58 strings.
 
 Check `quote.execution === "serverTransaction"` before accessing router
 instructions. See [Direct RFQ transaction contracts](#direct-rfq-transaction-contracts)
-for the new provider contract and current integration status.
+for the direct provider contract and submission behavior.
 
 `hops` is an ordered `SwapHop[]` for the selected route. Each hop contains `kind`
 (`vaultMint`, `vaultRedeem`, `clamm`, `propamm`, or `treasuryMint`), `inputMint`, `outputMint`,
@@ -120,11 +144,22 @@ is one HTTP request only if the application's reader/provider supports it.
 | Vault + CLAMM, either order | 6 accounts | Up to 3 tick arrays | 2 |
 | Redeem + CLAMM + Mint | 9 accounts | Up to 3 tick arrays | 2 |
 
-These budgets apply without an RFQ provider and to every `quoteForOutput` call.
-With PropAMM enabled, a swap quote adds one RFQ call. Direct swaps still use two
-reader calls. Routes with vaults use three: shared vault state, remaining CLAMM
-pool/mints, then ticks. Each account is fetched only once. Separating the shared
-vault batch lets a CLAMM read/validation failure leave PropAMM available.
+These budgets apply with or without an RFQ provider and to every
+`quoteForOutput` call. All SDK quotes use at most two account-reader calls;
+failures can stop loading earlier. The first batch contains every known vault,
+pool, and mint account; the second contains the derived CLAMM tick arrays.
+With PropAMM enabled, a swap quote also makes one RFQ provider call. aETH quotes
+make no SDK account reads and one direct RFQ call.
+Overlapping account requests share pending reads and confirmed absence within a
+quote. Decoded venue state is reused for that quote; subsequent quotes fetch
+fresh state. Each successfully read account is fetched only once. Malformed
+individual responses and CLAMM validation errors remain isolated to candidates
+that need those accounts; amount-dependent vault checks run per candidate too.
+If an RFQ-enabled swap's entire first batch fails transport or response framing,
+the second call recovers only its required vault accounts. CLAMM retains the
+original batch error, so no tick reads or third call follow. This recovery can
+request vault addresses again after a failed batch; confirmed missing or invalid
+shared accounts fail without recovery. RFQ calls are never retried.
 
 Only confirmed account absence should return `null`; resolve indexer cache misses
 in the application reader. CLAMM treats absent or empty system-owned tick accounts
@@ -133,8 +168,9 @@ as uninitialized arrays, matching the native program.
 Mint checks pause, NAV freshness, fees and the full-deposit cap. Redeem requires
 an empty observed queue and enough reserve for the gross claim. Both use the
 observed share supply; management fees accrue in native `Report`. Estimates use
-raw units, native rounding and one final slippage floor. Concurrent state can
-change before execution; native immediate-fill-or-abort support is still pending.
+raw units, native rounding and one final slippage floor. State can change before
+execution; quotes describe observed state and execution depends on the deployed
+programs and current liquidity.
 
 CLAMM estimates stay within three primary tick arrays, with zero supplements
 and an explicit window price limit. Quotes reject if that window cannot consume
@@ -148,16 +184,25 @@ two-instruction compute allowance needed by the tested three-hop execution.
 Do not replace it with a compute-budget instruction; the signing server accepts
 only the canonical input-ATA/router bundle.
 
-For instruction-based router quotes, the application owns quote refresh, final transaction sizing and compilation,
-blockhashes, signing, submission, deadline handling, and confirmation. The SDK
-provides estimates and instruction encoding, not execution preflight.
+For instruction-based router quotes, the application owns quote refresh, final
+transaction compilation, blockhashes, signing, submission, deadline handling,
+and confirmation. The SDK provides estimates, instruction encoding, and
+transaction byte/account eligibility checks.
 
 The runtime transaction limit is **4,096 bytes**, exported as
 `TRANSACTION_SIZE_LIMIT`, an alias of arch-sdk's `RUNTIME_TX_SIZE_LIMIT`.
-Measure application-assembled transactions with `TransactionUtil.serializedSize`,
-including all required 64-byte signatures. The size guards follow the dependency's
-limit without a local override.
-The live quote smoke test compiles and measures every supported route.
+The account limit is **50 compiled unique keys**, including program keys, from
+arch-sdk's `MAX_ACCOUNTS_PER_TRANSACTION`. The SDK measures the complete returned
+bundle with every required 64-byte signature slot reserved. Router bundles use a
+32-byte placeholder blockhash; aETH uses its original server message. These checks
+make no account or blockhash RPC calls and follow both dependency constants.
+An over-limit candidate is excluded before quote selection, leaving an eligible
+alternative available. A sole candidate exposes `TRANSACTION_TOO_LARGE` or
+`TRANSACTION_TOO_MANY_ACCOUNTS`; exhausted competing candidates expose `NO_ROUTE`
+with the underlying errors in its `AggregateError` cause.
+If the application appends instructions to a router quote, recompile and recheck
+the final key count and `TransactionUtil.serializedSize`, reserving all required
+signature slots. The live quote smoke test checks both limits for every route.
 
 ## Optional PropAMM quotes
 
@@ -189,18 +234,21 @@ if (quote.execution === "serverTransaction") {
 }
 ```
 
-`quoteExactIn` compares at most two candidates along the existing fixed path.
+`quoteExactIn` compares at most two graph candidates for the requested pair.
 Higher final output, including vault fees and rounding, wins; CLAMM wins ties.
 Each RFQ waits at most **2 seconds**, without retries. A declined, invalid,
-expired or oversized RFQ leaves CLAMM available; a CLAMM-specific failure leaves
-PropAMM available. Required shared-vault failures invalidate both. Direct vault
-quotes and `quoteForOutput` never call the provider.
+expired RFQ or one exceeding either transaction limit leaves CLAMM available;
+a CLAMM-specific failure leaves PropAMM available. Required shared-vault failures
+invalidate both. A destination vault's amount-dependent failure rejects only the
+candidate whose output violates its constraints. Direct vault quotes and
+`quoteForOutput` never call the provider.
 
 The PropAMM deadline is `min(request.deadlineMs, terms.expiryMs)`, rechecked at
 selection. Original compact terms are preserved. The SDK checks the compiled
-PropAMM bundle against 4,096 bytes, including two 64-byte signatures; callers
-must recheck if they alter it. The native three-hop fixture is 1,225 bytes with
-shared fee destinations; distinct fee accounts increase its serialized size.
+PropAMM bundle against 4,096 bytes and 50 compiled account keys. Byte measurement
+reserves both 64-byte signatures; callers must recheck if they alter the bundle.
+The native three-hop fixture is 1,225 bytes with shared fee destinations;
+distinct fee accounts increase its serialized size.
 
 The application provider maps requests to `POST /rfq/quote`: deployment aBTC
 `base_mint` and aUSD `quote_mint` in hex, `side` (`sell` for aBTC → aUSD, `buy`
@@ -217,12 +265,14 @@ decoding or reject unsafe values; ordinary `response.json()` and arbitrary
 `bigint` → `number` casts can lose precision. Transport/proxy setup stays in the
 application; the SDK never calls the server directly.
 
-PropAMM uses the v2 config (`PROPAMM2`, version 2) and config-owned vaults.
-The configured config addresses assume migration with each deployment's current
-signer. Migrate and fund the v2 vaults and deploy a compatible router before using
-this SDK version. Vault seeds are `["vault", config, mint]`; config and nonce
-addresses stay fixed during subsequent signer rotations. Only `quoteSigner`
-changes between quotes, so rotation needs no SDK release or additional RPC read.
+PropAMM uses the network's configured config account and config-owned vaults.
+Vault seeds are `["vault", config, mint]`; config and nonce addresses stay fixed
+during subsequent signer rotations. Only `quoteSigner` changes between quotes,
+so rotation needs no SDK release or additional RPC read. The SDK resolves these
+accounts from the registry and RFQ; it does not fetch or upgrade the config.
+The [recorded mainnet snapshot](tests/fixtures/mainnet-v2/README.md) was v3 when
+captured. Router source support for v2/v3/v4 does not establish the current live
+storage version or deployment readiness.
 
 For a router RFQ winner, compile with **`compileRouterMessage`**, which corrects
 arch-sdk 0.13.0's insertion ordering to the Rust account ordering required by the
@@ -265,9 +315,18 @@ Rust transaction fixtures, signer permissions and compiled size, plus candidate
 selection and failure isolation. Fixtures retain their original Rust provenance;
 tests do not establish live compatibility.
 
-Package/browser verification and live smoke coverage remain later work. The
-package stays private, exports only its root entry point, and has no wallet,
-transport, graph-discovery, or ranking framework.
+The packed SDK's public entry point has been checked in Node and an ES2022
+browser-targeted bundle running in an isolated V8 context without Node globals.
+Both runs cover all 12 core exact-input paths, all 12 receive-sizing paths, eight
+router RFQ paths, and both aETH server-transaction directions using offline
+fixtures. Consumer type checks cover the packed declarations and private graph
+boundary. This is package/runtime compatibility coverage; actual-browser app
+integration and live quote generation are separate checks.
+The package stays private and exports only its root entry point. Wallet signing
+and transport remain application-owned, and graph construction/evaluation stay
+internal to the SDK. Step 6 in the dynamic routing plan records final offline
+validation and live quote-only results; its two-call follow-up log records the
+latest loading changes and offline checks.
 
 ## Direct RFQ transaction contracts
 
@@ -307,9 +366,9 @@ const buy = await router.quoteExactIn({
 
 The client validates the request before calling the provider once, with a
 two-second timeout. It validates the response's fixed programs, accounts, amounts,
-signers, expiry and signed transaction size before returning it. Buys return the
-exact encoded mint payout as both estimate and minimum; sells return the signed
-output minimum after checking the requested slippage floor. Provider errors,
+signers, expiry and transaction byte/account limits before returning it. Buys
+return the exact encoded mint payout as both estimate and minimum; sells return
+the signed output minimum after checking the requested slippage floor. Provider errors,
 invalid transactions and expiry errors propagate without retries or fallback.
 There are no account-reader calls on this path.
 

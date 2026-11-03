@@ -1,4 +1,4 @@
-import { RpcConnection, TransactionUtil } from "@arch-network/arch-sdk";
+import { MAX_ACCOUNTS_PER_TRANSACTION, RpcConnection, TransactionUtil } from "@arch-network/arch-sdk";
 import { base58, hex } from "@scure/base";
 import { expect, it, vi } from "vitest";
 import {
@@ -82,6 +82,7 @@ it.skipIf(!rpcUrl).each(routes.map((route) => ({
     signatures: Array.from({ length: signatureCount }, () => new Uint8Array(64)),
   });
   expect(signedSize).toBeLessThanOrEqual(TRANSACTION_SIZE_LIMIT);
+  expect(message.account_keys.length).toBeLessThanOrEqual(MAX_ACCOUNTS_PER_TRANSACTION);
   expect(quote.hops.map((hop) => hop.kind === "clamm" || hop.kind === "propamm" ? "swap" : hop.kind))
     .toEqual(operations);
   expect([quote.inputMint, ...quote.hops.map((hop) => hop.outputMint)])
@@ -195,6 +196,7 @@ it.skipIf(!rpcUrl).each([
     ...quote.transaction, signatures: Array.from({ length: signatureCount }, () => new Uint8Array(64)),
   });
   expect(signedSize).toBeLessThanOrEqual(TRANSACTION_SIZE_LIMIT);
+  expect(quote.transaction.message.account_keys.length).toBeLessThanOrEqual(MAX_ACCOUNTS_PER_TRANSACTION);
   console.log(`Route: ${input} --[${quote.hops[0]!.kind}]--> ${output}`);
   console.table(quote.hops.map((hop, index) => ({
     hop: index + 1, kind: hop.kind, input, output,

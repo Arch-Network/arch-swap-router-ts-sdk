@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { fixedRoutes, FIXED_ROUTES, SUPPORTED_PAIRS } from "../../src/config/routes.js";
-import { TESTNET_MINTS, TESTNET_VENUES } from "../../src/config/networks.js";
+import { describe, expect, it, vi } from "vitest";
+import { buildRouteGraph, coreRoutes, findRoutes, supportedPairs, TESTNET_ROUTES, SUPPORTED_PAIRS, type RouteGraph, type RouteStep } from "../../src/config/routes.js";
+import { NETWORKS, TESTNET_MINTS, TESTNET_VENUES } from "../../src/config/networks.js";
+import { createRouterClient } from "../../src/index.js";
 import { namedFixture } from "../transactions/fixtures.js";
 
 const directedFixtures = [
@@ -11,14 +12,35 @@ const directedFixtures = [
   "three-hop-btc-shared", "three-hop-usd-shared",
 ];
 
-describe("fixed testnet routes", () => {
-  it("uses selected mints throughout the same fixed paths", () => {
-    const mints = { aBTC: "btc", aUSD: "usd", primeBTC: "prime-btc", primeUSD: "prime-usd" };
-    const replace = new Map(Object.entries(TESTNET_MINTS).map(([name, address]) => [address as string, mints[name as keyof typeof mints]]));
-    expect(fixedRoutes(mints)).toEqual(FIXED_ROUTES.map((route) => ({
-      inputMint: replace.get(route.inputMint), outputMint: replace.get(route.outputMint),
-      steps: route.steps.map((step) => ({ ...step, inputMint: replace.get(step.inputMint), outputMint: replace.get(step.outputMint) })),
-    })));
+describe("graph-generated core routes", () => {
+  it.each(["testnet", "mainnet"] as const)("uses the selected %s registry for every core path", (network) => {
+    const config = NETWORKS[network];
+    const routes = coreRoutes(config);
+    const replace = new Map(Object.entries(TESTNET_MINTS).map(([name, mint]) => [mint as string, config.mints[name as keyof typeof TESTNET_MINTS]]));
+    expect(routes).toHaveLength(12);
+    for (const name of directedFixtures) {
+      const fixture = namedFixture(name);
+      const mints = fixture.mints.map((mint) => replace.get(mint)!);
+      const route = routes.find((route) => route.inputMint === mints[0] && route.outputMint === mints.at(-1))!;
+      expect(route.steps.map((step) => step.operation)).toEqual(fixture.hops.map((hop) => hop.args.kind));
+      expect([route.inputMint, ...route.steps.map((step) => step.outputMint)]).toEqual(mints);
+    }
+    expect(routes.every((route) => route.steps.every((step) => Object.values(config.mints).includes(step.inputMint)
+      && Object.values(config.mints).includes(step.outputMint)))).toBe(true);
+  });
+
+  it("builds edges from venue endpoints rather than assuming the named mint order", () => {
+    const config = NETWORKS.testnet;
+    const graph = buildRouteGraph({ ...config, venues: {
+      ...config.venues,
+      btcVault: { ...config.venues.btcVault, assetMint: "asset", shareMint: "share" },
+      clamm: { ...config.venues.clamm, tokenMintA: config.mints.aUSD, tokenMintB: "asset" },
+    } });
+    expect(findRoutes(graph, "share", config.mints.aUSD)[0]!.steps).toMatchObject([
+      { venue: "btcVault", operation: "vaultRedeem", inputMint: "share", outputMint: "asset" },
+      { venue: "clamm", operation: "clamm", inputMint: "asset", outputMint: config.mints.aUSD },
+    ]);
+    expect(graph.has(config.mints.aBTC)).toBe(false);
   });
 
   it("offers each distinct directed pair exactly once", () => {
@@ -35,7 +57,7 @@ describe("fixed testnet routes", () => {
 
   it.each(directedFixtures)("matches native venue order and mint path: %s", (name) => {
     const fixture = namedFixture(name);
-    const route = FIXED_ROUTES.find(
+    const route = TESTNET_ROUTES.find(
       (route) => route.inputMint === fixture.mints[0] && route.outputMint === fixture.mints.at(-1),
     )!;
     expect(route).toBeDefined();
@@ -55,9 +77,130 @@ describe("fixed testnet routes", () => {
     expect(Object.keys(SUPPORTED_PAIRS[0]!)).toEqual(["inputMint", "outputMint"]);
     expect(Reflect.set(SUPPORTED_PAIRS[0]!, "inputMint", "changed")).toBe(false);
     expect(Reflect.set(TESTNET_MINTS, "aBTC", "changed")).toBe(false);
-    for (const route of FIXED_ROUTES) {
+    for (const route of TESTNET_ROUTES) {
+      expect(Object.isFrozen(route)).toBe(true);
       expect(Object.isFrozen(route.steps)).toBe(true);
       expect(route.steps.every(Object.isFrozen)).toBe(true);
     }
+  });
+});
+
+describe("parallel RFQ candidates", () => {
+  it.each(["testnet", "mainnet"] as const)("finds both venues without adding pairs on %s", (network) => {
+    const config = NETWORKS[network];
+    const graph = buildRouteGraph(config, true);
+    const edges = [...graph.values()].flat();
+    expect(edges).toHaveLength(8);
+    expect(new Set(edges.map((edge) => edge.id)).size).toBe(8);
+    expect(buildRouteGraph(config, true)).toEqual(graph);
+    expect(supportedPairs(graph)).toEqual(supportedPairs(buildRouteGraph(config)));
+    for (const route of coreRoutes(config)) {
+      const candidates = findRoutes(graph, route.inputMint, route.outputMint);
+      const swaps = route.steps.some((step) => step.venue === "clamm");
+      expect(candidates).toHaveLength(swaps ? 2 : 1);
+      expect(candidates[0]).toEqual(route);
+      if (swaps) {
+        expect(candidates[1]!.steps.map((step) => step.operation)).toEqual(
+          route.steps.map((step) => step.operation === "clamm" ? "propamm" : step.operation),
+        );
+        const rfq = candidates[1]!.steps.find((step) => step.venue === "propamm")!;
+        expect(rfq.id).toContain(config.propamm.config);
+        expect([rfq.inputMint, rfq.outputMint].sort()).toEqual([config.propamm.baseMint, config.propamm.quoteMint].sort());
+      }
+      expect(findRoutes(graph, route.inputMint, route.outputMint, { forOutput: true })).toEqual([route]);
+      for (const candidate of candidates) {
+        const mints = [candidate.inputMint, ...candidate.steps.map((step) => step.outputMint)];
+        expect(new Set(mints).size).toBe(mints.length);
+        expect(candidate.steps.length).toBeLessThanOrEqual(3);
+      }
+    }
+  });
+
+  it("requires both provider opt-in and a configured deployment", () => {
+    const { propamm: _deployment, ...withoutDeployment } = NETWORKS.testnet;
+    for (const graph of [buildRouteGraph(NETWORKS.testnet), buildRouteGraph(NETWORKS.testnet, false), buildRouteGraph(withoutDeployment, true)]) {
+      expect([...graph.values()].flat()).toHaveLength(6);
+      expect(supportedPairs(graph)).toEqual(SUPPORTED_PAIRS);
+    }
+  });
+
+  it("constructs client graphs and metadata without account or provider calls", () => {
+    const source = { getAccounts: vi.fn(async () => { throw new Error("Unexpected account read"); }) };
+    const provider = { quoteExactIn: vi.fn(async () => { throw new Error("Unexpected RFQ"); }) };
+    for (const network of ["testnet", "mainnet"] as const) {
+      const client = createRouterClient({ network, source, propAmmQuoteProvider: provider, directRfqQuoteProvider: provider });
+      expect(client.supportedPairs).toHaveLength(network === "mainnet" ? 14 : 12);
+    }
+    expect(source.getAccounts).not.toHaveBeenCalled();
+    expect(provider.quoteExactIn).not.toHaveBeenCalled();
+  });
+});
+
+function edge(inputMint: string, outputMint: string, operation: "clamm" | "propamm" = "clamm"): RouteStep {
+  const fields = { id: `${operation}:${inputMint}:${outputMint}`, inputMint, outputMint };
+  return operation === "propamm" ? { ...fields, venue: "propamm", operation } : { ...fields, venue: "clamm", operation };
+}
+
+function graphOf(...edges: RouteStep[]): RouteGraph {
+  const graph = new Map<string, RouteStep[]>();
+  for (const edge of edges) graph.set(edge.inputMint, [...(graph.get(edge.inputMint) ?? []), edge]);
+  return graph;
+}
+
+describe("bounded simple-path traversal", () => {
+  it.each([
+    ["a", "a"], ["missing", "b"], ["a", "missing"], ["c", "a"],
+  ])("rejects an identical or unreachable pair %s → %s", (input, output) => {
+    expect(findRoutes(graphOf(edge("a", "b"), edge("b", "c")), input, output)).toEqual([]);
+  });
+
+  it("rejects cycles and self loops while exploring independent sibling paths", () => {
+    const graph = graphOf(edge("a", "a"), edge("a", "b"), edge("b", "a"), edge("b", "c"), edge("a", "d"), edge("d", "c"), edge("c", "b"));
+    const routes = findRoutes(graph, "a", "c");
+    expect(routes.map((route) => [route.inputMint, ...route.steps.map((step) => step.outputMint)])).toEqual([
+      ["a", "b", "c"], ["a", "d", "c"],
+    ]);
+    expect(findRoutes(graph, "a", "b").map((route) => route.steps.length)).toEqual([1, 3]);
+  });
+
+  it("accepts three hops and excludes four-hop reachability from pair metadata", () => {
+    const graph = graphOf(edge("a", "b"), edge("b", "c"), edge("c", "d"), edge("d", "e"));
+    expect(findRoutes(graph, "a", "d")[0]!.steps).toHaveLength(3);
+    expect(findRoutes(graph, "a", "e")).toEqual([]);
+    const pairs = supportedPairs(graph);
+    expect(pairs).toContainEqual({ inputMint: "a", outputMint: "d" });
+    expect(pairs).not.toContainEqual({ inputMint: "a", outputMint: "e" });
+    expect(pairs).toContainEqual({ inputMint: "d", outputMint: "e" });
+  });
+
+  it("allows one RFQ at any hop but excludes two-RFQ paths", () => {
+    const graph = graphOf(edge("a", "b", "propamm"), edge("b", "c", "propamm"), edge("c", "d"), edge("b", "d"), edge("a", "c"), edge("c", "d", "propamm"));
+    expect(findRoutes(graph, "a", "d").map((route) => route.steps.map((step) => step.operation))).toEqual([
+      ["propamm", "clamm"], ["clamm", "clamm"], ["clamm", "propamm"],
+    ]);
+    expect(findRoutes(graphOf(edge("a", "b", "propamm"), edge("b", "c"), edge("c", "d")), "a", "d")).toHaveLength(1);
+    expect(findRoutes(graphOf(edge("a", "b"), edge("b", "c", "propamm"), edge("c", "d")), "a", "d")).toHaveLength(1);
+    expect(findRoutes(graphOf(edge("a", "b"), edge("b", "c"), edge("c", "d", "propamm")), "a", "d")).toHaveLength(1);
+    expect(findRoutes(graph, "a", "d", { forOutput: true }).map((route) => route.steps.map((step) => step.operation))).toEqual([["clamm", "clamm"]]);
+    expect(supportedPairs(graphOf(edge("a", "b", "propamm"), edge("b", "c", "propamm"))))
+      .not.toContainEqual({ inputMint: "a", outputMint: "c" });
+  });
+
+  it("freezes candidate paths and deduplicates frozen metadata across parallel venues", () => {
+    const graph = buildRouteGraph(NETWORKS.testnet, true);
+    const routes = findRoutes(graph, TESTNET_MINTS.primeBTC, TESTNET_MINTS.primeUSD);
+    expect(Object.isFrozen(routes)).toBe(true);
+    for (const route of routes) {
+      expect(Object.isFrozen(route)).toBe(true);
+      expect(Object.isFrozen(route.steps)).toBe(true);
+      expect(route.steps.every(Object.isFrozen)).toBe(true);
+    }
+    expect([...graph.values()].every(Object.isFrozen)).toBe(true);
+    const pairs = supportedPairs(graph);
+    expect(Object.isFrozen(pairs)).toBe(true);
+    expect(pairs.every(Object.isFrozen)).toBe(true);
+    expect(new Set(pairs.map(({ inputMint, outputMint }) => `${inputMint}:${outputMint}`)).size).toBe(12);
+    expect(pairs.every((pair) => Object.keys(pair).join() === "inputMint,outputMint")).toBe(true);
+    expect(supportedPairs(new Map())).toEqual([]);
   });
 });
