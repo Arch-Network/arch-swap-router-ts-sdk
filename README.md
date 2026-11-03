@@ -9,14 +9,19 @@ Supported pairs use graph-generated one-to-three-hop paths
 through the two vaults and the aBTC/aUSD CLAMM, with optional PropAMM RFQs for
 exact-input swaps on either network. An optional mainnet direct RFQ provider adds
 aUSD ↔ aETH exact-input swaps using the original server transactions.
+Opting into `composableAethSells` instead builds router instructions for aETH
+sales to aUSD or primeUSD, using the same direct RFQ provider.
 
 **Current status:** all 12 core directions support exact-input quotes and receive
 sizing. An opted-in mainnet direct RFQ provider adds the two aETH/aUSD exact-input
 directions. Unsupported or identical mint pairs reject with `UNSUPPORTED_PAIR`
 before account or provider calls.
+With `composableAethSells: true`, mainnet exposes 15 unique directed pairs:
+aETH → aUSD uses the router and aETH → primeUSD becomes available. Buys retain
+the original direct treasury transaction.
 
-**Latest offline validation (2026-11-03):** typecheck, build, and 846 tests pass,
-including the two-call account-loading budget. Earlier live quote-only tests
+**Latest offline validation (2026-11-03):** typecheck, build, and 881 tests pass,
+including composable aETH sells and the two-call account-loading budget. Earlier live quote-only tests
 passed 13/14 directions, before the batching follow-up: all twelve core pairs and
 aETH → aUSD. aUSD → aETH rejects because the server's treasury authority and
 bridge program differ from the SDK's pinned deployment. The existing validator
@@ -35,9 +40,11 @@ output, with CLAMM winning ties; receive sizing selects the smallest valid input
 using only local vault/CLAMM estimates. Every returned bundle fits the dependency's
 transaction byte and account limits.
 The internal graph uses the selected registry, simple paths of at most three
-hops, and at most one PropAMM step. It adds no markets, automatic discovery, or
-public graph configuration. aETH server transactions stay on their separate
-dispatch path and cannot be composed into other routes.
+hops, and at most one PropAMM step. Markets come from the fixed registry, with
+no automatic discovery or public graph configuration. The co-signing server's
+current capabilities exclude routes mixing CLAMM and PropAMM. Default aETH
+server transactions stay on their separate dispatch path; opted-in sells reuse
+validated native quote terms in newly compiled router transactions.
 
 ## Frontend API
 
@@ -149,13 +156,15 @@ These budgets apply with or without an RFQ provider and to every
 failures can stop loading earlier. The first batch contains every known vault,
 pool, and mint account; the second contains the derived CLAMM tick arrays.
 With PropAMM enabled, a swap quote also makes one RFQ provider call. aETH quotes
-make no SDK account reads and one direct RFQ call.
+on the default direct path make no SDK account reads. Composable aETH sells
+make zero account reads for aUSD output or one four-account USD-vault batch for
+primeUSD output. Both use one direct RFQ provider call.
 Overlapping account requests share pending reads and confirmed absence within a
 quote. Decoded venue state is reused for that quote; subsequent quotes fetch
 fresh state. Each successfully read account is fetched only once. Malformed
 individual responses and CLAMM validation errors remain isolated to candidates
 that need those accounts; amount-dependent vault checks run per candidate too.
-If an RFQ-enabled swap's entire first batch fails transport or response framing,
+If competing RFQ/CLAMM paths' entire first batch fails transport or response framing,
 the second call recovers only its required vault accounts. CLAMM retains the
 original batch error, so no tick reads or third call follow. This recovery can
 request vault addresses again after a failed batch; confirmed missing or invalid
@@ -327,6 +336,58 @@ and transport remain application-owned, and graph construction/evaluation stay
 internal to the SDK. Step 6 in the dynamic routing plan records final offline
 validation and live quote-only results; its two-call follow-up log records the
 latest loading changes and offline checks.
+
+## Composable aETH sells
+
+Enable the mainnet sell routes explicitly using the existing direct provider:
+
+```ts
+import {
+  createRouterClient, MAINNET_AETH_USD,
+  type DirectRfqQuoteProvider, type RouterDataSource,
+} from "@arch-network/swap-router-sdk";
+
+declare const source: RouterDataSource;
+declare const directRfqQuoteProvider: DirectRfqQuoteProvider;
+declare const user: string;
+
+const router = createRouterClient({
+  network: "mainnet", source, directRfqQuoteProvider,
+  composableAethSells: true,
+});
+const quote = await router.quoteExactIn({
+  inputMint: MAINNET_AETH_USD.baseMint,
+  outputMint: router.mints!.primeUSD, // Or MAINNET_AETH_USD.quoteMint for aUSD.
+  amountIn: 1_000_000n, // 0.001 aETH, with 9 decimals.
+  slippageBps: 100, user, deadlineMs: Date.now() + 30_000,
+});
+if (quote.execution === "serverTransaction") throw new Error("Expected a router sell");
+// Compile quote.instructions with compileRouterMessage and a fresh blockhash.
+// User-sign that complete message and submit it with quote.rfq!.quoteId.
+```
+
+The direct provider always receives a native aETH → aUSD sell request, even
+when the final output is primeUSD. The SDK applies the existing strict sell
+validator, preserves its compact terms/quote ID, and constructs `[input ATA,
+router]`. The native response is left unchanged. A primeUSD suffix consumes the
+sell estimate, including vault fees/rounding; slippage applies once to final
+output. The server accepts a router-level final minimum instead of the direct
+trade's minimum. Existing quote/result/provider shapes remain unchanged; the
+new option defaults to false and requires a mainnet direct provider.
+
+These sells return `RouterSwapQuote`, taking precedence over direct sell
+dispatch only when opted in. Buys still return the original
+`ServerTransactionSwapQuote`. Pair metadata is deduplicated. aETH receive
+sizing, reverse primeUSD → aETH, BTC compositions, and treasury-mint graph
+steps remain unsupported and reject before account/provider calls. A failed
+composable sell propagates its error without retrying it as a direct sell.
+
+Use the existing HTTP decoder from [examples/aeth-usd.ts](examples/aeth-usd.ts).
+For submission, compile and user-sign the new router message and send the flat
+transaction with `quote_id` to the RFQ server's `/rfq/swap`; the server adds its
+quote-signer signature. The server must trust this router and, for primeUSD,
+enable the matching vault program. Fresh RFQ and vault state, available aUSD
+inventory, and user balances remain execution prerequisites.
 
 ## Direct RFQ transaction contracts
 

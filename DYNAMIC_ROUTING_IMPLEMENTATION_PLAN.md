@@ -1,13 +1,16 @@
 # Minimal TypeScript graph routing: implementation plan and handoff
 
 Status: All six steps and the two-call follow-up have been implemented and tested
-offline. Typecheck, build, and 846 offline tests pass. The last live run, before
+offline. The composable aETH sell follow-up also passes 881 offline tests. The last full live run, before
 the batching follow-up, passed 13/14 directions; aUSD → aETH remains blocked
 by a mismatch between the server's deployment and the SDK's pinned registry.
 See the Step 6 results below for evidence and the remaining external action.
 Follow-up: the account-loading budget is now at most two reader calls per quote,
 including RFQ-enabled vault/swap routes. The two-call follow-up log below
 supersedes earlier three-call budgets.
+The user subsequently authorized composable aETH sells: the optional mode adds
+aETH → primeUSD and routes aETH → aUSD through the router, for 15 unique mainnet
+pairs. Default behavior remains at 12/14 pairs. See the sell follow-up below.
 
 ## Goal and agreed decisions
 
@@ -17,7 +20,8 @@ transaction builders. Keep the changes small enough to review and ship together.
 
 The user explicitly selected:
 
-- Keep the current **14 directed pairs**, rather than adding aETH cross routes.
+- Initially keep **14 directed pairs**; the later composable-sell authorization
+  adds only the optional aETH → primeUSD direction.
 - Keep the current **two-second RFQ timeout**, rather than adding an earlier
   selection deadline.
 
@@ -89,15 +93,17 @@ fourteen directed pairs. Without that provider, or on testnet, preserve the
 existing twelve-pair behavior. BTC/USD RFQ edges are available only when the
 matching provider and network deployment are configured.
 
-The aETH pair is a separate execution capability: buys use a treasury mint and
-sells use a native PropAMM transaction. These are complete server-built messages,
-not composable router instructions. The smallest implementation keeps the
-existing aETH dispatcher and validators and combines its pair metadata with the
-graph-generated core pairs. Do not splice these transactions into graph paths.
+By default, the aETH pair remains a separate execution capability: buys use a
+treasury mint and sells use the original native PropAMM transaction. Opting into
+`composableAethSells` reuses the strict sell validator and original quote terms
+to build a separately co-signed router message for aETH → aUSD or primeUSD.
+The original server response is never modified or spliced into another message.
+Treasury buys retain their direct dispatcher and are not graph steps. Market
+capabilities exclude CLAMM/PropAMM combinations unsupported by the signer.
 
 `quoteForOutput` remains approximate receive sizing for the twelve core pairs,
 using only vault/CLAMM paths. It must never invoke an RFQ provider. aETH receive
-sizing and cross routes remain unsupported.
+sizing remains unsupported; the sole opted-in cross route is aETH → primeUSD.
 
 ## Implementation checklist
 
@@ -198,8 +204,9 @@ Error policy (without changing the public quote union):
 
 - [x] Reuse existing resolved steps, canonical builders, and RFQ account
   ordering. Preserve the exact bundle for each mode: vault/CLAMM quotes return
-  `[router]`, PropAMM router quotes return `[input ATA, router]`, and aETH quotes
-  return the original server transaction. Do not add compute instructions.
+  `[router]`, PropAMM router quotes (including composable aETH sells) return
+  `[input ATA, router]`, and direct aETH quotes return the original server
+  transaction. Do not add compute instructions.
 - [x] Compile each otherwise valid instruction-based candidate with a 32-byte
   placeholder blockhash and reserve all signatures indicated by its header.
 - [x] Enforce serialized bytes <= `RUNTIME_TX_SIZE_LIMIT` and compiled unique
@@ -208,8 +215,9 @@ Error policy (without changing the public quote union):
   smaller eligible alternative. Do not compare the number of fetched accounts
   with the transaction's account limit. Report exhausted candidates using the
   error policy in Step 3.
-- [x] For aETH, measure the original validated message with both required
-  signature slots reserved. Do not recompile or replace its blockhash.
+- [x] For direct aETH, measure the original validated message with both required
+  signature slots reserved. Composable sells also measure their new router
+  bundle; original provider messages and blockhashes remain untouched.
 - [x] Retain caller responsibility to recheck the final transaction if the
   application appends instructions. No blockhash RPC is needed for size checks.
 

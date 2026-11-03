@@ -168,7 +168,9 @@ it.skipIf(!rpcUrl).each(["aUSD", "primeUSD"] as const)("gets a live mainnet comp
   expect(post).toHaveBeenCalledOnce();
   expect(source.getAccounts).toHaveBeenCalledTimes(output === "primeUSD" ? 1 : 0);
   if (output === "primeUSD") expect(source.getAccounts.mock.calls[0]![0]).toHaveLength(4);
-  const rfq = await directRfqQuoteProvider.quoteExactIn.mock.results[0]!.value;
+  const rfqCall = directRfqQuoteProvider.quoteExactIn.mock.results[0];
+  if (rfqCall?.type !== "return") throw new Error("Native aETH sell RFQ was not requested");
+  const rfq = await rfqCall.value;
   expect(hex.encode(TransactionUtil.serialize(rfq.transaction))).toBe(originalBytes);
   expect(quote.rfq).toEqual({ quoteId: rfq.quoteId });
   expect(quote.hops.map((hop) => hop.kind)).toEqual(output === "primeUSD" ? ["propamm", "vaultMint"] : ["propamm"]);
