@@ -16,11 +16,11 @@ interface CandidateQuoteInput {
   readonly request: Omit<QuoteExactInRequest, "amountIn">;
   readonly amount: bigint;
   readonly forOutput: boolean;
-  readonly propAmmQuoteProvider?: PropAmmQuoteProvider | undefined;
+  readonly propAmmQuoteProviders?: ReadonlyMap<string, PropAmmQuoteProvider>;
 }
 
 /** Evaluate graph paths against one request's prepared state, then choose a quote. */
-export async function quoteCandidates({ candidates, state, config, request, amount, forOutput, propAmmQuoteProvider }: CandidateQuoteInput): Promise<RouterSwapQuote> {
+export async function quoteCandidates({ candidates, state, config, request, amount, forOutput, propAmmQuoteProviders }: CandidateQuoteInput): Promise<RouterSwapQuote> {
   const { inputMint, outputMint, slippageBps, user, deadlineMs } = request;
   const prefix: { amountOut: bigint; resolved: ResolvedStep }[] = [];
   if (!forOutput && candidates.length > 1) {
@@ -52,10 +52,12 @@ export async function quoteCandidates({ candidates, state, config, request, amou
         value = shared.amountOut;
         steps.push(shared.resolved);
       } else if (step.venue === "propamm") {
-        if (!propAmmQuoteProvider || !config.propamm) throw new RouterSdkError("INVALID_RFQ", "PropAMM provider or deployment is unavailable.");
-        const rfq = await quotePropAmm(propAmmQuoteProvider, {
+        const provider = propAmmQuoteProviders?.get(step.marketId);
+        const deployment = config.propammMarkets?.find((market) => market.id === step.marketId);
+        if (!provider || !deployment) throw new RouterSdkError("INVALID_RFQ", "PropAMM provider or deployment is unavailable.");
+        const rfq = await quotePropAmm(provider, {
           inputMint: step.inputMint, outputMint: step.outputMint, amountIn: value, user, deadlineMs,
-        }, config.propamm);
+        }, deployment);
         value = rfq.estimatedAmountOut;
         effectiveDeadline = rfq.deadlineMs;
         quoteId = rfq.quoteId;

@@ -25,8 +25,9 @@ describe("graph-generated core routes", () => {
       expect(route.steps.map((step) => step.operation)).toEqual(fixture.hops.map((hop) => hop.args.kind));
       expect([route.inputMint, ...route.steps.map((step) => step.outputMint)]).toEqual(mints);
     }
-    expect(routes.every((route) => route.steps.every((step) => Object.values(config.mints).includes(step.inputMint)
-      && Object.values(config.mints).includes(step.outputMint)))).toBe(true);
+    const deployedMints = new Set<string>(Object.values(config.mints));
+    expect(routes.every((route) => route.steps.every((step) => deployedMints.has(step.inputMint)
+      && deployedMints.has(step.outputMint)))).toBe(true);
   });
 
   it("builds edges from venue endpoints rather than assuming the named mint order", () => {
@@ -88,11 +89,11 @@ describe("graph-generated core routes", () => {
 describe("parallel RFQ candidates", () => {
   it.each(["testnet", "mainnet"] as const)("finds both venues without adding pairs on %s", (network) => {
     const config = NETWORKS[network];
-    const graph = buildRouteGraph(config, true);
+    const graph = buildRouteGraph(config, ["btc-usd"]);
     const edges = [...graph.values()].flat();
     expect(edges).toHaveLength(8);
     expect(new Set(edges.map((edge) => edge.id)).size).toBe(8);
-    expect(buildRouteGraph(config, true)).toEqual(graph);
+    expect(buildRouteGraph(config, ["btc-usd"])).toEqual(graph);
     expect(supportedPairs(graph)).toEqual(supportedPairs(buildRouteGraph(config)));
     for (const route of coreRoutes(config)) {
       const candidates = findRoutes(graph, route.inputMint, route.outputMint);
@@ -104,8 +105,9 @@ describe("parallel RFQ candidates", () => {
           route.steps.map((step) => step.operation === "clamm" ? "propamm" : step.operation),
         );
         const rfq = candidates[1]!.steps.find((step) => step.venue === "propamm")!;
-        expect(rfq.id).toContain(config.propamm.config);
-        expect([rfq.inputMint, rfq.outputMint].sort()).toEqual([config.propamm.baseMint, config.propamm.quoteMint].sort());
+        const market = config.propammMarkets[0]!;
+        expect(rfq.id).toContain(market.config);
+        expect([rfq.inputMint, rfq.outputMint].sort()).toEqual([market.baseMint, market.quoteMint].sort());
       }
       expect(findRoutes(graph, route.inputMint, route.outputMint, { forOutput: true })).toEqual([route]);
       for (const candidate of candidates) {
@@ -117,8 +119,8 @@ describe("parallel RFQ candidates", () => {
   });
 
   it("requires both provider opt-in and a configured deployment", () => {
-    const { propamm: _deployment, ...withoutDeployment } = NETWORKS.testnet;
-    for (const graph of [buildRouteGraph(NETWORKS.testnet), buildRouteGraph(NETWORKS.testnet, false), buildRouteGraph(withoutDeployment, true)]) {
+    const { propammMarkets: _deployments, ...withoutDeployment } = NETWORKS.testnet;
+    for (const graph of [buildRouteGraph(NETWORKS.testnet), buildRouteGraph(NETWORKS.testnet, []), buildRouteGraph(withoutDeployment, ["btc-usd"])]) {
       expect([...graph.values()].flat()).toHaveLength(6);
       expect(supportedPairs(graph)).toEqual(SUPPORTED_PAIRS);
     }
@@ -138,7 +140,7 @@ describe("parallel RFQ candidates", () => {
 
 function edge(inputMint: string, outputMint: string, operation: "clamm" | "propamm" = "clamm"): RouteStep {
   const fields = { id: `${operation}:${inputMint}:${outputMint}`, inputMint, outputMint };
-  return operation === "propamm" ? { ...fields, venue: "propamm", operation } : { ...fields, venue: "clamm", operation };
+  return operation === "propamm" ? { ...fields, venue: "propamm", operation, marketId: "synthetic", allowClamm: true } : { ...fields, venue: "clamm", operation };
 }
 
 function graphOf(...edges: RouteStep[]): RouteGraph {
@@ -187,7 +189,7 @@ describe("bounded simple-path traversal", () => {
   });
 
   it("freezes candidate paths and deduplicates frozen metadata across parallel venues", () => {
-    const graph = buildRouteGraph(NETWORKS.testnet, true);
+    const graph = buildRouteGraph(NETWORKS.testnet, ["btc-usd"]);
     const routes = findRoutes(graph, TESTNET_MINTS.primeBTC, TESTNET_MINTS.primeUSD);
     expect(Object.isFrozen(routes)).toBe(true);
     for (const route of routes) {

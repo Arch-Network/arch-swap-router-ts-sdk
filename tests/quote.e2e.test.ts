@@ -137,6 +137,54 @@ it.skipIf(!rpcUrl).each(routes.map((route) => ({
   console.log(`Transaction size: ${signedSize}/${TRANSACTION_SIZE_LIMIT} bytes (signatures: ${signatureCount})`);
 }, 30_000);
 
+it.skipIf(!rpcUrl).each(["aUSD", "primeUSD"] as const)("gets a live mainnet composable aETH → %s quote", async (output) => {
+  const rpc = new RpcConnection(rpcUrl!);
+  const source = { getAccounts: vi.fn(async (addresses: readonly string[]) => {
+    const accounts = await rpc.getMultipleAccounts(addresses.map((address) => base58.decode(address)));
+    return accounts.map((account) => account === null ? null : {
+      ...account, owner: Uint8Array.from(account.owner), data: Uint8Array.from(account.data), utxo: account.utxo ?? "",
+    });
+  }) };
+  const post = vi.fn(async (url: string, body: string) => {
+    const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body,
+      signal: AbortSignal.timeout(1800) });
+    const raw = await response.text();
+    if (!response.ok) throw new Error(`RFQ HTTP ${response.status}: ${raw}`);
+    return raw;
+  });
+  const httpProvider = createAethUsdRfqProvider(rfqUrl, post);
+  let originalBytes: string | undefined;
+  const directRfqQuoteProvider = { quoteExactIn: vi.fn(async (request: QuoteExactInRequest) => {
+    const rfq = await httpProvider.quoteExactIn(request);
+    originalBytes = hex.encode(TransactionUtil.serialize(rfq.transaction));
+    return rfq;
+  }) };
+  const router = createRouterClient({ source, network: "mainnet", directRfqQuoteProvider, composableAethSells: true });
+  const request = { inputMint: ethUsd.baseMint, outputMint: router.mints![output], amountIn: 1_000_000n,
+    user, slippageBps: 100, deadlineMs: Date.now() + 30_000 };
+  const quote = await router.quoteExactIn(request);
+  if (quote.execution === "serverTransaction") throw new Error("Expected composable sell instructions");
+  expect(directRfqQuoteProvider.quoteExactIn).toHaveBeenCalledExactlyOnceWith({ ...request, outputMint: ethUsd.quoteMint });
+  expect(post).toHaveBeenCalledOnce();
+  expect(source.getAccounts).toHaveBeenCalledTimes(output === "primeUSD" ? 1 : 0);
+  if (output === "primeUSD") expect(source.getAccounts.mock.calls[0]![0]).toHaveLength(4);
+  const rfq = await directRfqQuoteProvider.quoteExactIn.mock.results[0]!.value;
+  expect(hex.encode(TransactionUtil.serialize(rfq.transaction))).toBe(originalBytes);
+  expect(quote.rfq).toEqual({ quoteId: rfq.quoteId });
+  expect(quote.hops.map((hop) => hop.kind)).toEqual(output === "primeUSD" ? ["propamm", "vaultMint"] : ["propamm"]);
+  expect(quote.hops[0]!.estimatedAmountOut).toBe(rfq.estimatedAmountOut);
+  if (output === "primeUSD") expect(quote.hops[1]!.amountIn).toBe(rfq.estimatedAmountOut);
+  expect(quote.estimatedAmountOut).toBeGreaterThan(0n);
+  expect(quote.minAmountOut).toBe(quote.estimatedAmountOut * 9900n / 10_000n);
+  expect(quote.deadlineMs).toBeGreaterThan(Date.now());
+  const message = compileRouterMessage(quote.instructions, user, new Uint8Array(32));
+  const signedSize = TransactionUtil.serializedSize({ version: 0, message, signatures: [new Uint8Array(64), new Uint8Array(64)] });
+  expect(message.header).toMatchObject({ num_required_signatures: 2, num_readonly_signed_accounts: 1 });
+  expect(message.account_keys.length).toBeLessThanOrEqual(MAX_ACCOUNTS_PER_TRANSACTION);
+  expect(signedSize).toBeLessThanOrEqual(TRANSACTION_SIZE_LIMIT);
+  console.log(`Composable aETH → ${output}: ${source.getAccounts.mock.calls.length} account-reader calls, ${signedSize} signed bytes`);
+}, 30_000);
+
 it.skipIf(!rpcUrl).each([
   { input: "aUSD", output: "aETH", inputMint: ethUsd.quoteMint, outputMint: ethUsd.baseMint,
     amountIn: 1_000_000n, kind: "treasuryMint" }, // 1 aUSD (6 decimals).

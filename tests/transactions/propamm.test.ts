@@ -146,7 +146,7 @@ describe("native PropAMM contract", () => {
     ["testnet", "FosDeThFmSTGcaQxgyhaPWhBrnEovCJ7jHzTcwp1dmYi"],
     ["mainnet", "A97DopD3nWbcwj89Suma32AhGfGUiLYZZzKqpP3H1PiG"],
   ] as const)("pins the %s v2 config to the migration signer", (network, configId) => {
-    const deployment = NETWORKS[network].propamm;
+    const deployment = NETWORKS[network].propammMarkets[0]!;
     expect(deriveAddress(deployment.programId, "config_v2", decodeAddress(configId))).toBe(deployment.config);
     expect(deployment).not.toHaveProperty("maker");
   });

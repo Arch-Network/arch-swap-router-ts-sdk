@@ -11,7 +11,12 @@ export type CoreRouteStep = Edge & (
   | { readonly venue: "btcVault" | "usdVault"; readonly operation: "vaultMint" | "vaultRedeem" }
   | { readonly venue: "clamm"; readonly operation: "clamm" }
 );
-export type RouteStep = CoreRouteStep | (Edge & { readonly venue: "propamm"; readonly operation: "propamm" });
+export type RouteStep = CoreRouteStep | (Edge & {
+  readonly venue: "propamm";
+  readonly operation: "propamm";
+  readonly marketId: string;
+  readonly allowClamm: boolean;
+});
 export type RouteGraph<Step extends RouteStep = RouteStep> = ReadonlyMap<Address, readonly Step[]>;
 export interface Route<Step extends RouteStep = RouteStep> {
   readonly inputMint: Address;
@@ -22,9 +27,9 @@ export interface Route<Step extends RouteStep = RouteStep> {
 const MAX_HOPS = 3;
 
 /** Internal deployment graph. RFQ edges require explicit provider opt-in. No reads. */
-export function buildRouteGraph(config: NetworkConfig, rfqEnabled?: false): RouteGraph<CoreRouteStep>;
-export function buildRouteGraph(config: NetworkConfig, rfqEnabled: boolean): RouteGraph;
-export function buildRouteGraph({ venues, propamm }: NetworkConfig, rfqEnabled = false): RouteGraph {
+export function buildRouteGraph(config: NetworkConfig): RouteGraph<CoreRouteStep>;
+export function buildRouteGraph(config: NetworkConfig, enabledMarkets: readonly string[]): RouteGraph;
+export function buildRouteGraph({ venues, propammMarkets }: NetworkConfig, enabledMarkets: readonly string[] = []): RouteGraph {
   const edges: RouteStep[] = [];
   for (const venue of ["btcVault", "usdVault"] as const) {
     const { address, assetMint, shareMint } = venues[venue];
@@ -38,11 +43,14 @@ export function buildRouteGraph({ venues, propamm }: NetworkConfig, rfqEnabled =
     { id: `clamm:${pool.address}:aToB`, venue: "clamm", operation: "clamm", inputMint: pool.tokenMintA, outputMint: pool.tokenMintB },
     { id: `clamm:${pool.address}:bToA`, venue: "clamm", operation: "clamm", inputMint: pool.tokenMintB, outputMint: pool.tokenMintA },
   );
-  if (rfqEnabled && propamm) {
-    edges.push(
-      { id: `propamm:${propamm.config}:sell`, venue: "propamm", operation: "propamm", inputMint: propamm.baseMint, outputMint: propamm.quoteMint },
-      { id: `propamm:${propamm.config}:buy`, venue: "propamm", operation: "propamm", inputMint: propamm.quoteMint, outputMint: propamm.baseMint },
-    );
+  for (const market of propammMarkets ?? []) {
+    if (!enabledMarkets.includes(market.id)) continue;
+    for (const side of market.sides) edges.push({
+      id: `propamm:${market.programId}:${market.config}:${market.baseMint}:${market.quoteMint}:${side}`,
+      venue: "propamm", operation: "propamm", marketId: market.id, allowClamm: market.allowClamm,
+      inputMint: side === "sell" ? market.baseMint : market.quoteMint,
+      outputMint: side === "sell" ? market.quoteMint : market.baseMint,
+    });
   }
   const adjacency = new Map<Address, RouteStep[]>();
   for (const edge of edges) {
@@ -66,6 +74,8 @@ export function findRoutes<Step extends RouteStep>(
     for (const edge of graph.get(mint) ?? []) {
       const rfq = edge.operation === "propamm";
       if (visited.has(edge.outputMint) || (rfq && (forOutput || hasRfq))) continue;
+      if ((rfq && !edge.allowClamm && steps.some((step) => step.operation === "clamm"))
+        || (edge.operation === "clamm" && steps.some((step) => step.operation === "propamm" && !step.allowClamm))) continue;
       steps.push(edge);
       if (edge.outputMint === outputMint) {
         routes.push(Object.freeze({ inputMint, outputMint, steps: Object.freeze([...steps]) }));

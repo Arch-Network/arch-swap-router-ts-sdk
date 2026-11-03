@@ -19,7 +19,7 @@ const maker = base58.encode(new Uint8Array(32).fill(0x22));
 async function setupCandidates(rfqEnabled = true) {
   const fixture = setup();
   const request = { ...fixture.request, deadlineMs: nowMs + 30_000 };
-  const candidates = findRoutes(buildRouteGraph(config, rfqEnabled), request.inputMint, request.outputMint);
+  const candidates = findRoutes(buildRouteGraph(config, rfqEnabled ? ["btc-usd"] : []), request.inputMint, request.outputMint);
   const state = await prepareQuoteState(fixture.source, config, candidates);
   return { ...fixture, request, candidates, state, config, amount: request.amountIn, forOutput: false };
 }
@@ -46,7 +46,7 @@ describe("graph candidate evaluation", () => {
     const swap = input.candidates[0]!.steps.find((step) => step.venue === "clamm")!;
     const expected = (await input.state.clamm(swap)).estimate(input.amount);
     const provider = providerFor(expected);
-    const quote = await quoteCandidates({ ...input, candidates: [...input.candidates].reverse(), propAmmQuoteProvider: provider });
+    const quote = await quoteCandidates({ ...input, candidates: [...input.candidates].reverse(), propAmmQuoteProviders: new Map([["btc-usd", provider]]) });
     expect(quote.hops[0]!.kind).toBe("clamm");
     expect(quote.estimatedAmountOut).toBe(expected);
     expect(quote.rfq).toBeUndefined();
@@ -86,7 +86,7 @@ describe("graph candidate evaluation", () => {
     input.source.getAccounts.mockRejectedValueOnce(poolError);
     const provider = providerFor(1_000n);
     provider.quoteExactIn.mockRejectedValueOnce(rfqError);
-    const error: unknown = await quoteCandidates({ ...input, propAmmQuoteProvider: provider }).catch((error: unknown) => error);
+    const error: unknown = await quoteCandidates({ ...input, propAmmQuoteProviders: new Map([["btc-usd", provider]]) }).catch((error: unknown) => error);
     expect(error).toMatchObject({ code: "NO_ROUTE", cause: expect.any(AggregateError) });
     if (!(error instanceof RouterSdkError) || !(error.cause instanceof AggregateError)) throw error;
     expect(error.cause.errors[0]).toBe(poolError);
@@ -118,7 +118,7 @@ describe("graph candidate evaluation", () => {
     })) };
     input.source.getAccounts.mockClear();
     const provider = providerFor(1_000n);
-    const quote = await quoteCandidates({ ...input, state, candidates, amount: target, forOutput: true, propAmmQuoteProvider: provider });
+    const quote = await quoteCandidates({ ...input, state, candidates, amount: target, forOutput: true, propAmmQuoteProviders: new Map([["btc-usd", provider]]) });
     expect(quote.amountIn).toBe(expectedInput);
     expect(quote.estimatedAmountOut).toBe(expectedOutput);
     expect(quote.minAmountOut).toBe(expectedOutput * 9950n / 10_000n);
@@ -134,7 +134,7 @@ describe("graph candidate evaluation", () => {
   it("never requests an RFQ during receive sizing even if an RFQ path reaches the evaluator", async () => {
     const input = await setupCandidates();
     const provider = providerFor(1_000n);
-    const quote = await quoteCandidates({ ...input, amount: 100_000n, forOutput: true, propAmmQuoteProvider: provider });
+    const quote = await quoteCandidates({ ...input, amount: 100_000n, forOutput: true, propAmmQuoteProviders: new Map([["btc-usd", provider]]) });
     expect(quote.estimatedAmountOut).toBeGreaterThanOrEqual(100_000n);
     expect(quote.hops[0]!.kind).toBe("clamm");
     expect(provider.quoteExactIn).not.toHaveBeenCalled();
@@ -185,7 +185,7 @@ describe.each(["clamm", "propamm"] as const)("transaction eligibility with prefe
         : message;
       return check(measured, label);
     });
-    const quote = await quoteCandidates({ ...input, propAmmQuoteProvider: provider });
+    const quote = await quoteCandidates({ ...input, propAmmQuoteProviders: new Map([["btc-usd", provider]]) });
     const expected = rejected ? preferred === "clamm" ? "propamm" : "clamm" : preferred;
     expect(quote.hops[0]!.kind).toBe(expected);
     expect(quote.instructions).toHaveLength(expected === "propamm" ? 2 : 1);
@@ -208,7 +208,7 @@ describe("transaction eligibility errors", () => {
     vi.spyOn(transactionLimits, "assertMessageLimits").mockImplementation((message, label) => check(
       message.header.num_required_signatures === 2 ? withPacketSize(message, 4097) : withAccountCount(message, 51), label,
     ));
-    const error: unknown = await quoteCandidates({ ...input, propAmmQuoteProvider: providerFor(1_000n) })
+    const error: unknown = await quoteCandidates({ ...input, propAmmQuoteProviders: new Map([["btc-usd", providerFor(1_000n)]]) })
       .catch((error: unknown) => error);
     expect(error).toMatchObject({ code: "NO_ROUTE", cause: expect.any(AggregateError) });
     if (!(error instanceof RouterSdkError) || !(error.cause instanceof AggregateError)) throw error;

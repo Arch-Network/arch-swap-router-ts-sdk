@@ -1,4 +1,5 @@
 import type { Address } from "../types.js";
+import { MAINNET_AETH_USD } from "./aeth-usd.js";
 
 /** Fixed deployments; callers select a network rather than supplying addresses. */
 export const TESTNET = Object.freeze({
@@ -85,10 +86,16 @@ export interface PropAmmDeployment {
   readonly baseMint: Address;
   readonly quoteMint: Address;
 }
+export interface PropAmmMarket extends PropAmmDeployment {
+  readonly id: string;
+  readonly sides: readonly ("buy" | "sell")[];
+  /** The co-signing server must accept CLAMM steps before these can compose. */
+  readonly allowClamm: boolean;
+}
 export interface NetworkConfig {
   readonly programs: ProgramIds;
   readonly mints: NetworkMints;
-  readonly propamm?: PropAmmDeployment;
+  readonly propammMarkets?: readonly PropAmmMarket[];
   readonly venues: {
     readonly btcVault: VaultVenue;
     readonly usdVault: VaultVenue;
@@ -103,18 +110,24 @@ export interface NetworkConfig {
 export const NETWORKS = Object.freeze({
   testnet: Object.freeze({
     programs: TESTNET, mints: TESTNET_MINTS, venues: TESTNET_VENUES,
-    propamm: Object.freeze({
+    propammMarkets: Object.freeze([Object.freeze({
+      id: "btc-usd", sides: Object.freeze(["sell", "buy"] as const), allowClamm: false,
       programId: "9EqAsENtgBA4Uo4wbS8LVdaQJjMKPpagMxgDVhxEWtKq",
       config: "7X7QM1eEQwgE9b6tA4HMGxWGdzuTvcU9ip9FeZS338yn",
       baseMint: TESTNET_MINTS.aBTC, quoteMint: TESTNET_MINTS.aUSD,
-    }),
+    })]),
   }),
   mainnet: Object.freeze({
     programs: MAINNET, mints: MAINNET_MINTS, venues: MAINNET_VENUES,
-    propamm: Object.freeze({
+    propammMarkets: Object.freeze([Object.freeze({
+      id: "btc-usd", sides: Object.freeze(["sell", "buy"] as const), allowClamm: false,
       programId: "5KMw4VNavLhM5wxTxyQGm8hs5ymFhqMCZ5BpkHybcEBV",
       config: "3jwSNH8P5tNFMY72ZwFi5z3gEkK1vVor3xcAFvr4DHzr",
       baseMint: MAINNET_MINTS.aBTC, quoteMint: MAINNET_MINTS.aUSD,
-    }),
+    }), Object.freeze({
+      id: "aeth-usd", sides: Object.freeze(["sell"] as const), allowClamm: false,
+      programId: MAINNET_AETH_USD.programId, config: MAINNET_AETH_USD.config,
+      baseMint: MAINNET_AETH_USD.baseMint, quoteMint: MAINNET_AETH_USD.quoteMint,
+    })]),
   }),
 } satisfies Record<Network, NetworkConfig | null>);

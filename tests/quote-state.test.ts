@@ -7,7 +7,7 @@ import { decodeAddress, deriveAddress } from "../src/utils.js";
 import { now, setup } from "./fixtures/quotes.js";
 
 const config = NETWORKS.testnet;
-const graph = buildRouteGraph(config, true);
+const graph = buildRouteGraph(config, ["btc-usd"]);
 const setU64 = (data: Uint8Array, offset: number, value: bigint) => new DataView(data.buffer).setBigUint64(offset, value, true);
 
 type VaultStep = Exclude<CoreRouteStep, { readonly venue: "clamm" }>;

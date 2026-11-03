@@ -21,6 +21,7 @@ export async function prepareQuoteState(source: RouterDataSource, config: Networ
   } });
   const steps = [...new Map(candidates.flatMap((route) => route.steps).map((step) => [step.id, step])).values()];
   const hasRfq = steps.some((step) => step.venue === "propamm");
+  const hasClamm = steps.some((step) => step.venue === "clamm");
   const pool = venues.clamm;
   const poolKeys = [pool.address, pool.tokenMintA, pool.tokenMintB];
   const vaultKeys = steps.flatMap((step) => {
@@ -29,13 +30,13 @@ export async function prepareQuoteState(source: RouterDataSource, config: Networ
     return [venue.address, venue.assetMint, venue.shareMint,
       deriveAddress(programs.vaultProgramId, "reserve", decodeAddress(venue.shareMint))];
   });
-  const keys = [...vaultKeys, ...(steps.some((step) => step.venue === "clamm") ? poolKeys : [])];
+  const keys = [...vaultKeys, ...(hasClamm ? poolKeys : [])];
   // Prime the cache in one batch. Each candidate consumes only its own accounts.
   // Attach a handler even when the RFQ needs no accounts and can start immediately.
   const initial = load(keys);
   void initial.catch(() => {});
   const accounts = hasRfq ? await load(vaultKeys).catch(async (error: unknown) => {
-    if (initialBatchAvailable) throw error; // Required account contents are invalid.
+    if (initialBatchAvailable || !hasClamm) throw error; // No optional CLAMM batch to recover from.
     // A failed combined batch leaves no shared state. Spend the second read only
     // on vaults for RFQ; CLAMM keeps its cached batch failure and cannot read ticks.
     return readAccounts(source, vaultKeys);

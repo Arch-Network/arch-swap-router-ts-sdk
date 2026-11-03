@@ -84,7 +84,7 @@ describe("PropAMM route selection", () => {
     expect(source.getAccounts).toHaveBeenCalledTimes(2);
     const keys = source.getAccounts.mock.calls.flatMap(([keys]) => keys);
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).not.toContain(NETWORKS.testnet.propamm.config);
+    expect(keys).not.toContain(NETWORKS.testnet.propammMarkets[0]!.config);
     expect(client.supportedPairs).toHaveLength(12);
   });
 
@@ -301,7 +301,7 @@ describe("RFQ validation and excluded paths", () => {
     const { client, provider, request } = setupRfq();
     const invalid = mutate(response(request)) as PropAmmQuote;
     provider.quoteExactIn.mockResolvedValue(invalid);
-    await expect(quotePropAmm(provider, request, NETWORKS.testnet.propamm)).rejects.toBeInstanceOf(RouterSdkError);
+    await expect(quotePropAmm(provider, request, NETWORKS.testnet.propammMarkets[0]!)).rejects.toBeInstanceOf(RouterSdkError);
     expect((await client.quoteExactIn(request)).rfq).toBeUndefined();
   });
 
@@ -321,9 +321,9 @@ describe("RFQ validation and excluded paths", () => {
     const { provider, request } = setupRfq();
     const buy = { ...request, inputMint: mints.aUSD, outputMint: mints.aBTC };
     provider.quoteExactIn.mockResolvedValue({ ...response(buy), terms: { ...response(buy).terms, quoteAmount: 1n } });
-    await expect(quotePropAmm(provider, buy, NETWORKS.testnet.propamm)).rejects.toMatchObject({ code: "INVALID_RFQ" });
+    await expect(quotePropAmm(provider, buy, NETWORKS.testnet.propammMarkets[0]!)).rejects.toMatchObject({ code: "INVALID_RFQ" });
     provider.quoteExactIn.mockClear();
-    await expect(quotePropAmm(provider, { ...buy, deadlineMs: nowMs }, NETWORKS.testnet.propamm)).rejects.toMatchObject({ code: "RFQ_EXPIRED" });
+    await expect(quotePropAmm(provider, { ...buy, deadlineMs: nowMs }, NETWORKS.testnet.propammMarkets[0]!)).rejects.toMatchObject({ code: "RFQ_EXPIRED" });
     expect(provider.quoteExactIn).not.toHaveBeenCalled();
   });
 
@@ -336,7 +336,7 @@ describe("RFQ validation and excluded paths", () => {
 
   it.each(["buy", "sell"] as const)("uses mainnet RFQ identities for %s without testnet fallback", async (side) => {
     const { provider, source, request } = setupRfq();
-    const deployment = NETWORKS.mainnet.propamm;
+    const deployment = NETWORKS.mainnet.propammMarkets[0]!;
     const buy = side === "buy";
     const input = {
       ...request, inputMint: buy ? MAINNET_MINTS.aUSD : MAINNET_MINTS.aBTC,
