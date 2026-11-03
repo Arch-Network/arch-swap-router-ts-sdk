@@ -1,8 +1,10 @@
 import { TransactionUtil } from "@arch-network/arch-sdk";
 import { base58, hex } from "@scure/base";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { prepareAethUsdSwap } from "../../examples/aeth-usd.js";
-import { MAINNET_AETH_USD as market } from "../../src/index.js";
+import { createAethUsdRfqProvider, prepareAethUsdSwap } from "../../examples/aeth-usd.js";
+import { createRouterClient, MAINNET_AETH_USD as market } from "../../src/index.js";
+import { NETWORKS } from "../../src/config/networks.js";
+import { setupComposableAeth } from "../fixtures/composable-aeth.js";
 import fixtures from "../fixtures/aeth-usd/transactions.json" with { type: "json" };
 import { nativeTransaction } from "../fixtures/aeth-usd/transactions.js";
 
@@ -22,7 +24,7 @@ function setup(side = "buy") {
   const post = vi.fn(async (url: string, _body: string) => url.endsWith("/rfq/quote")
     ? JSON.stringify(wire) : JSON.stringify({ transaction_hash: "mock-transaction-hash" }));
   const source = { getAccounts: vi.fn(async () => { throw new Error("Unexpected account read"); }) };
-  const signMessage = vi.fn(async (_message: typeof transaction.message) => signature);
+  const signMessage = vi.fn(async (_message: typeof transaction.message): Promise<Uint8Array> => signature);
   const confirm = vi.fn(async (_hash: string) => {});
   const options = { serverUrl: "http://example.invalid:3002/", source, post, signMessage, confirm };
   return { fixture, transaction, wire, request, signature, options, post, source, signMessage, confirm };
@@ -32,6 +34,68 @@ beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(fixtures.now_ms); });
 afterEach(() => { vi.restoreAllMocks(); });
 
 describe("aETH/aUSD HTTP, wallet and submission example (mocked)", () => {
+  it("derives a native sell's expiry when the server omits the metadata", async () => {
+    const state = setup("sell");
+    Reflect.deleteProperty(state.wire, "expires_at_ms");
+    const prepared = await prepareAethUsdSwap(state.options, state.request);
+    expect(prepared.quote.deadlineMs).toBe(state.fixture.expires_at_ms);
+    expect(hex.encode(TransactionUtil.serialize(prepared.quote.transaction))).toBe(state.fixture.transaction_hex);
+    expect(state.signMessage).not.toHaveBeenCalled();
+  });
+
+  it.each([NETWORKS.mainnet.mints.aBTC, NETWORKS.mainnet.mints.primeBTC])("uses the metadata-free HTTP sell in a mixed route to %s", async outputMint => {
+    const state = setup("sell");
+    Reflect.deleteProperty(state.wire, "expires_at_ms");
+    const mixed = setupComposableAeth(outputMint);
+    const directRfqQuoteProvider = createAethUsdRfqProvider("https://vaults.veloxapi.net/propamm/rfq", state.post);
+    const client = createRouterClient({ ...mixed.options, directRfqQuoteProvider });
+    const quote = await client.quoteExactIn(mixed.request);
+    expect(quote.hops.map(hop => hop.kind)).toEqual(outputMint === NETWORKS.mainnet.mints.aBTC
+      ? ["propamm", "clamm"] : ["propamm", "clamm", "vaultMint"]);
+    expect(quote.deadlineMs).toBe(state.fixture.expires_at_ms);
+    expect(state.post).toHaveBeenCalledOnce();
+    expect(state.post.mock.calls[0]![0]).toBe("https://vaults.veloxapi.net/propamm/rfq/quote");
+    expect(JSON.parse(state.post.mock.calls[0]![1])).toMatchObject({ side: "sell", amount: Number(mixed.request.amountIn),
+      base_mint: hex.encode(base58.decode(market.baseMint)), quote_mint: hex.encode(base58.decode(market.quoteMint)) });
+    expect(mixed.source.getAccounts).toHaveBeenCalledTimes(2);
+    expect(state.signMessage).not.toHaveBeenCalled();
+  });
+
+  it("reads full-u64 encoded sell expiry without a Number conversion", async () => {
+    const state = setup("sell");
+    Reflect.deleteProperty(state.wire, "expires_at_ms");
+    const data = state.transaction.message.instructions[0]!.data;
+    const expiry = (1n << 64n) - 1n;
+    new DataView(data.buffer, data.byteOffset, data.byteLength).setBigUint64(18, expiry, true);
+    state.wire.message = TransactionUtil.toNumberArray(state.transaction).message;
+    const provider = createAethUsdRfqProvider("https://example.invalid/rfq", state.post);
+    expect((await provider.quoteExactIn(state.request)).expiresAtMs).toBe(expiry);
+    const prepared = await prepareAethUsdSwap(state.options, state.request);
+    expect(prepared.quote.deadlineMs).toBe(state.request.deadlineMs);
+  });
+
+  it("still requires expiry metadata for treasury buys", async () => {
+    const state = setup("buy");
+    Reflect.deleteProperty(state.wire, "expires_at_ms");
+    await expect(prepareAethUsdSwap(state.options, state.request)).rejects.toMatchObject({ code: "INVALID_RFQ" });
+  });
+
+  it.each(["mismatch", "null", "truncated", "extra instruction", "wrong program", "wrong side"])("rejects invalid sell expiry source: %s", async field => {
+    const state = setup("sell");
+    const trade = state.wire.message.instructions[0]!;
+    if (field === "mismatch") state.wire.expires_at_ms++;
+    else if (field === "null") Reflect.set(state.wire, "expires_at_ms", null);
+    else {
+      Reflect.deleteProperty(state.wire, "expires_at_ms");
+      if (field === "truncated") trade.data = trade.data.slice(0, 25);
+      if (field === "extra instruction") state.wire.message.instructions.push(trade);
+      if (field === "wrong program") trade.program_id_index = 0;
+      if (field === "wrong side") trade.data[1] = 0;
+    }
+    await expect(prepareAethUsdSwap(state.options, state.request)).rejects.toMatchObject({ code: "INVALID_RFQ" });
+    expect(state.signMessage).not.toHaveBeenCalled();
+  });
+
   it.each(["buy", "sell"])("quotes, validates, signs, submits and confirms a %s without changing the message", async side => {
     const state = setup(side);
     const prepared = await prepareAethUsdSwap(state.options, state.request);

@@ -33,16 +33,20 @@ const quote = await router.quoteExactIn({
 
 Here `source`, `options` and the wallet's `user` come from the application's
 callbacks below. `quote` contains router instructions for aETH → aUSD → primeUSD;
-use `MAINNET_AETH_USD.quoteMint` for aUSD output. Narrow the quote to the router
+use `MAINNET_AETH_USD.quoteMint` for aUSD output, `router.mints!.aBTC` for
+PropAMM → CLAMM, or `router.mints!.primeBTC` for PropAMM → CLAMM → Vault mint.
+Narrow the quote to the router
 branch, compile with `compileRouterMessage` and a fresh blockhash, user-sign that
 complete message, and send its flat transaction plus `quote_id: quote.rfq!.quoteId`
-to `/rfq/swap`. The server must enable the matching router and vault program.
+to `/rfq/swap`. The server must run the CLAMM-aware validator and enable the
+matching router, CLAMM and vault programs.
 There are zero account-reader calls for aUSD and one four-account batch for
-primeUSD, plus one RFQ call in either case.
+primeUSD. Both BTC outputs use two batched account reads. All four outputs
+request one native aETH/aUSD sell RFQ.
 
 `prepareAethUsdSwap` below continues to prepare original direct transactions;
 the opt-in above uses `createRouterClient` directly. Treasury buys keep their
-original flow. BTC compositions, reverse primeUSD buys and receive sizing are
+original flow. Reverse prime-token/BTC buys and aETH receive sizing are
 not enabled by this option. No signing or submission occurs when quoting.
 
 Run the offline example tests from the SDK root:
@@ -70,7 +74,7 @@ declare const signMessage: AethUsdExampleOptions["signMessage"];
 declare const confirm: AethUsdExampleOptions["confirm"];
 
 const options: AethUsdExampleOptions = {
-  serverUrl: "http://18.88.43.115:3002", source, signMessage, confirm,
+  serverUrl: "https://vaults.veloxapi.net/propamm", source, signMessage, confirm,
   async post(url, body) {
     const response = await fetch(url, { method: "POST",
       headers: { "content-type": "application/json" }, body });
@@ -135,9 +139,11 @@ must persist the exact signed body and quote ID using its own storage.
 The HTTP request writes `amountIn` directly as a JSON numeric u64 literal without
 converting it to `number`. The compact response decoder uses `JSON.parse` and
 rejects output/expiry metadata that is not a nonnegative safe integer before
-conversion to `bigint`. This example supports ordinary safe-size server amounts;
-replace its decoder with a lossless JSON adapter for larger output/expiry
-values. It never converts a rounded unsafe number into an accepted `bigint`.
+conversion to `bigint`. Native sells derive expiry directly from the instruction's
+u64 bytes, so `expires_at_ms` may be omitted. If supplied, it must match those
+bytes. Treasury buys still require expiry metadata. Replace the JSON decoder
+with a lossless adapter for larger output or buy-expiry metadata values.
+It never converts a rounded unsafe number into an accepted `bigint`.
 Byte values and account indexes are range-checked before normalization.
 
 aETH uses 9 decimals; aUSD uses 6. Use `MAINNET_AETH_USD` for the ETH market's

@@ -2,18 +2,18 @@
 
 ## Live quote smoke test
 
-`quote.e2e.test.ts` contains 16 live quote cases: the original 14 directions
-among aBTC, aUSD, primeBTC, primeUSD and aETH, plus two opted-in composable
-aETH sell cases (aUSD and primeUSD output):
+`quote.e2e.test.ts` contains 18 live quote cases: the original 14 directions
+among aBTC, aUSD, primeBTC, primeUSD and aETH, plus four opted-in composable
+aETH sell cases (aUSD, primeUSD, aBTC and primeBTC output):
 
-| Route type | Pairs, each tested in both directions |
+| Route type | Pairs |
 | --- | --- |
 | Asset swap | aBTC ↔ aUSD |
 | Direct server RFQ | aETH ↔ aUSD |
 | Direct vault mint/redeem | aBTC ↔ primeBTC; aUSD ↔ primeUSD |
 | Vault plus swap | primeBTC ↔ aUSD; primeUSD ↔ aBTC |
 | Redeem, swap, mint | primeBTC ↔ primeUSD |
-| Composable aETH sell | aETH → aUSD; aETH → primeUSD |
+| Composable aETH sell | aETH → aUSD/primeUSD/aBTC/primeBTC |
 
 Inputs are 1 aUSD/primeUSD, 0.00001 aBTC/primeBTC, or 0.001 aETH. aETH uses
 9 decimals; aUSD uses 6. Each test checks an explicit expected token path and
@@ -72,12 +72,24 @@ ARCH_RPC_URL=https://rpc.mainnet.arch.network \
   corepack pnpm exec vitest run tests/quote.e2e.test.ts
 ```
 
-Append `-t aETH` to run all four ETH cases.
-Use `-t 'composable aETH'` to run only the two composable sell cases. These
-require zero/one account-reader calls, respectively, one fresh native aETH sell
+Append `-t aETH` to run all six ETH cases.
+Use `-t 'composable aETH'` to run only the four composable sell cases. These
+require zero/one/two/two account-reader calls for aUSD/primeUSD/aBTC/primeBTC,
+respectively, and one fresh native aETH sell
 RFQ, preserved terms/quote ID and original response, router instruction bundles,
-final-only slippage, and both transaction limits. `-t aETH` also includes these
-two cases in addition to the original direct ETH directions.
+final-only slippage, and both transaction limits. BTC outputs must use CLAMM
+after the native sell; primeBTC adds a final vault mint. The tests assert the
+explicit mint path, hop amounts, native compact terms, signer privileges,
+deduplicated account reads and deadline clamping. `-t aETH` also includes the
+original two direct ETH directions.
+
+The targeted composable run on **2026-11-03** passed **3/4**: aUSD and both
+new BTC outputs passed; primeUSD failed with `STALE_NAV` from the USD vault.
+The other 14 cases were filtered out. Both BTC outputs used two account-reader
+calls, with 1,105/1,338 bytes, respectively. The USD vault
+needs a fresh NAV before the primeUSD mint quote can pass. The report is
+`/tmp/router-aeth-clamm-smoke.log`. This run checks live quoting and instruction
+construction; server co-signing and transaction execution remain unverified.
 
 The RPC endpoint must match the client's `mainnet` network. Set `ARCH_RFQ_URL`
 to override the default RFQ base URL (including `/rfq`, without `/quote`). The
@@ -121,23 +133,34 @@ malformed payloads and HTTP errors without retries.
 
 ## aETH/aUSD direct RFQ coverage
 
-`composable-aeth.test.ts` adds 36 offline cases for the explicit sell opt-in,
+`composable-aeth.test.ts` has 44 offline cases for the explicit sell opt-in,
 market-specific edges/providers, shared-config edge identities, server capability
-filtering, deduplicated 15-pair metadata, and unchanged direct buys/defaults.
+filtering, deduplicated 17-pair metadata, and unchanged direct buys/defaults.
 It reuses the independent native aETH sell transaction and Rust vault-layout
 fixtures to verify original compact terms, native vault/nonce identities,
 the router's read-only maker signer, suffix fees and final slippage, u64 input
 precision, byte/account limits, expiry/timeout handling, malformed quotes,
 request snapshotting, actionable vault errors and no direct fallback. aUSD
 outputs read no accounts; primeUSD outputs use one four-account batch with
-no pool/tick reads. Unsupported BTC/reverse/receive paths reject before I/O.
+no pool/tick reads. BTC outputs cover PropAMM → CLAMM and the optional BTC
+vault mint, both within two reads, including expiry during tick loading and
+tick/cap failures without direct-sell fallback. Unsupported reverse/receive
+paths reject before I/O.
 Public consumer type tests cover the optional boolean flag.
 
-The temporary native audit described in the plan also passes the SDK's two
-unsigned router messages through the unmodified Rust server validator. That
-validates its quote/account contract; it does not co-sign, submit or execute.
-The final sell follow-up passes typecheck, build, and **882 offline tests**
-(16 live cases skipped). The targeted live composable sell run also passes both
+The CLAMM follow-up passes typecheck, build, and **901 offline tests** (18 live
+cases and the optional Rust interoperability test skipped). The HTTP example
+tests cover native sells without redundant expiry metadata, full-u64 encoded
+expiry and mismatched metadata, including both mixed BTC destinations.
+
+`propamm-clamm.interop.test.ts` separately passes all four SDK router packets
+through the external server's unmodified Rust validator and Arch 0.13 runtime
+sanitizer. See [the replay instructions](fixtures/propamm-clamm/README.md).
+It validates quote/account contracts and packet limits; it does not co-sign,
+submit or execute. Both BTC quote-only smoke cases now pass live; server
+co-signing and execution remain unverified.
+
+The earlier targeted live composable USD sell run passed both
 cases: zero/one reader calls and 756/989 bytes with required signatures reserved.
 The other 14 live cases were filtered out, not rerun. Reports and the native
 validator replay are recorded in the plan's composable-sell follow-up.

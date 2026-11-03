@@ -80,7 +80,25 @@ function decodeQuote(raw: string, buy: boolean) {
       }),
     },
   };
-  return { transaction, quoteId: wire.quote_id, expiresAtMs: safeU64(wire.expires_at_ms),
+  let expiresAtMs: bigint;
+  if (buy) {
+    expiresAtMs = safeU64(wire.expires_at_ms);
+  } else {
+    // Native sell responses need no redundant expiry metadata. Read the exact
+    // u64 from the trade; the SDK still validates the complete native packet.
+    const trade = transaction.message.instructions[0];
+    const program = trade && transaction.message.account_keys[trade.program_id_index];
+    if (transaction.message.instructions.length !== 1 || !trade || !program
+      || base58.encode(program) !== market.programId || trade.data.length !== 50
+      || trade.data[0] !== 2 || trade.data[1] !== 1) {
+      throw new RouterSdkError("INVALID_RFQ", "Expected a native aETH sell with an explicit minimum output.");
+    }
+    expiresAtMs = new DataView(trade.data.buffer, trade.data.byteOffset, trade.data.byteLength).getBigUint64(18, true);
+    if (wire.expires_at_ms !== undefined && safeU64(wire.expires_at_ms) !== expiresAtMs) {
+      throw new RouterSdkError("INVALID_RFQ", "RFQ expiry metadata differs from the native sell.");
+    }
+  }
+  return { transaction, quoteId: wire.quote_id, expiresAtMs,
     estimatedAmountOut: safeU64(buy ? estimate.base_amount : estimate.quote_amount) };
 }
 
