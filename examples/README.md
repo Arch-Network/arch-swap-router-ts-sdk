@@ -49,6 +49,21 @@ the opt-in above uses `createRouterClient` directly. Treasury buys keep their
 original flow. Reverse prime-token/BTC buys and aETH receive sizing are
 not enabled by this option. No signing or submission occurs when quoting.
 
+## Native buy quotes
+
+Add `composableAethBuys: true` to the client above, using the same provider, to
+enable regular swaps into aETH. Set `outputMint: MAINNET_AETH_USD.baseMint` and
+choose aUSD, primeUSD, aBTC or primeBTC as the input. The provider receives one
+native aUSD → aETH buy for the net aUSD estimate after any redeem/CLAMM prefix.
+Account reads are respectively 0, 1, 2 and 2. Both flags together expose all
+20 directed pairs among the five assets.
+
+Native buys require a one-instruction PropAMM response and available aETH vault
+inventory. The server at the reference endpoint currently returns treasury-mint
+buys, so its actual market configuration/deployment must switch to native buys
+before live buy quotes pass. No treasury-mint edge or automatic fallback is added.
+The original `prepareAethUsdSwap` direct example retains its existing contract.
+
 Run the offline example tests from the SDK root:
 
 ```sh
@@ -139,10 +154,10 @@ must persist the exact signed body and quote ID using its own storage.
 The HTTP request writes `amountIn` directly as a JSON numeric u64 literal without
 converting it to `number`. The compact response decoder uses `JSON.parse` and
 rejects output/expiry metadata that is not a nonnegative safe integer before
-conversion to `bigint`. Native sells derive expiry directly from the instruction's
+conversion to `bigint`. Native swaps derive expiry directly from the instruction's
 u64 bytes, so `expires_at_ms` may be omitted. If supplied, it must match those
 bytes. Treasury buys still require expiry metadata. Replace the JSON decoder
-with a lossless adapter for larger output or buy-expiry metadata values.
+with a lossless adapter for larger output or treasury-buy expiry metadata values.
 It never converts a rounded unsafe number into an accepted `bigint`.
 Byte values and account indexes are range-checked before normalization.
 

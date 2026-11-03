@@ -21,14 +21,18 @@ describe("composable aETH sell discovery", () => {
   it("registers distinct market edges even when BTC and ETH share a config", () => {
     const graph = buildRouteGraph(config, ["btc-usd", "aeth-usd"]);
     const edges = [...graph.values()].flat();
-    expect(edges).toHaveLength(9);
-    expect(new Set(edges.map((edge) => edge.id)).size).toBe(9);
+    expect(edges).toHaveLength(10);
+    expect(new Set(edges.map((edge) => edge.id)).size).toBe(10);
     const eth = edges.filter((edge) => edge.venue === "propamm" && edge.marketId === "aeth-usd");
-    expect(eth).toMatchObject([{ inputMint: market.baseMint, outputMint: market.quoteMint, allowClamm: true }]);
+    expect(eth).toHaveLength(2);
+    expect(eth).toEqual(expect.arrayContaining([
+      expect.objectContaining({ inputMint: market.baseMint, outputMint: market.quoteMint, allowClamm: true }),
+      expect.objectContaining({ inputMint: market.quoteMint, outputMint: market.baseMint, allowClamm: true }),
+    ]));
     expect(config.propammMarkets.map((entry) => entry.config)).toEqual([market.config, market.config]);
     expect(config.propammMarkets.every((entry) => Object.isFrozen(entry) && Object.isFrozen(entry.sides))).toBe(true);
     expect(findRoutes(graph, market.baseMint, usd.shareMint)[0]!.steps.map((step) => step.operation)).toEqual(["propamm", "vaultMint"]);
-    expect(supportedPairs(graph)).toHaveLength(16);
+    expect(supportedPairs(graph)).toHaveLength(20);
   });
 
   it("requires market opt-in and never creates a testnet ETH market", () => {
@@ -37,7 +41,7 @@ describe("composable aETH sell discovery", () => {
       expect(graph.has(market.baseMint)).toBe(false);
     }
     const graph = buildRouteGraph(config, ["aeth-usd"]);
-    expect([...graph.values()].flat().filter((edge) => edge.venue === "propamm")).toHaveLength(1);
+    expect([...graph.values()].flat().filter((edge) => edge.venue === "propamm")).toHaveLength(2);
   });
 
   it.each([config.mints.aBTC, config.mints.primeBTC])("discovers a single mixed CLAMM/RFQ path to %s", (output) => {

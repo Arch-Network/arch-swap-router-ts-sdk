@@ -73,6 +73,15 @@ export function clientWithComposableAethSells(source: RouterDataSource, directRf
   return createRouterClient(options);
 }
 
+export function clientWithNativeAethSwaps(source: RouterDataSource, directRfqQuoteProvider: DirectRfqQuoteProvider): RouterClient {
+  const options: RouterClientOptions = { source, network: "mainnet", directRfqQuoteProvider,
+    composableAethSells: true, composableAethBuys: true };
+  // @ts-expect-error Buy opt-in must be boolean.
+  const invalid: RouterClientOptions = { ...options, composableAethBuys: "true" };
+  void invalid;
+  return createRouterClient(options);
+}
+
 export function serverQuoteRequiresId(quote: Omit<ServerTransactionSwapQuote, "rfq">) {
   // @ts-expect-error Every server transaction needs RFQ submission metadata.
   const invalid: SwapQuote = quote;

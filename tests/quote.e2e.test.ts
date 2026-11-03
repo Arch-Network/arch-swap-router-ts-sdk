@@ -138,87 +138,97 @@ it.skipIf(!rpcUrl).each(routes.map((route) => ({
 }, 30_000);
 
 const composableAethRoutes = [
-  { output: "aUSD", path: ["aETH", "aUSD"], operations: ["propamm"], reads: 0, initialAccounts: 0 },
-  { output: "primeUSD", path: ["aETH", "aUSD", "primeUSD"], operations: ["propamm", "vaultMint"], reads: 1, initialAccounts: 4 },
-  { output: "aBTC", path: ["aETH", "aUSD", "aBTC"], operations: ["propamm", "clamm"], reads: 2, initialAccounts: 3 },
-  { output: "primeBTC", path: ["aETH", "aUSD", "aBTC", "primeBTC"], operations: ["propamm", "clamm", "vaultMint"], reads: 2, initialAccounts: 6 },
+  { side: "sell", input: "aETH", output: "aUSD", path: ["aETH", "aUSD"], operations: ["propamm"], reads: 0, initialAccounts: 0 },
+  { side: "sell", input: "aETH", output: "primeUSD", path: ["aETH", "aUSD", "primeUSD"], operations: ["propamm", "vaultMint"], reads: 1, initialAccounts: 4 },
+  { side: "sell", input: "aETH", output: "aBTC", path: ["aETH", "aUSD", "aBTC"], operations: ["propamm", "clamm"], reads: 2, initialAccounts: 3 },
+  { side: "sell", input: "aETH", output: "primeBTC", path: ["aETH", "aUSD", "aBTC", "primeBTC"], operations: ["propamm", "clamm", "vaultMint"], reads: 2, initialAccounts: 6 },
+  { side: "buy", input: "aUSD", output: "aETH", path: ["aUSD", "aETH"], operations: ["propamm"], reads: 0, initialAccounts: 0 },
+  { side: "buy", input: "primeUSD", output: "aETH", path: ["primeUSD", "aUSD", "aETH"], operations: ["vaultRedeem", "propamm"], reads: 1, initialAccounts: 4 },
+  { side: "buy", input: "aBTC", output: "aETH", path: ["aBTC", "aUSD", "aETH"], operations: ["clamm", "propamm"], reads: 2, initialAccounts: 3 },
+  { side: "buy", input: "primeBTC", output: "aETH", path: ["primeBTC", "aBTC", "aUSD", "aETH"], operations: ["vaultRedeem", "clamm", "propamm"], reads: 2, initialAccounts: 6 },
 ] as const;
 
-it.skipIf(!rpcUrl).each(composableAethRoutes)("gets a live mainnet composable aETH → $output quote", async ({ output, path, operations, reads, initialAccounts }) => {
-  const rpc = new RpcConnection(rpcUrl!);
-  const source = { getAccounts: vi.fn(async (addresses: readonly string[]) => {
-    const accounts = await rpc.getMultipleAccounts(addresses.map((address) => base58.decode(address)));
-    return accounts.map((account) => account === null ? null : {
-      ...account, owner: Uint8Array.from(account.owner), data: Uint8Array.from(account.data), utxo: account.utxo ?? "",
+for (const side of ["sell", "buy"] as const) {
+  it.skipIf(!rpcUrl).each(composableAethRoutes.filter(route => route.side === side))(`gets a live mainnet composable aETH ${side}: $input → $output quote`, async ({ input, output, path, operations, reads, initialAccounts }) => {
+    const rpc = new RpcConnection(rpcUrl!);
+    const source = { getAccounts: vi.fn(async (addresses: readonly string[]) => {
+      const accounts = await rpc.getMultipleAccounts(addresses.map((address) => base58.decode(address)));
+      return accounts.map((account) => account === null ? null : {
+        ...account, owner: Uint8Array.from(account.owner), data: Uint8Array.from(account.data), utxo: account.utxo ?? "",
+      });
+    }) };
+    const post = vi.fn(async (url: string, body: string) => {
+      const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body,
+        signal: AbortSignal.timeout(1800) });
+      const raw = await response.text();
+      if (!response.ok) throw new Error(`RFQ HTTP ${response.status}: ${raw}`);
+      return raw;
     });
-  }) };
-  const post = vi.fn(async (url: string, body: string) => {
-    const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body,
-      signal: AbortSignal.timeout(1800) });
-    const raw = await response.text();
-    if (!response.ok) throw new Error(`RFQ HTTP ${response.status}: ${raw}`);
-    return raw;
-  });
-  const httpProvider = createAethUsdRfqProvider(rfqUrl, post);
-  let originalBytes: string | undefined;
-  const directRfqQuoteProvider = { quoteExactIn: vi.fn(async (request: QuoteExactInRequest) => {
-    const rfq = await httpProvider.quoteExactIn(request);
-    originalBytes = hex.encode(TransactionUtil.serialize(rfq.transaction));
-    return rfq;
-  }) };
-  const router = createRouterClient({ source, network: "mainnet", directRfqQuoteProvider, composableAethSells: true });
-  const request = { inputMint: ethUsd.baseMint, outputMint: router.mints![output], amountIn: 1_000_000n,
-    user, slippageBps: 100, deadlineMs: Date.now() + 30_000 };
-  const quote = await router.quoteExactIn(request);
-  if (quote.execution === "serverTransaction") throw new Error("Expected composable sell instructions");
-  expect(directRfqQuoteProvider.quoteExactIn).toHaveBeenCalledExactlyOnceWith({ ...request, outputMint: ethUsd.quoteMint });
-  expect(post).toHaveBeenCalledOnce();
-  expect(post.mock.calls[0]![0]).toBe(`${rfqUrl.replace(/\/+$/, "")}/quote`);
-  expect(source.getAccounts).toHaveBeenCalledTimes(reads);
-  if (reads > 0) expect(source.getAccounts.mock.calls[0]![0]).toHaveLength(initialAccounts);
-  if (reads === 2) {
-    const ticks = source.getAccounts.mock.calls[1]![0];
-    expect(ticks.length).toBeGreaterThan(0);
-    expect(ticks.length).toBeLessThanOrEqual(3);
-  }
-  const addresses = source.getAccounts.mock.calls.flatMap(([keys]) => keys);
-  expect(new Set(addresses).size).toBe(addresses.length);
-  const rfqCall = directRfqQuoteProvider.quoteExactIn.mock.results[0];
-  if (rfqCall?.type !== "return") throw new Error("Native aETH sell RFQ was not requested");
-  const rfq = await rfqCall.value;
-  expect(hex.encode(TransactionUtil.serialize(rfq.transaction))).toBe(originalBytes);
-  expect(rfq.transaction.signatures).toEqual([]);
-  expect(quote.rfq).toEqual({ quoteId: rfq.quoteId });
-  expect(quote.inputMint).toBe(request.inputMint);
-  expect(quote.outputMint).toBe(request.outputMint);
-  expect(quote.amountIn).toBe(request.amountIn);
-  expect(quote.hops.map((hop) => hop.kind)).toEqual(operations);
-  const mints = { ...router.mints!, aETH: ethUsd.baseMint };
-  expect([quote.inputMint, ...quote.hops.map((hop) => hop.outputMint)]).toEqual(path.map((mint) => mints[mint]));
-  expect(quote.hops[0]!.estimatedAmountOut).toBe(rfq.estimatedAmountOut);
-  for (const [index, hop] of quote.hops.entries()) {
-    const previous = quote.hops[index - 1];
-    expect(hop.inputMint).toBe(previous?.outputMint ?? request.inputMint);
-    expect(hop.amountIn).toBe(previous?.estimatedAmountOut ?? request.amountIn);
-    expect(hop.estimatedAmountOut).toBeGreaterThan(0n);
-  }
-  expect(quote.hops.at(-1)!.estimatedAmountOut).toBe(quote.estimatedAmountOut);
-  expect(quote.estimatedAmountOut).toBeGreaterThan(0n);
-  expect(quote.minAmountOut).toBe(quote.estimatedAmountOut * 9900n / 10_000n);
-  expect(quote.deadlineMs).toBeGreaterThan(Date.now());
-  expect(quote.deadlineMs).toBeLessThanOrEqual(request.deadlineMs);
-  expect(BigInt(quote.deadlineMs)).toBeLessThanOrEqual(rfq.expiresAtMs);
-  // Preserve the native compact quote in the first router hop, including its
-  // side, amounts, expiry and nonce; only the enclosing router message is new.
-  expect(quote.instructions[1]!.data.subarray(27, 60)).toEqual(rfq.transaction.message.instructions[0]!.data.subarray(1, 34));
-  const message = compileRouterMessage(quote.instructions, user, new Uint8Array(32));
-  const signedSize = TransactionUtil.serializedSize({ version: 0, message, signatures: [new Uint8Array(64), new Uint8Array(64)] });
-  expect(message.header).toMatchObject({ num_required_signatures: 2, num_readonly_signed_accounts: 1 });
-  expect(message.account_keys.slice(0, 2).map(base58.encode)).toEqual([user, ethUsd.quoteSigner]);
-  expect(message.account_keys.length).toBeLessThanOrEqual(MAX_ACCOUNTS_PER_TRANSACTION);
-  expect(signedSize).toBeLessThanOrEqual(TRANSACTION_SIZE_LIMIT);
-  console.log(`Composable aETH → ${output}: ${source.getAccounts.mock.calls.length} account-reader calls, ${signedSize} signed bytes`);
-}, 30_000);
+    const httpProvider = createAethUsdRfqProvider(rfqUrl, post);
+    let originalBytes: string | undefined;
+    const directRfqQuoteProvider = { quoteExactIn: vi.fn(async (request: QuoteExactInRequest) => {
+      const rfq = await httpProvider.quoteExactIn(request);
+      originalBytes = hex.encode(TransactionUtil.serialize(rfq.transaction));
+      return rfq;
+    }) };
+    const router = createRouterClient({ source, network: "mainnet", directRfqQuoteProvider, composableAethSells: true, composableAethBuys: true });
+    const mints = { ...router.mints!, aETH: ethUsd.baseMint };
+    const request = { inputMint: mints[input], outputMint: mints[output], amountIn: input === "aETH" ? 1_000_000n : amounts[input],
+      user, slippageBps: 100, deadlineMs: Date.now() + 30_000 };
+    const quote = await router.quoteExactIn(request);
+    if (quote.execution === "serverTransaction") throw new Error("Expected composable swap instructions");
+    const rfqIndex = quote.hops.findIndex(hop => hop.kind === "propamm");
+    const rfqHop = quote.hops[rfqIndex]!;
+    expect(directRfqQuoteProvider.quoteExactIn).toHaveBeenCalledExactlyOnceWith({
+      ...request, inputMint: rfqHop.inputMint, outputMint: rfqHop.outputMint, amountIn: rfqHop.amountIn,
+    });
+    expect(post).toHaveBeenCalledOnce();
+    expect(post.mock.calls[0]![0]).toBe(`${rfqUrl.replace(/\/+$/, "")}/quote`);
+    expect(source.getAccounts).toHaveBeenCalledTimes(reads);
+    if (reads > 0) expect(source.getAccounts.mock.calls[0]![0]).toHaveLength(initialAccounts);
+    if (reads === 2) {
+      const ticks = source.getAccounts.mock.calls[1]![0];
+      expect(ticks.length).toBeGreaterThan(0);
+      expect(ticks.length).toBeLessThanOrEqual(3);
+    }
+    const addresses = source.getAccounts.mock.calls.flatMap(([keys]) => keys);
+    expect(new Set(addresses).size).toBe(addresses.length);
+    const rfqCall = directRfqQuoteProvider.quoteExactIn.mock.results[0];
+    if (rfqCall?.type !== "return") throw new Error("Native aETH swap RFQ was not requested");
+    const rfq = await rfqCall.value;
+    expect(hex.encode(TransactionUtil.serialize(rfq.transaction))).toBe(originalBytes);
+    expect(rfq.transaction.signatures).toEqual([]);
+    expect(quote.rfq).toEqual({ quoteId: rfq.quoteId });
+    expect(quote.inputMint).toBe(request.inputMint);
+    expect(quote.outputMint).toBe(request.outputMint);
+    expect(quote.amountIn).toBe(request.amountIn);
+    expect(quote.hops.map((hop) => hop.kind)).toEqual(operations);
+    expect([quote.inputMint, ...quote.hops.map((hop) => hop.outputMint)]).toEqual(path.map((mint) => mints[mint]));
+    expect(rfqHop.estimatedAmountOut).toBe(rfq.estimatedAmountOut);
+    for (const [index, hop] of quote.hops.entries()) {
+      const previous = quote.hops[index - 1];
+      expect(hop.inputMint).toBe(previous?.outputMint ?? request.inputMint);
+      expect(hop.amountIn).toBe(previous?.estimatedAmountOut ?? request.amountIn);
+      expect(hop.estimatedAmountOut).toBeGreaterThan(0n);
+    }
+    expect(quote.hops.at(-1)!.estimatedAmountOut).toBe(quote.estimatedAmountOut);
+    expect(quote.estimatedAmountOut).toBeGreaterThan(0n);
+    expect(quote.minAmountOut).toBe(quote.estimatedAmountOut * 9900n / 10_000n);
+    expect(quote.deadlineMs).toBeGreaterThan(Date.now());
+    expect(quote.deadlineMs).toBeLessThanOrEqual(request.deadlineMs);
+    expect(BigInt(quote.deadlineMs)).toBeLessThanOrEqual(rfq.expiresAtMs);
+    // Preserve native terms in the appropriate router hop, including its side.
+    const rfqOffset = 26 + operations.slice(0, rfqIndex).reduce((length, kind) => length + (kind === "clamm" ? 19 : 1), 0);
+    expect(quote.instructions[1]!.data.subarray(rfqOffset + 1, rfqOffset + 34)).toEqual(rfq.transaction.message.instructions[0]!.data.subarray(1, 34));
+    const message = compileRouterMessage(quote.instructions, user, new Uint8Array(32));
+    const signedSize = TransactionUtil.serializedSize({ version: 0, message, signatures: [new Uint8Array(64), new Uint8Array(64)] });
+    expect(message.header).toMatchObject({ num_required_signatures: 2, num_readonly_signed_accounts: 1 });
+    expect(message.account_keys.slice(0, 2).map(base58.encode)).toEqual([user, ethUsd.quoteSigner]);
+    expect(message.account_keys.length).toBeLessThanOrEqual(MAX_ACCOUNTS_PER_TRANSACTION);
+    expect(signedSize).toBeLessThanOrEqual(TRANSACTION_SIZE_LIMIT);
+    console.log(`Composable ${input} → ${output}: ${source.getAccounts.mock.calls.length} account-reader calls, ${signedSize} signed bytes`);
+  }, 30_000);
+}
 
 it.skipIf(!rpcUrl).each([
   { input: "aUSD", output: "aETH", inputMint: ethUsd.quoteMint, outputMint: ethUsd.baseMint,

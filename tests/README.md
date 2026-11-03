@@ -2,9 +2,9 @@
 
 ## Live quote smoke test
 
-`quote.e2e.test.ts` contains 18 live quote cases: the original 14 directions
-among aBTC, aUSD, primeBTC, primeUSD and aETH, plus four opted-in composable
-aETH sell cases (aUSD, primeUSD, aBTC and primeBTC output):
+`quote.e2e.test.ts` contains 22 live quote cases: the original 14 directions
+among aBTC, aUSD, primeBTC, primeUSD and aETH, plus eight opted-in composable
+aETH buy/sell cases against aUSD, primeUSD, aBTC and primeBTC:
 
 | Route type | Pairs |
 | --- | --- |
@@ -13,7 +13,7 @@ aETH sell cases (aUSD, primeUSD, aBTC and primeBTC output):
 | Direct vault mint/redeem | aBTC ↔ primeBTC; aUSD ↔ primeUSD |
 | Vault plus swap | primeBTC ↔ aUSD; primeUSD ↔ aBTC |
 | Redeem, swap, mint | primeBTC ↔ primeUSD |
-| Composable aETH sell | aETH → aUSD/primeUSD/aBTC/primeBTC |
+| Composable aETH swap | aETH ↔ aUSD/primeUSD/aBTC/primeBTC |
 
 Inputs are 1 aUSD/primeUSD, 0.00001 aBTC/primeBTC, or 0.001 aETH. aETH uses
 9 decimals; aUSD uses 6. Each test checks an explicit expected token path and
@@ -22,7 +22,7 @@ contain instructions, every hop must consume the preceding hop's estimated
 output, and the final hop must match the overall estimate.
 
 Router instruction bundles are compiled with a zero blockhash for size
-measurement. ETH/USD quotes retain the original server transaction and are
+measurement. Legacy direct ETH/USD quotes retain the original server transaction and are
 measured without recompilation. All routes are checked against the dependency's
 **4,096-byte** and **50-account-key** limits, including program keys and one
 64-byte signature for CLAMM/vault-only routes or both signatures for PropAMM/direct
@@ -72,8 +72,10 @@ ARCH_RPC_URL=https://rpc.mainnet.arch.network \
   corepack pnpm exec vitest run tests/quote.e2e.test.ts
 ```
 
-Append `-t aETH` to run all six ETH cases.
-Use `-t 'composable aETH'` to run only the four composable sell cases. These
+Append `-t aETH` to run all ten ETH cases.
+Use `-t 'composable aETH sell'` for the four composable sells,
+`-t 'composable aETH buy'` for the four native buys, or
+`-t 'composable aETH'` for all eight. Sells
 require zero/one/two/two account-reader calls for aUSD/primeUSD/aBTC/primeBTC,
 respectively, and one fresh native aETH sell
 RFQ, preserved terms/quote ID and original response, router instruction bundles,
@@ -82,6 +84,16 @@ after the native sell; primeBTC adds a final vault mint. The tests assert the
 explicit mint path, hop amounts, native compact terms, signer privileges,
 deduplicated account reads and deadline clamping. `-t aETH` also includes the
 original two direct ETH directions.
+
+Native buys use the same zero/one/two/two read budget for aUSD/primeUSD/aBTC/
+primeBTC input. They must consume the net aUSD estimate of their prefix and end
+with a native PropAMM buy. The live native buy run on **2026-11-03** executed all
+four cases and failed all four: the deployed service returned a token transfer
+plus bridge treasury mint, which the native mode rejects with `INVALID_RFQ`.
+An additional quote capture confirmed instruction tags 3 and 21. Switch the
+actual service's aETH market to native buys and provide aETH inventory before
+rerunning. Report: `/tmp/router-native-aeth-buy-smoke.log`. Treasury responses
+are not accepted as native swaps or silently retried through a minting flow.
 
 The targeted composable run on **2026-11-03** passed **3/4**: aUSD and both
 new BTC outputs passed; primeUSD failed with `STALE_NAV` from the USD vault.
@@ -148,12 +160,18 @@ tick/cap failures without direct-sell fallback. Unsupported reverse/receive
 paths reject before I/O.
 Public consumer type tests cover the optional boolean flag.
 
-The CLAMM follow-up passes typecheck, build, and **901 offline tests** (18 live
+The native buy follow-up passes typecheck, build, and **945 offline tests** (22 live
 cases and the optional Rust interoperability test skipped). The HTTP example
 tests cover native sells without redundant expiry metadata, full-u64 encoded
 expiry and mismatched metadata, including both mixed BTC destinations.
 
-`propamm-clamm.interop.test.ts` separately passes all four SDK router packets
+`composable-aeth-buy.test.ts` adds 34 tests for all four native buy paths,
+independent buy/sell opt-ins, 14/17/20-pair metadata, prefix-sized RFQs, input
+precision, deadlines, quote/account tampering and rejection of treasury packets.
+`examples/aeth-native-buy.test.ts` adds 10 mocked HTTP cases, including native
+buys without expiry metadata, full-u64 fields and unsafe numeric metadata.
+
+`propamm-clamm.interop.test.ts` separately passes all eight SDK router packets
 through the external server's unmodified Rust validator and Arch 0.13 runtime
 sanitizer. See [the replay instructions](fixtures/propamm-clamm/README.md).
 It validates quote/account contracts and packet limits; it does not co-sign,

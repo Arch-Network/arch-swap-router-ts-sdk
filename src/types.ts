@@ -101,8 +101,10 @@ export interface RouterClientOptions {
   readonly propAmmQuoteProvider?: PropAmmQuoteProvider;
   /** Exact-input server transactions for the fixed mainnet aETH/aUSD market. */
   readonly directRfqQuoteProvider?: DirectRfqQuoteProvider;
-  /** Mainnet only; reuse the direct provider for aETH -> aUSD/primeUSD router sells. */
+  /** Mainnet only; reuse the direct provider for router sells to aUSD/primeUSD/aBTC/primeBTC. */
   readonly composableAethSells?: boolean;
+  /** Mainnet only; require native PropAMM buys from the direct provider for router routes into aETH. */
+  readonly composableAethBuys?: boolean;
 }
 
 export interface RouterClient {

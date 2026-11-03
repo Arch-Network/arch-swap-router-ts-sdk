@@ -9,7 +9,7 @@ import { MAINNET_AETH_USD as market } from "../src/index.js";
 import { NETWORKS } from "../src/config/networks.js";
 import { compileRouterMessage } from "../src/utils.js";
 import fixtures from "./fixtures/aeth-usd/transactions.json" with { type: "json" };
-import { setupComposableAeth } from "./fixtures/composable-aeth.js";
+import { setupComposableAeth, setupComposableAethBuy } from "./fixtures/composable-aeth.js";
 
 const run = promisify(execFile);
 const repository = process.env.PROPAMM_REPO;
@@ -17,13 +17,14 @@ afterEach(() => { vi.restoreAllMocks(); });
 
 // Explicit opt-in keeps the regular SDK suite independent of a Rust checkout.
 describe.skipIf(!repository)("SDK packets against the external PropAMM CLAMM validator", () => {
-  it("accepts all four aETH sell routes and rejects altered terms/programs/oracles", async () => {
+  it("accepts all eight aETH swap routes and rejects altered terms/programs/oracles", async () => {
     vi.spyOn(Date, "now").mockReturnValue(fixtures.now_ms);
     const repo = await realpath(repository!);
     const config = NETWORKS.mainnet;
     const results = [];
-    for (const outputMint of [market.quoteMint, config.mints.primeUSD, config.mints.aBTC, config.mints.primeBTC]) {
-      const state = setupComposableAeth(outputMint);
+    const assets = [market.quoteMint, config.mints.primeUSD, config.mints.aBTC, config.mints.primeBTC];
+    const states = [...assets.map(setupComposableAeth), ...assets.map(setupComposableAethBuy)];
+    for (const state of states) {
       const quote = await state.client.quoteExactIn(state.request);
       if (quote.execution === "serverTransaction") throw new Error("Expected a router packet");
       const message = compileRouterMessage(quote.instructions, state.request.user, new Uint8Array(32));
@@ -31,13 +32,18 @@ describe.skipIf(!repository)("SDK packets against the external PropAMM CLAMM val
       const signedSize = TransactionUtil.serializedSize(transaction);
       expect(signedSize).toBeLessThanOrEqual(4096);
       expect(state.source.getAccounts.mock.calls.length).toBeLessThanOrEqual(2);
-      results.push({ outputMint, hops: quote.hops.length, mixed: quote.hops.some(hop => hop.kind === "clamm"),
+      const rfq = await state.directRfqQuoteProvider.quoteExactIn.mock.results[0]!.value;
+      const data = rfq.transaction.message.instructions[0]!.data;
+      const readU64 = (offset: number) => new DataView(data.buffer, data.byteOffset, data.byteLength).getBigUint64(offset, true).toString();
+      const rfqOffset = 26 + quote.hops.slice(0, quote.hops.findIndex(hop => hop.kind === "propamm"))
+        .reduce((length, hop) => length + (hop.kind === "clamm" ? 19 : 1), 0);
+      results.push({ inputMint: state.request.inputMint, outputMint: state.request.outputMint,
+        hops: quote.hops.length, mixed: quote.hops.some(hop => hop.kind === "clamm"),
+        rfqFirst: quote.hops[0]!.kind === "propamm", rfqOffset,
+        terms: { side: data[1] === 0 ? "buy" : "sell", baseAmount: readU64(2), quoteAmount: readU64(10), expiry: readU64(18), nonce: readU64(26) },
         reads: state.source.getAccounts.mock.calls.length, signedSize, accounts: message.account_keys.length,
         transaction: TransactionUtil.toNumberArray(transaction) });
     }
-    const native = setupComposableAeth();
-    const data = native.rfq.transaction.message.instructions[0]!.data;
-    const readU64 = (offset: number) => new DataView(data.buffer, data.byteOffset, data.byteLength).getBigUint64(offset, true).toString();
     const directory = await mkdtemp(join(tmpdir(), "router-propamm-clamm-"));
     try {
       await mkdir(join(directory, "src"));
@@ -61,8 +67,7 @@ propamm-config = { path = ${JSON.stringify(join(repo, "config"))} }
 `);
       const packets = join(directory, "packets.json");
       await writeFile(packets, JSON.stringify({
-        base: market.baseMint, quote: market.quoteMint, user: native.request.user,
-        baseAmount: readU64(2), quoteAmount: readU64(10), expiry: readU64(18), nonce: readU64(26),
+        base: market.baseMint, quote: market.quoteMint, user: fixtures.user,
         router: config.programs.routerProgramId, vault: config.programs.vaultProgramId,
         clamm: config.programs.clammProgramId, pool: config.venues.clamm.address,
         program: market.programId, config: market.config, maker: market.quoteSigner, now: fixtures.now_ms, results,
@@ -71,7 +76,7 @@ propamm-config = { path = ${JSON.stringify(join(repo, "config"))} }
         env: { ...process.env, CARGO_TARGET_DIR: join(tmpdir(), "router-propamm-clamm-target"), RUSTFLAGS: "--cap-lints=allow" },
         timeout: 180_000, maxBuffer: 1024 * 1024,
       });
-      expect(result.stdout.match(/^accepted /gm)).toHaveLength(4);
+      expect(result.stdout.match(/^accepted /gm)).toHaveLength(8);
       console.log(result.stdout.trim());
     } finally {
       await rm(directory, { recursive: true, force: true });

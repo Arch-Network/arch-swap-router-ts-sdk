@@ -1,7 +1,7 @@
 import { buildRouteGraph, findRoutes, supportedPairs } from "./config/routes.js";
 import { NETWORKS, type NetworkConfig } from "./config/networks.js";
 import { MAINNET_AETH_USD as ethUsd } from "./config/aeth-usd.js";
-import { composableAethSell, normalizeAethUsdBuy, normalizeAethUsdSell } from "./direct-rfq.js";
+import { composableAethSwap, normalizeAethUsdBuy, normalizeAethUsdSell } from "./direct-rfq.js";
 import { RouterSdkError } from "./errors.js";
 import { quoteCandidates } from "./quote-candidates.js";
 import { prepareQuoteState } from "./quote-state.js";
@@ -26,17 +26,20 @@ function validateRequest(request: QuoteExactInRequest | QuoteForOutputRequest, a
   }
 }
 
-export function createRouterClient({ source, network = "testnet", propAmmQuoteProvider, directRfqQuoteProvider, composableAethSells = false }: RouterClientOptions): RouterClient {
+export function createRouterClient({ source, network = "testnet", propAmmQuoteProvider, directRfqQuoteProvider, composableAethSells = false, composableAethBuys = false }: RouterClientOptions): RouterClient {
   if (!Object.hasOwn(NETWORKS, network)) {
     throw new RouterSdkError("INVALID_NETWORK", `Unknown network: ${network}.`);
   }
   const config: NetworkConfig | null = NETWORKS[network];
   const directProvider = network === "mainnet" ? directRfqQuoteProvider : undefined;
-  if (composableAethSells && !directProvider) {
-    throw new RouterSdkError("INVALID_REQUEST", "Composable aETH sells require a mainnet directRfqQuoteProvider.");
+  if ((composableAethSells || composableAethBuys) && !directProvider) {
+    throw new RouterSdkError("INVALID_REQUEST", "Composable aETH swaps require a mainnet directRfqQuoteProvider.");
   }
-  const enabledMarkets = [...(propAmmQuoteProvider ? ["btc-usd"] : []), ...(composableAethSells ? ["aeth-usd"] : [])];
-  const graph = config ? buildRouteGraph(config, enabledMarkets) : undefined;
+  const enabledMarkets = [...(propAmmQuoteProvider ? ["btc-usd"] : []), ...(composableAethSells || composableAethBuys ? ["aeth-usd"] : [])];
+  // Keep the fixed registry immutable; each direction has an independent opt-in.
+  const graph = config ? buildRouteGraph({ ...config, propammMarkets: (config.propammMarkets ?? []).map(market =>
+    market.id === "aeth-usd" ? { ...market, sides: market.sides.filter(side => side === "buy" ? composableAethBuys : composableAethSells) } : market),
+  }, enabledMarkets) : undefined;
   const pairs = graph ? supportedPairs(graph) : [];
   const directPairs = directProvider ? [
     { inputMint: ethUsd.quoteMint, outputMint: ethUsd.baseMint },
@@ -51,16 +54,17 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
       throw new RouterSdkError("UNSUPPORTED_PAIR", forOutput && directProvider && isAethUsdPair(inputMint, outputMint)
         ? "aETH/aUSD supports exact-input quotes only." : "The requested mint pair is not supported.");
     }
-    if (composableAethSells && inputMint === ethUsd.baseMint && deadlineMs <= Date.now()) {
-      throw new RouterSdkError("RFQ_EXPIRED", "Composable aETH sell deadline has expired.");
+    if (((composableAethSells && inputMint === ethUsd.baseMint) || (composableAethBuys && outputMint === ethUsd.baseMint))
+      && deadlineMs <= Date.now()) {
+      throw new RouterSdkError("RFQ_EXPIRED", "Composable aETH swap deadline has expired.");
     }
     const state = await prepareQuoteState(source, config, candidates);
     const providers = new Map<string, PropAmmQuoteProvider>();
     if (propAmmQuoteProvider) providers.set("btc-usd", propAmmQuoteProvider);
-    if (composableAethSells && directProvider) providers.set("aeth-usd", {
+    if ((composableAethSells || composableAethBuys) && directProvider) providers.set("aeth-usd", {
       async quoteExactIn(input) {
-        const sell = { ...input, slippageBps, deadlineMs };
-        return composableAethSell(sell, await directProvider.quoteExactIn({ ...sell }));
+        const swap = { ...input, slippageBps, deadlineMs };
+        return composableAethSwap(swap, await directProvider.quoteExactIn({ ...swap }));
       },
     });
     return quoteCandidates({
@@ -70,7 +74,8 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
   }
   async function quoteExactIn(request: QuoteExactInRequest): Promise<SwapQuote> {
     if (!directProvider || !isAethUsdPair(request.inputMint, request.outputMint)
-      || (composableAethSells && request.inputMint === ethUsd.baseMint)) return quote(request, request.amountIn, false);
+      || (composableAethSells && request.inputMint === ethUsd.baseMint)
+      || (composableAethBuys && request.outputMint === ethUsd.baseMint)) return quote(request, request.amountIn, false);
     // Keep the validated request stable across the provider's asynchronous call.
     const input = { ...request };
     validateRequest(input, input.amountIn, false);
