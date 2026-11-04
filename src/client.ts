@@ -29,6 +29,9 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
   const original = NETWORKS[network];
   const markets = network === "mainnet" ? directRfqMarkets.map((market, index) => {
     for (const key of ["baseMint", "quoteMint", "programId", "config", "quoteSigner", "treasuryAuthority", "bridgeProgramId", "tokenProgramId", "associatedTokenProgramId", "systemProgramId"] as const) decodeAddress(market[key]);
+    for (const key of ["tokenProgramId", "associatedTokenProgramId", "systemProgramId"] as const) {
+      if (market[key] !== original.programs[key]) throw new RouterSdkError("INVALID_REQUEST", "RFQ market programs must match the router network.");
+    }
     if (market.baseMint === market.quoteMint) throw new RouterSdkError("INVALID_REQUEST", "Distinct market mints required.");
     return Object.freeze({ ...market, id: `configured-${index}`, sides: ["buy", "sell"] as const, allowClamm: true });
   }) : [];

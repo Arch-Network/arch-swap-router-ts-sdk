@@ -91,3 +91,9 @@ describe("configured direct markets", () => {
     expect(() => createRouterClient({ ...options, directRfqMarkets: [{ ...hype, config: "bad" }] })).toThrow();
   });
 });
+
+it("rejects market programs incompatible with router composition", () => {
+  for (const key of ["tokenProgramId", "associatedTokenProgramId", "systemProgramId"] as const) {
+    expect(() => createRouterClient({ network: "mainnet", source: { getAccounts: async () => [] }, directRfqMarkets: [{ ...eth, [key]: eth.baseMint }] })).toThrow("programs must match");
+  }
+});
