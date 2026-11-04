@@ -13,6 +13,7 @@ export interface QuoteExactInRequest {
   readonly inputMint: Address;
   readonly outputMint: Address;
   readonly amountIn: bigint;
+  readonly routePreference?: "auto" | "vault" | "propamm";
   readonly slippageBps: number;
   readonly user: Address;
   /** Absolute Unix milliseconds: encoded by router instructions, a client submission deadline for server transactions. */
