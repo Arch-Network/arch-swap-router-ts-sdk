@@ -1,5 +1,4 @@
 import type { Address } from "../types.js";
-import { MAINNET_AETH_USD } from "./aeth-usd.js";
 
 /** Fixed deployments; callers select a network rather than supplying addresses. */
 export const TESTNET = Object.freeze({
@@ -72,6 +71,16 @@ export const MAINNET_VENUES = Object.freeze({
   }),
 });
 
+export const MAINNET_RFQ_DEPLOYMENT = Object.freeze({
+  programId: "5KMw4VNavLhM5wxTxyQGm8hs5ymFhqMCZ5BpkHybcEBV",
+  config: "3jwSNH8P5tNFMY72ZwFi5z3gEkK1vVor3xcAFvr4DHzr",
+  quoteSigner: "A97DopD3nWbcwj89Suma32AhGfGUiLYZZzKqpP3H1PiG",
+  treasuryAuthority: "GPoZuMS41Ct92nUUqWyu8dqCY74QkfHRX8N3RsYiTCAT",
+  bridgeProgramId: "F5uRFVRuupfFgw1L5x7uWt41ug7MTZr2BfnfZiFj12fk",
+} as const);
+
+export const MAINNET_AETH_MINT = "7g1nPCjKW7zzZ4q7mcABeFXaPSLfBQ6syrz4HnPGAVYt";
+
 export type Network = "testnet" | "mainnet";
 export type NetworkMints = Readonly<Record<keyof typeof TESTNET_MINTS, Address>>;
 export type ProgramIds = Readonly<Record<keyof typeof TESTNET, Address>>;
@@ -81,6 +90,8 @@ export interface VaultVenue {
   readonly shareMint: Address;
 }
 export interface PropAmmDeployment {
+  readonly treasuryAuthority?: Address;
+  readonly bridgeProgramId?: Address;
   readonly programId: Address;
   readonly config: Address;
   readonly baseMint: Address;
@@ -121,13 +132,11 @@ export const NETWORKS = Object.freeze({
     programs: MAINNET, mints: MAINNET_MINTS, venues: MAINNET_VENUES,
     propammMarkets: Object.freeze([Object.freeze({
       id: "btc-usd", sides: Object.freeze(["sell", "buy"] as const), allowClamm: false,
-      programId: "5KMw4VNavLhM5wxTxyQGm8hs5ymFhqMCZ5BpkHybcEBV",
-      config: "3jwSNH8P5tNFMY72ZwFi5z3gEkK1vVor3xcAFvr4DHzr",
+      programId: MAINNET_RFQ_DEPLOYMENT.programId, config: MAINNET_RFQ_DEPLOYMENT.config,
       baseMint: MAINNET_MINTS.aBTC, quoteMint: MAINNET_MINTS.aUSD,
     }), Object.freeze({
       id: "aeth-usd", sides: Object.freeze(["sell", "buy"] as const), allowClamm: true,
-      programId: MAINNET_AETH_USD.programId, config: MAINNET_AETH_USD.config,
-      baseMint: MAINNET_AETH_USD.baseMint, quoteMint: MAINNET_AETH_USD.quoteMint,
+      ...MAINNET_RFQ_DEPLOYMENT, baseMint: MAINNET_AETH_MINT, quoteMint: MAINNET_MINTS.aUSD,
     })]),
   }),
 } satisfies Record<Network, NetworkConfig | null>);

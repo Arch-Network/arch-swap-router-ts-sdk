@@ -21,7 +21,7 @@ function setup(side = "buy") {
   const source = { getAccounts: vi.fn(async () => { throw new Error("Unexpected read"); }) };
   const directRfqQuoteProvider = { quoteExactIn: vi.fn(async (_request: QuoteExactInRequest) => rfq) };
   const propAmmQuoteProvider = { quoteExactIn: vi.fn(async () => { throw new Error("Unexpected legacy RFQ"); }) };
-  const options = { source, network: "mainnet" as const, directRfqQuoteProvider, propAmmQuoteProvider };
+  const options = { source, network: "mainnet" as const, directRfqQuoteProvider, propAmmQuoteProvider, directRfqDeployment: market, directRfqMarkets: [market] };
   return { fixture, request, rfq, ...options, options, router: createRouterClient(options) };
 }
 

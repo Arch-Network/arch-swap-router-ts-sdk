@@ -7,18 +7,11 @@ One quote call returns one estimate with its
 instructions, sized from either a fixed input or an approximate receive amount.
 Supported pairs use graph-generated one-to-three-hop paths
 through the two vaults and the aBTC/aUSD CLAMM, with optional PropAMM RFQs for
-exact-input swaps on either network. An optional mainnet direct RFQ provider adds
-aUSD ↔ aETH exact-input swaps using the original server transactions.
-Opting into `composableAethSells` instead builds router instructions for aETH
-sales to aUSD or primeUSD, using the same direct RFQ provider.
+exact-input swaps on either network. A mainnet direct RFQ provider and an
+explicit market catalog enable additional inventory and treasury quotes.
 
-**Current status:** all 12 core directions support exact-input quotes and receive
-sizing. An opted-in mainnet direct RFQ provider adds the two aETH/aUSD exact-input
-directions. Unsupported or identical mint pairs reject with `UNSUPPORTED_PAIR`
-before account or provider calls.
-With `composableAethSells: true`, mainnet exposes 15 unique directed pairs:
-aETH → aUSD uses the router and aETH → primeUSD becomes available. Buys retain
-the original direct treasury transaction.
+All 12 core directions support exact-input quotes and receive sizing. Unsupported
+or identical mint pairs reject with `UNSUPPORTED_PAIR` before account or provider calls.
 
 **Latest offline validation (2026-11-03):** typecheck, build, and 882 tests pass,
 including composable aETH sells and the two-call account-loading budget. Both
@@ -42,11 +35,8 @@ output, with CLAMM winning ties; receive sizing selects the smallest valid input
 using only local vault/CLAMM estimates. Every returned bundle fits the dependency's
 transaction byte and account limits.
 The internal graph uses the selected registry, simple paths of at most three
-hops, and at most one PropAMM step. Markets come from the fixed registry, with
-no automatic discovery or public graph configuration. The co-signing server's
-current capabilities exclude routes mixing CLAMM and PropAMM. Default aETH
-server transactions stay on their separate dispatch path; opted-in sells reuse
-validated native quote terms in newly compiled router transactions.
+hops, and at most one PropAMM step. Core markets come from the network registry. Configured RFQ markets use
+validated native quote terms in composed router instructions.
 
 ## Frontend API
 
@@ -101,7 +91,7 @@ configured in [src/config/networks.ts](src/config/networks.ts). Its CLAMM pool
 orders aBTC as token A and aUSD as token B. Its vaults and prime-token mints
 match the mainnet-v2 deployment. The BTC RFQ and aETH market use the same
 PropAMM program and config. The client exposes all 12 core pairs, plus the two
-optional mainnet aETH/aUSD directions when `directRfqQuoteProvider` is configured.
+optional mainnet direct RFQ directions when a provider and catalog are configured.
 Supply a reader and optional RFQ providers for the selected
 network; there is no testnet fallback.
 Account validation, PDA/ATA derivation and instructions use the selected deployment.
@@ -339,131 +329,45 @@ internal to the SDK. Step 6 in the dynamic routing plan records final offline
 validation and live quote-only results; its two-call follow-up log records the
 latest loading changes and offline checks.
 
-## Composable aETH sells
+## Configure direct RFQ markets
 
-Enable the mainnet sell routes explicitly using the existing direct provider:
+Set `directRfqDeployment` once for the maker's program, config and quote
+signer. Add the treasury authority and bridge program there if the provider can
+return treasury-mint quotes. Each market lists only its mints and supported
+sides. Token programs come from the selected network, and the router derives
+market vaults from the config and mints.
+
+For example, opt in to the existing aETH market on mainnet:
 
 ```ts
 import {
-  createRouterClient, MAINNET_AETH_USD,
+  createRouterClient, MAINNET_AETH_USD, MAINNET_RFQ_DEPLOYMENT,
   type DirectRfqQuoteProvider, type RouterDataSource,
 } from "@arch-network/swap-router-sdk";
 
 declare const source: RouterDataSource;
 declare const directRfqQuoteProvider: DirectRfqQuoteProvider;
-declare const user: string;
 
 const router = createRouterClient({
-  network: "mainnet", source, directRfqQuoteProvider,
-  composableAethSells: true,
+  network: "mainnet",
+  source,
+  directRfqQuoteProvider,
+  directRfqDeployment: MAINNET_RFQ_DEPLOYMENT,
+  directRfqMarkets: [{
+    baseMint: MAINNET_AETH_USD.baseMint,
+    quoteMint: MAINNET_AETH_USD.quoteMint,
+    sides: ["buy", "sell"],
+  }],
 });
-const quote = await router.quoteExactIn({
-  inputMint: MAINNET_AETH_USD.baseMint,
-  outputMint: router.mints!.primeUSD, // Or MAINNET_AETH_USD.quoteMint for aUSD.
-  amountIn: 1_000_000n, // 0.001 aETH, with 9 decimals.
-  slippageBps: 100, user, deadlineMs: Date.now() + 30_000,
-});
-if (quote.execution === "serverTransaction") throw new Error("Expected a router sell");
-// Compile quote.instructions with compileRouterMessage and a fresh blockhash.
-// User-sign that complete message and submit it with quote.rfq!.quoteId.
 ```
 
-The direct provider always receives a native aETH → aUSD sell request, even
-when the final output is primeUSD. The SDK applies the existing strict sell
-validator, preserves its compact terms/quote ID, and constructs `[input ATA,
-router]`. The native response is left unchanged. A primeUSD suffix consumes the
-sell estimate, including vault fees/rounding; slippage applies once to final
-output. The server accepts a router-level final minimum instead of the direct
-trade's minimum. Existing quote/result/provider shapes remain unchanged; the
-new option defaults to false and requires a mainnet direct provider.
+Use the host application's mint registry to add other entries. An omitted or
+empty catalog enables no direct RFQ markets. The provider returns the original
+unsigned packet, quote ID, expiry and estimated output. The router validates
+the packet against the deployment, then uses its terms to build the route.
+Treasury identities are needed only when the packet uses treasury minting.
+Direct RFQ edges support exact input on mainnet.
 
-These sells return `RouterSwapQuote`, taking precedence over direct sell
-dispatch only when opted in. Buys still return the original
-`ServerTransactionSwapQuote`. Pair metadata is deduplicated. aETH receive
-sizing, reverse primeUSD → aETH, BTC compositions, and treasury-mint graph
-steps remain unsupported and reject before account/provider calls. A failed
-composable sell propagates its error without retrying it as a direct sell.
-
-Use the existing HTTP decoder from [examples/aeth-usd.ts](examples/aeth-usd.ts).
-For submission, compile and user-sign the new router message and send the flat
-transaction with `quote_id` to the RFQ server's `/rfq/swap`; the server adds its
-quote-signer signature. The server must trust this router and, for primeUSD,
-enable the matching vault program. Fresh RFQ and vault state, available aUSD
-inventory, and user balances remain execution prerequisites.
-
-## Direct RFQ transaction contracts
-
-`DirectRfqQuoteProvider` defines an application-owned provider for the fixed
-`MAINNET_AETH_USD` market. Its `quoteExactIn` receives the full
-`QuoteExactInRequest`, including `slippageBps` and `deadlineMs`, and returns:
-
-```ts
-interface DirectRfqQuote {
-  transaction: RuntimeTransaction; // Original unsigned server transaction.
-  quoteId: string;
-  expiresAtMs: bigint; // Unix milliseconds from the server.
-  estimatedAmountOut: bigint; // Raw output token units.
-}
-```
-
-Supply `directRfqQuoteProvider` with `network: "mainnet"` to add exactly two
-directions to `supportedPairs` (14 total): aUSD → aETH and aETH → aUSD.
-Use `MAINNET_AETH_USD.quoteMint` and `.baseMint` for these requests. Its aUSD
-mint is also `router.mints.aUSD`. aETH uses 9 decimal places; aUSD uses 6.
-
-```ts
-import { createRouterClient, MAINNET_AETH_USD, type DirectRfqQuoteProvider,
-  type RouterDataSource } from "@arch-network/swap-router-sdk";
-
-declare const source: RouterDataSource;
-declare const directRfqQuoteProvider: DirectRfqQuoteProvider;
-declare const user: string;
-
-const router = createRouterClient({ network: "mainnet", source, directRfqQuoteProvider });
-const buy = await router.quoteExactIn({
-  inputMint: MAINNET_AETH_USD.quoteMint, outputMint: MAINNET_AETH_USD.baseMint,
-  amountIn: 1_000_000n, slippageBps: 100, user, deadlineMs: Date.now() + 30_000,
-});
-// For a sell, reverse the mints and provide the raw aETH input amount.
-```
-
-The client validates the request before calling the provider once, with a
-two-second timeout. It validates the response's fixed programs, accounts, amounts,
-signers, expiry and transaction byte/account limits before returning it. Buys
-return the exact encoded mint payout as both estimate and minimum; sells return
-the signed output minimum after checking the requested slippage floor. Provider errors,
-invalid transactions and expiry errors propagate without retries or fallback.
-There are no account-reader calls on this path.
-
-Clients without this provider retain their existing pairs. The direct provider
-is inactive on testnet. ETH/USD receive sizing and other ETH combinations reject
-with `UNSUPPORTED_PAIR`. Existing `propAmmQuoteProvider` behavior is unchanged.
-
-Consumers must narrow the quote result before deciding how to sign:
-
-```ts
-import { compileRouterMessage, type SwapQuote } from "@arch-network/swap-router-sdk";
-
-declare const quote: SwapQuote;
-declare const user: string;
-declare const recentBlockhash: Uint8Array;
-
-if (quote.execution === "serverTransaction") {
-  const { transaction, rfq } = quote;
-  // Sign transaction.message exactly as returned, then submit the user-signed
-  // transaction to /rfq/swap with quote_id: rfq.quoteId before quote.deadlineMs.
-  // Do not replace its blockhash, recompile its message or append instructions.
-} else {
-  const message = compileRouterMessage(quote.instructions, user, recentBlockhash);
-  // Existing router signing/submission path.
-}
-```
-
-`deadlineMs` on a server-transaction result is a client submission deadline;
-it must not be written into the original message. The SDK does not own HTTP
-transport, wallet signing or submission.
-
-See [AETH_AUSD_SDK_HANDOVER.md](AETH_AUSD_SDK_HANDOVER.md) for the fixed deployment,
-HTTP provider mapping, signing/submission contract and offline verification evidence.
-The [working example](examples/README.md) wires HTTP, wallet signing, submission,
-confirmation and explicit retries; its mocked tests cover both directions.
+Compile the returned instructions with a fresh blockhash and submit the
+user-signed transaction with its quote ID for maker co-signing. See the
+[working example](examples/README.md).

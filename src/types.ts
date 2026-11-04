@@ -72,6 +72,21 @@ export interface DirectRfqQuote {
   readonly treasuryAuthorization?: TreasuryAuthorization;
 }
 
+/** Identities shared by the direct RFQ markets of one maker. */
+export interface DirectRfqDeployment {
+  readonly programId: Address;
+  readonly config: Address;
+  readonly quoteSigner: Address;
+  readonly treasuryAuthority?: Address;
+  readonly bridgeProgramId?: Address;
+}
+
+export interface DirectRfqMarket {
+  readonly baseMint: Address;
+  readonly quoteMint: Address;
+  readonly sides: readonly ("buy" | "sell")[];
+}
+
 export interface DirectRfqQuoteProvider {
   quoteExactIn(request: QuoteExactInRequest): Promise<DirectRfqQuote>;
 }
@@ -119,8 +134,11 @@ export interface RouterClientOptions {
   readonly source: RouterDataSource;
   /** Optional exact-input alternative to CLAMM; must use the selected network. Each RFQ waits at most 2s. */
   readonly propAmmQuoteProvider?: PropAmmQuoteProvider;
-  /** aETH/aUSD native swap or treasury packets; enables all mainnet aETH graph routes. */
+  /** Supplies native swap or treasury packets for the configured markets. */
   readonly directRfqQuoteProvider?: DirectRfqQuoteProvider;
+  readonly directRfqDeployment?: DirectRfqDeployment;
+  /** Explicit markets added to the routing graph. */
+  readonly directRfqMarkets?: readonly DirectRfqMarket[];
 }
 
 export interface RouterClient {

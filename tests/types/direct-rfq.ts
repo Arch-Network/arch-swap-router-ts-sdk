@@ -1,6 +1,8 @@
 import {
   compileRouterMessage,
   createRouterClient,
+  MAINNET_AETH_USD,
+  MAINNET_RFQ_DEPLOYMENT,
   type DirectRfqQuote,
   type DirectRfqQuoteProvider,
   type PropAmmQuoteProvider,
@@ -61,10 +63,10 @@ export async function receiveQuoteRemainsRouter(client: RouterClient, request: Q
 }
 
 export function clientWithNativeAethSwaps(source: RouterDataSource, directRfqQuoteProvider: DirectRfqQuoteProvider): RouterClient {
-  const options: RouterClientOptions = { source, network: "mainnet", directRfqQuoteProvider };
-  // @ts-expect-error Composable sells are always enabled with the mainnet provider.
+  const options: RouterClientOptions = { source, network: "mainnet", directRfqQuoteProvider, directRfqDeployment: MAINNET_RFQ_DEPLOYMENT, directRfqMarkets: [MAINNET_AETH_USD] };
+  // @ts-expect-error Composable sells use the explicit catalog.
   const invalidSells: RouterClientOptions = { ...options, composableAethSells: false };
-  // @ts-expect-error Composable buys are always enabled with the mainnet provider.
+  // @ts-expect-error Composable buys use the explicit catalog.
   const invalidBuys: RouterClientOptions = { ...options, composableAethBuys: false };
   void invalidSells; void invalidBuys;
   return createRouterClient(options);

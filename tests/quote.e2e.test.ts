@@ -168,7 +168,7 @@ for (const side of ["sell", "buy"] as const) {
       originalBytes = hex.encode(TransactionUtil.serialize(rfq.transaction));
       return rfq;
     }) };
-    const router = createRouterClient({ source, network: "mainnet", directRfqQuoteProvider });
+    const router = createRouterClient({ source, network: "mainnet", directRfqQuoteProvider, directRfqDeployment: ethUsd, directRfqMarkets: [ethUsd] });
     const mints = { ...router.mints!, aETH: ethUsd.baseMint };
     const request = { inputMint: mints[input], outputMint: mints[output], amountIn: input === "aETH" ? 1_000_000n : amounts[input],
       user, slippageBps: 100, deadlineMs: Date.now() + 30_000 };
