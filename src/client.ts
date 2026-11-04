@@ -27,6 +27,8 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
     throw new RouterSdkError("INVALID_NETWORK", `Unknown network: ${network}.`);
   }
   const original = NETWORKS[network];
+  const isBtcUsd = (market: { baseMint: string; quoteMint: string }) =>
+    market.baseMint === original.mints.aBTC && market.quoteMint === original.mints.aUSD;
   const markets = network === "mainnet" ? directRfqMarkets.map((market, index) => {
     for (const key of ["baseMint", "quoteMint", "programId", "config", "quoteSigner", "tokenProgramId", "associatedTokenProgramId", "systemProgramId"] as const) decodeAddress(market[key]);
     for (const key of ["tokenProgramId", "associatedTokenProgramId", "systemProgramId"] as const) {
@@ -44,13 +46,14 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
       decodeAddress(market.bridgeProgramId);
     }
     if (market.baseMint === market.quoteMint) throw new RouterSdkError("INVALID_REQUEST", "Distinct market mints required.");
-    return Object.freeze({ ...market, id: `configured-${index}`, sides: Object.freeze([...market.sides]), allowClamm: true });
+    return Object.freeze({ ...market, id: `configured-${index}`, sides: Object.freeze([...market.sides]), allowClamm: !isBtcUsd(market) });
   }) : [];
   const keys = markets.map(m => [m.baseMint, m.quoteMint].sort().join(":"));
   if (new Set(keys).size !== keys.length) throw new RouterSdkError("INVALID_REQUEST", "Duplicate direct RFQ market.");
   const config: NetworkConfig = { ...original, propammMarkets: [...original.propammMarkets.filter(m => m.id !== "aeth-usd"), ...markets] };
   const directProvider = network === "mainnet" ? directRfqQuoteProvider : undefined;
-  const enabledMarkets = [...(propAmmQuoteProvider ? ["btc-usd"] : []), ...(directProvider ? markets.map(m => m.id) : [])];
+  const useLegacyBtcUsd = propAmmQuoteProvider !== undefined && !(directProvider && markets.some(isBtcUsd));
+  const enabledMarkets = [...(useLegacyBtcUsd ? ["btc-usd"] : []), ...(directProvider ? markets.map(m => m.id) : [])];
   const graph = config ? buildRouteGraph(config, enabledMarkets) : undefined;
   const pairs = graph ? supportedPairs(graph) : [];
   async function quote(request: QuoteExactInRequest | QuoteForOutputRequest, amount: bigint, forOutput: boolean): Promise<RouterSwapQuote> {
@@ -68,7 +71,7 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
     }
     const state = await prepareQuoteState(source, config, candidates);
     const providers = new Map<string, RoutedRfqQuoteProvider>();
-    if (propAmmQuoteProvider) providers.set("btc-usd", propAmmQuoteProvider);
+    if (useLegacyBtcUsd) providers.set("btc-usd", propAmmQuoteProvider);
     if (directProvider) for (const market of markets) providers.set(market.id, {
       async quoteExactIn(input) {
         const swap = { ...input, slippageBps, deadlineMs };
