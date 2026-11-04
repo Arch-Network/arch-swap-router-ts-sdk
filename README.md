@@ -371,3 +371,23 @@ Direct RFQ edges support exact input on mainnet.
 Compile the returned instructions with a fresh blockhash and submit the
 user-signed transaction with its quote ID for maker co-signing. See the
 [working example](examples/README.md).
+
+## Prime sells
+
+`directRfqMarkets` supplies trusted inventory-market identities for configured
+vault share/underlying pairs with the sell side enabled. `directRfqQuoteProvider` requests their compact
+native sell packets. No treasury or bridge identity is needed. Exact-input Auto
+compares the validated RFQ against immediate reserve redemption, using final
+estimated output; reserve wins ties. A failed candidate does not hide a usable
+alternative, and expired RFQs cannot win.
+
+`quoteExactIn({ ...request, routePreference: "auto" | "vault" | "propamm" })`
+constrains these direct sells. A forced route never falls back or requests its
+competitor. Unsupported pairs and forced receive sizing reject. Buy dispatch and
+existing ETH/HYPE graph routes remain available. Both winners return router
+instructions. PropMM terms are validated against trusted market identities and
+encoded as a router hop, with the RFQ identity retained for co-signing. The host
+adds any supported lending wrapper around that bundle.
+
+These quotes neither reserve VM capacity nor submit redemption. A later PropMM
+redemption remains a separate manager operation.

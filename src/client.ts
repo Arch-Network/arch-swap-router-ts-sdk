@@ -27,6 +27,7 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
     throw new RouterSdkError("INVALID_NETWORK", `Unknown network: ${network}.`);
   }
   const original = NETWORKS[network];
+  const vaults = [original.venues.btcVault, original.venues.usdVault];
   const isBtcUsd = (market: { baseMint: string; quoteMint: string }) =>
     market.baseMint === original.mints.aBTC && market.quoteMint === original.mints.aUSD;
   if (network === "mainnet" && directRfqMarkets.length > 0 && directRfqDeployment === undefined) {
@@ -55,7 +56,7 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
     }
     if (baseMint === quoteMint) throw new RouterSdkError("INVALID_REQUEST", "Distinct market mints required.");
     return Object.freeze({ ...deployment, baseMint, quoteMint, sides: Object.freeze([...sides]),
-      tokenProgramId, associatedTokenProgramId, systemProgramId, id: `configured-${index}`, allowClamm: !isBtcUsd(market) });
+      tokenProgramId, associatedTokenProgramId, systemProgramId, id: `configured-${index}`, allowClamm: !isBtcUsd(market) && !vaults.some(vault => vault.shareMint === baseMint && vault.assetMint === quoteMint) });
   }) : [];
   const keys = markets.map(m => [m.baseMint, m.quoteMint].sort().join(":"));
   if (new Set(keys).size !== keys.length) throw new RouterSdkError("INVALID_REQUEST", "Duplicate direct RFQ market.");
@@ -69,7 +70,13 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
     if (!config || !graph) throw new RouterSdkError("NETWORK_NOT_CONFIGURED", `${network} deployment is not configured.`);
     const { inputMint, outputMint, slippageBps, user, deadlineMs } = request;
     validateRequest(request, amount, forOutput);
-    const candidates = findRoutes(graph, inputMint, outputMint, { forOutput });
+    const preference = request.routePreference ?? "auto";
+    if (!["auto", "vault", "propamm"].includes(preference)) throw new RouterSdkError("INVALID_REQUEST", "Unknown route preference.");
+    const sell = markets.some(m => m.sides.includes("sell") && m.baseMint === inputMint && m.quoteMint === outputMint
+      && vaults.some(vault => vault.shareMint === inputMint && vault.assetMint === outputMint));
+    if (preference !== "auto" && (forOutput || !sell)) throw new RouterSdkError("UNSUPPORTED_PAIR", "Route preference requires a configured exact-input share sell.");
+    if (sell && deadlineMs <= Date.now()) throw new RouterSdkError("RFQ_EXPIRED", "Sell deadline has expired.");
+    const candidates = findRoutes(graph, inputMint, outputMint, { forOutput }).filter(route => preference === "auto" || (route.steps.length === 1 && (preference === "vault" ? route.steps[0]!.operation === "vaultRedeem" : route.steps[0]!.venue === "propamm")));
     if (!candidates.length) {
       throw new RouterSdkError("UNSUPPORTED_PAIR", forOutput && directProvider && (inputMint === ethUsd.baseMint || outputMint === ethUsd.baseMint)
         ? "aETH/aUSD supports exact-input quotes only." : "The requested mint pair is not supported.");
@@ -87,10 +94,12 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
         return composableDirectRfqSwap(swap, await directProvider.quoteExactIn({ ...swap }), market);
       },
     });
-    return quoteCandidates({
+    const result = await quoteCandidates({
       candidates, state, config, request: { inputMint, outputMint, slippageBps, user, deadlineMs },
       amount, forOutput, propAmmQuoteProviders: providers,
     });
+    if (sell && result.deadlineMs <= Date.now()) throw new RouterSdkError("RFQ_EXPIRED", "Sell quote expired during selection.");
+    return result;
   }
   return Object.freeze<RouterClient>({
     network,
