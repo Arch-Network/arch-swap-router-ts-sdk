@@ -72,19 +72,19 @@ export interface DirectRfqQuote {
   readonly treasuryAuthorization?: TreasuryAuthorization;
 }
 
-/** Trusted deployment data supplied by the host, never taken from an RFQ response. */
-export interface DirectRfqMarket {
-  readonly baseMint: Address;
-  readonly quoteMint: Address;
+/** Identities shared by the direct RFQ markets of one maker. */
+export interface DirectRfqDeployment {
   readonly programId: Address;
   readonly config: Address;
   readonly quoteSigner: Address;
-  readonly sides: readonly ("buy" | "sell")[];
   readonly treasuryAuthority?: Address;
   readonly bridgeProgramId?: Address;
-  readonly tokenProgramId: Address;
-  readonly associatedTokenProgramId: Address;
-  readonly systemProgramId: Address;
+}
+
+export interface DirectRfqMarket {
+  readonly baseMint: Address;
+  readonly quoteMint: Address;
+  readonly sides: readonly ("buy" | "sell")[];
 }
 
 export interface DirectRfqQuoteProvider {
@@ -134,9 +134,10 @@ export interface RouterClientOptions {
   readonly source: RouterDataSource;
   /** Optional exact-input alternative to CLAMM; must use the selected network. Each RFQ waits at most 2s. */
   readonly propAmmQuoteProvider?: PropAmmQuoteProvider;
-  /** aETH/aUSD native swap or treasury packets; enables all mainnet aETH graph routes. */
+  /** Supplies native swap or treasury packets for the configured markets. */
   readonly directRfqQuoteProvider?: DirectRfqQuoteProvider;
-  /** Trusted RFQ markets added to the routing graph; omitted retains ETH, [] disables it. */
+  readonly directRfqDeployment?: DirectRfqDeployment;
+  /** Explicit markets added to the routing graph. */
   readonly directRfqMarkets?: readonly DirectRfqMarket[];
 }
 

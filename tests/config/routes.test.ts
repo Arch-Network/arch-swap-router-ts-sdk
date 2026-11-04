@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildRouteGraph, coreRoutes, findRoutes, supportedPairs, TESTNET_ROUTES, SUPPORTED_PAIRS, type RouteGraph, type RouteStep } from "../../src/config/routes.js";
 import { NETWORKS, TESTNET_MINTS, TESTNET_VENUES } from "../../src/config/networks.js";
-import { createRouterClient } from "../../src/index.js";
+import { createRouterClient, MAINNET_AETH_USD, MAINNET_RFQ_DEPLOYMENT } from "../../src/index.js";
 import { namedFixture } from "../transactions/fixtures.js";
 
 const directedFixtures = [
@@ -130,7 +130,7 @@ describe("parallel RFQ candidates", () => {
     const source = { getAccounts: vi.fn(async () => { throw new Error("Unexpected account read"); }) };
     const provider = { quoteExactIn: vi.fn(async () => { throw new Error("Unexpected RFQ"); }) };
     for (const network of ["testnet", "mainnet"] as const) {
-      const client = createRouterClient({ network, source, propAmmQuoteProvider: provider, directRfqQuoteProvider: provider });
+      const client = createRouterClient({ network, source, propAmmQuoteProvider: provider, directRfqQuoteProvider: provider, directRfqDeployment: MAINNET_RFQ_DEPLOYMENT, directRfqMarkets: [MAINNET_AETH_USD] });
       expect(client.supportedPairs).toHaveLength(network === "mainnet" ? 20 : 12);
     }
     expect(source.getAccounts).not.toHaveBeenCalled();

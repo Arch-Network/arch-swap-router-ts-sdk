@@ -1,7 +1,7 @@
 import { TransactionUtil } from "@arch-network/arch-sdk";
 import { base58, hex } from "@scure/base";
 import {
-  compileRouterMessage, createRouterClient, MAINNET_AETH_USD as market, RouterSdkError,
+  compileRouterMessage, createRouterClient, MAINNET_AETH_USD as market, MAINNET_RFQ_DEPLOYMENT, RouterSdkError,
   type DirectRfqQuoteProvider, type QuoteExactInRequest, type RouterDataSource, type TreasuryAuthorization,
   type RuntimeTransaction, type RouterSwapQuote,
 } from "../src/index.js";
@@ -156,7 +156,7 @@ export async function prepareAethUsdSwap(options: AethUsdExampleOptions, request
   const { post, signMessage, confirm, getRecentBlockhash } = options;
   const serverUrl = options.serverUrl.replace(/\/+$/, "");
   const provider = createAethUsdRfqProvider(`${serverUrl}/rfq`, post);
-  const router = createRouterClient({ network: "mainnet", source: options.source, directRfqQuoteProvider: provider });
+  const router = createRouterClient({ network: "mainnet", source: options.source, directRfqQuoteProvider: provider, directRfqDeployment: MAINNET_RFQ_DEPLOYMENT, directRfqMarkets: [market] });
   const quote = await router.quoteExactIn(input);
   const { deadlineMs, rfq } = quote;
   if (!rfq) throw new RouterSdkError("INVALID_RFQ", "Expected an aETH RFQ.");

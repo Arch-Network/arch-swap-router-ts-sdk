@@ -8,11 +8,13 @@ Native swaps and treasury buys use router instructions automatically.
 ## Quote routes
 
 ```ts
-import { createRouterClient, MAINNET_AETH_USD } from "@arch-network/swap-router-sdk";
+import { createRouterClient, MAINNET_AETH_USD, MAINNET_RFQ_DEPLOYMENT } from "@arch-network/swap-router-sdk";
 import { createAethUsdRfqProvider } from "./aeth-usd.js";
 
 const router = createRouterClient({
   network: "mainnet", source,
+  directRfqDeployment: MAINNET_RFQ_DEPLOYMENT,
+  directRfqMarkets: [MAINNET_AETH_USD],
   directRfqQuoteProvider: createAethUsdRfqProvider(`${options.serverUrl}/rfq`, options.post),
 });
 const sell = await router.quoteExactIn({
@@ -25,7 +27,7 @@ const buy = await router.quoteExactIn({
 });
 ```
 
-The mainnet provider automatically enables all eight aETH directions and
+The explicit aETH market and mainnet provider enable all eight aETH directions and
 20 unique pairs overall. There are no `composableAethSells` or
 `composableAethBuys` options. Both results contain `instructions` ready for
 router compilation. aETH receive sizing remains unsupported.

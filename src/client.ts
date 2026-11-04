@@ -22,31 +22,40 @@ function validateRequest(request: QuoteExactInRequest | QuoteForOutputRequest, a
   }
 }
 
-export function createRouterClient({ source, network = "testnet", propAmmQuoteProvider, directRfqQuoteProvider, directRfqMarkets = [ethUsd] }: RouterClientOptions): RouterClient {
+export function createRouterClient({ source, network = "testnet", propAmmQuoteProvider, directRfqQuoteProvider, directRfqDeployment, directRfqMarkets = [] }: RouterClientOptions): RouterClient {
   if (!Object.hasOwn(NETWORKS, network)) {
     throw new RouterSdkError("INVALID_NETWORK", `Unknown network: ${network}.`);
   }
   const original = NETWORKS[network];
   const isBtcUsd = (market: { baseMint: string; quoteMint: string }) =>
     market.baseMint === original.mints.aBTC && market.quoteMint === original.mints.aUSD;
-  const markets = network === "mainnet" ? directRfqMarkets.map((market, index) => {
-    for (const key of ["baseMint", "quoteMint", "programId", "config", "quoteSigner", "tokenProgramId", "associatedTokenProgramId", "systemProgramId"] as const) decodeAddress(market[key]);
-    for (const key of ["tokenProgramId", "associatedTokenProgramId", "systemProgramId"] as const) {
-      if (market[key] !== original.programs[key]) throw new RouterSdkError("INVALID_REQUEST", "RFQ market programs must match the router network.");
+  if (network === "mainnet" && directRfqMarkets.length > 0 && directRfqDeployment === undefined) {
+    throw new RouterSdkError("INVALID_REQUEST", "Direct RFQ markets require a deployment.");
+  }
+  const deployment = network === "mainnet" ? directRfqDeployment : undefined;
+  if (deployment) {
+    for (const key of ["programId", "config", "quoteSigner"] as const) decodeAddress(deployment[key]);
+    const { treasuryAuthority, bridgeProgramId } = deployment;
+    if (treasuryAuthority !== undefined || bridgeProgramId !== undefined) {
+      if (treasuryAuthority === undefined || bridgeProgramId === undefined) {
+        throw new RouterSdkError("INVALID_REQUEST", "Treasury settings require both identities.");
+      }
+      decodeAddress(treasuryAuthority);
+      decodeAddress(bridgeProgramId);
     }
+  }
+  const { tokenProgramId, associatedTokenProgramId, systemProgramId } = original.programs;
+  const markets = deployment ? directRfqMarkets.map((market, index) => {
+    const { baseMint, quoteMint, sides } = market;
+    decodeAddress(baseMint);
+    decodeAddress(quoteMint);
     if (!Array.isArray(market.sides) || !market.sides.length || new Set(market.sides).size !== market.sides.length
       || market.sides.some(side => side !== "buy" && side !== "sell")) {
       throw new RouterSdkError("INVALID_REQUEST", "RFQ markets require distinct supported sides.");
     }
-    if (market.treasuryAuthority !== undefined || market.bridgeProgramId !== undefined) {
-      if (market.treasuryAuthority === undefined || market.bridgeProgramId === undefined || !market.sides.includes("buy")) {
-        throw new RouterSdkError("INVALID_REQUEST", "Treasury settings require both identities and buy support.");
-      }
-      decodeAddress(market.treasuryAuthority);
-      decodeAddress(market.bridgeProgramId);
-    }
-    if (market.baseMint === market.quoteMint) throw new RouterSdkError("INVALID_REQUEST", "Distinct market mints required.");
-    return Object.freeze({ ...market, id: `configured-${index}`, sides: Object.freeze([...market.sides]), allowClamm: !isBtcUsd(market) });
+    if (baseMint === quoteMint) throw new RouterSdkError("INVALID_REQUEST", "Distinct market mints required.");
+    return Object.freeze({ ...deployment, baseMint, quoteMint, sides: Object.freeze([...sides]),
+      tokenProgramId, associatedTokenProgramId, systemProgramId, id: `configured-${index}`, allowClamm: !isBtcUsd(market) });
   }) : [];
   const keys = markets.map(m => [m.baseMint, m.quoteMint].sort().join(":"));
   if (new Set(keys).size !== keys.length) throw new RouterSdkError("INVALID_REQUEST", "Duplicate direct RFQ market.");
