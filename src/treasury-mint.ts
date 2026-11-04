@@ -1,5 +1,4 @@
 import type { PropAmmDeployment } from "./config/networks.js";
-import { MAINNET_AETH_USD as defaultMarket } from "./config/aeth-usd.js";
 import { RouterSdkError } from "./errors.js";
 import type { ResolvedStep } from "./transactions/types.js";
 import type { TreasuryMintTerms } from "./types.js";
@@ -14,24 +13,19 @@ export interface TreasuryMintQuote {
 }
 
 /** Canonical addresses are derived locally; treasury routing adds no account read. */
-export function resolveTreasuryMint(quote: TreasuryMintQuote, deployment: PropAmmDeployment): ResolvedStep {
-  const { treasuryAuthority, bridgeProgramId } = deployment;
-  const market = treasuryAuthority && bridgeProgramId
-    ? { ...deployment, treasuryAuthority, bridgeProgramId }
-    : defaultMarket;
-  if (deployment.programId !== market.programId || deployment.config !== market.config
-    || deployment.baseMint !== market.baseMint || deployment.quoteMint !== market.quoteMint) {
-    throw new RouterSdkError("INVALID_RFQ", "Treasury quote does not match the aETH deployment.");
+export function resolveTreasuryMint(quote: TreasuryMintQuote, market: PropAmmDeployment): ResolvedStep {
+  if (!market.treasuryAuthority || !market.bridgeProgramId) {
+    throw new RouterSdkError("INVALID_RFQ", "Treasury execution is not configured for this market.");
   }
   return {
-    kind: "treasuryMint", outputMint: deployment.baseMint,
+    kind: "treasuryMint", outputMint: market.baseMint,
     terms: { ...quote.terms, issuanceId: quote.terms.issuanceId.slice() },
     bridgeProgramId: market.bridgeProgramId, treasuryAuthority: market.treasuryAuthority,
     bridgeConfig: deriveAddress(market.bridgeProgramId, "config"),
-    assetConfig: deriveAddress(market.bridgeProgramId, "asset", decodeAddress(deployment.baseMint)),
+    assetConfig: deriveAddress(market.bridgeProgramId, "asset", decodeAddress(market.baseMint)),
     issuanceReceipt: deriveAddress(market.bridgeProgramId, "treasury_mint", quote.terms.issuanceId),
-    mintAuthority: deriveAddress(market.bridgeProgramId, "mint-authority", decodeAddress(deployment.baseMint)),
-    propammConfig: deployment.config,
-    paymentVault: deriveAddress(deployment.programId, "vault", decodeAddress(deployment.config), decodeAddress(deployment.quoteMint)),
+    mintAuthority: deriveAddress(market.bridgeProgramId, "mint-authority", decodeAddress(market.baseMint)),
+    propammConfig: market.config,
+    paymentVault: deriveAddress(market.programId, "vault", decodeAddress(market.config), decodeAddress(market.quoteMint)),
   };
 }
