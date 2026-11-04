@@ -28,12 +28,23 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
   }
   const original = NETWORKS[network];
   const markets = network === "mainnet" ? directRfqMarkets.map((market, index) => {
-    for (const key of ["baseMint", "quoteMint", "programId", "config", "quoteSigner", "treasuryAuthority", "bridgeProgramId", "tokenProgramId", "associatedTokenProgramId", "systemProgramId"] as const) decodeAddress(market[key]);
+    for (const key of ["baseMint", "quoteMint", "programId", "config", "quoteSigner", "tokenProgramId", "associatedTokenProgramId", "systemProgramId"] as const) decodeAddress(market[key]);
     for (const key of ["tokenProgramId", "associatedTokenProgramId", "systemProgramId"] as const) {
       if (market[key] !== original.programs[key]) throw new RouterSdkError("INVALID_REQUEST", "RFQ market programs must match the router network.");
     }
+    if (!Array.isArray(market.sides) || !market.sides.length || new Set(market.sides).size !== market.sides.length
+      || market.sides.some(side => side !== "buy" && side !== "sell")) {
+      throw new RouterSdkError("INVALID_REQUEST", "RFQ markets require distinct supported sides.");
+    }
+    if (market.treasuryAuthority !== undefined || market.bridgeProgramId !== undefined) {
+      if (market.treasuryAuthority === undefined || market.bridgeProgramId === undefined || !market.sides.includes("buy")) {
+        throw new RouterSdkError("INVALID_REQUEST", "Treasury settings require both identities and buy support.");
+      }
+      decodeAddress(market.treasuryAuthority);
+      decodeAddress(market.bridgeProgramId);
+    }
     if (market.baseMint === market.quoteMint) throw new RouterSdkError("INVALID_REQUEST", "Distinct market mints required.");
-    return Object.freeze({ ...market, id: `configured-${index}`, sides: ["buy", "sell"] as const, allowClamm: true });
+    return Object.freeze({ ...market, id: `configured-${index}`, sides: Object.freeze([...market.sides]), allowClamm: true });
   }) : [];
   const keys = markets.map(m => [m.baseMint, m.quoteMint].sort().join(":"));
   if (new Set(keys).size !== keys.length) throw new RouterSdkError("INVALID_REQUEST", "Duplicate direct RFQ market.");

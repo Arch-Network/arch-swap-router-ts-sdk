@@ -1,5 +1,6 @@
 // Mainnet deployment verified against /markets, a treasury quote and Arch RPC on 2026-11-03.
 export const MAINNET_AETH_USD = Object.freeze({
+  sides: Object.freeze(["buy", "sell"] as const),
   baseMint: "7g1nPCjKW7zzZ4q7mcABeFXaPSLfBQ6syrz4HnPGAVYt",
   baseDecimals: 9,
   quoteMint: "DQcBfwHu8gr8KGt3BE5BDUfBjGgFuDJYm9ByVTDsrww9",

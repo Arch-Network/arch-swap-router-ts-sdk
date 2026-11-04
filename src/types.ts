@@ -79,8 +79,9 @@ export interface DirectRfqMarket {
   readonly programId: Address;
   readonly config: Address;
   readonly quoteSigner: Address;
-  readonly treasuryAuthority: Address;
-  readonly bridgeProgramId: Address;
+  readonly sides: readonly ("buy" | "sell")[];
+  readonly treasuryAuthority?: Address;
+  readonly bridgeProgramId?: Address;
   readonly tokenProgramId: Address;
   readonly associatedTokenProgramId: Address;
   readonly systemProgramId: Address;

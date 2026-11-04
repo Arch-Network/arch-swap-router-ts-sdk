@@ -3,16 +3,17 @@ import { base58, hex } from "@scure/base";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRouterClient, MAINNET_AETH_USD as eth, type DirectRfqMarket, type DirectRfqQuote } from "../src/index.js";
 import { decodeAddress, deriveAddress, deriveProgramAddress } from "../src/utils.js";
+import { setupComposableAethBuy } from "./fixtures/composable-aeth.js";
 import fixtures from "./fixtures/aeth-usd/transactions.json" with { type: "json" };
 import { nativeTransaction } from "./fixtures/aeth-usd/transactions.js";
 
-const hype: DirectRfqMarket = { ...eth, baseMint: "e1nbE9knw6fS1TwDixC3ZuXhDJpBf874WErswvqvMes" };
+const hype = { ...eth, baseMint: "e1nbE9knw6fS1TwDixC3ZuXhDJpBf874WErswvqvMes" } satisfies DirectRfqMarket;
 const ata = (market: DirectRfqMarket, mint = market.baseMint) => deriveProgramAddress([
   decodeAddress(fixtures.user), decodeAddress(market.tokenProgramId), decodeAddress(mint),
 ], market.associatedTokenProgramId)[0];
 const vault = (market: DirectRfqMarket, mint = market.baseMint) => deriveAddress(market.programId, "vault", decodeAddress(market.config), decodeAddress(mint));
 
-function setup(side: string, configured: DirectRfqMarket = hype) {
+function setup(side: string, configured: DirectRfqMarket & { bridgeProgramId: string } = hype) {
   const fixture = fixtures.cases.find(value => value.side === side)!;
   const transaction = nativeTransaction(fixture.transaction_hex);
   const replacements = new Map([
@@ -96,4 +97,15 @@ it("rejects market programs incompatible with router composition", () => {
   for (const key of ["tokenProgramId", "associatedTokenProgramId", "systemProgramId"] as const) {
     expect(() => createRouterClient({ network: "mainnet", source: { getAccounts: async () => [] }, directRfqMarkets: [{ ...eth, [key]: eth.baseMint }] })).toThrow("programs must match");
   }
+});
+
+it("quotes inventory buys without treasury identities and rejects treasury packets for that market", async () => {
+  const { treasuryAuthority: _authority, bridgeProgramId: _bridge, ...inventory } = eth;
+  const { options, request, directRfqQuoteProvider } = setupComposableAethBuy();
+  const router = createRouterClient({ ...options, directRfqMarkets: [{ ...inventory, sides: ["buy"] }] });
+  expect((await router.quoteExactIn(request)).hops.map(hop => hop.kind)).toEqual(["propamm"]);
+  const treasury = setup("buy", eth).quote;
+  directRfqQuoteProvider.quoteExactIn.mockResolvedValueOnce(treasury);
+  await expect(router.quoteExactIn(request)).rejects.toThrow("Treasury execution is not configured");
+  expect(router.supportedPairs).not.toContainEqual({ inputMint: eth.baseMint, outputMint: eth.quoteMint });
 });
