@@ -467,3 +467,120 @@ See [AETH_AUSD_SDK_HANDOVER.md](AETH_AUSD_SDK_HANDOVER.md) for the fixed deploym
 HTTP provider mapping, signing/submission contract and offline verification evidence.
 The [working example](examples/README.md) wires HTTP, wallet signing, submission,
 confirmation and explicit retries; its mocked tests cover both directions.
+
+## Limit orders
+
+PropAMM limit orders are native PropAMM accounts on direct PropAMM vault markets.
+They do not use the router program or `createRouterClient`; treasury-mint
+markets are excluded. The SDK builds the owner's create and cancel instructions
+locally. It reads order accounts only through the injected `RouterDataSource`,
+and reaches the order server only through an injected `LimitOrderProvider`.
+Program and config addresses come from `LIMIT_ORDER_DEPLOYMENTS[network]`, which
+is the network's existing PropAMM deployment. Every helper takes
+`{ network }`, which defaults to `"testnet"`.
+
+**Lifecycle.**
+
+1. **Create.** The owner signs, pays and is recorded as `rent_refund`. The
+   transaction escrows exactly `inputAmount` and fixes `minOutputAmount`. The
+   owner also prepays `fillAllowanceLamports` into the order account.
+2. **Open.** The order waits for a fill or a cancel. Fills are full, with exact
+   input. There are no partial fills and no expiry.
+3. **Fill.** The PropAMM quote signer signs, and any payer funds the
+   transaction; the owner does not sign. The program pays the owner the
+   post-skew output and rejects payouts below `minOutputAmount`. The payer
+   receives the allowance.
+4. **Cancel.** The owner signs and pays. The escrow, its rent and the unused
+   allowance return to the owner's input ATA and to `rent_refund`.
+
+Filled and cancelled accounts are kept, along with `closedAt` and the actual
+`outputAmount`. That makes them the order history. An order ID is part of the
+PDA, so never reuse one for the same owner.
+
+| Transaction | Signers | Fee payer | Lamports |
+| --- | --- | --- | --- |
+| Create | owner | owner | Order/escrow rent plus the fill allowance, from the owner |
+| Fill | quote signer + payer | payer (server trigger, owner, or anyone) | The allowance goes to the payer |
+| Cancel | owner | owner | Rent and the unused allowance go back to `rent_refund` |
+
+```ts
+import {
+  buildCancelLimitOrderInstruction, buildCreateLimitOrderInstruction, compileRouterMessage,
+  generateLimitOrderId, loadLimitOrder, previewLimitOrder,
+  type LimitOrderProvider, type RouterDataSource,
+} from "@arch-network/swap-router-sdk";
+
+declare const provider: LimitOrderProvider; // Application-owned HTTP adapter.
+declare const source: RouterDataSource;
+declare const owner: string;
+declare const recentBlockhash: Uint8Array;
+
+const config = await provider.config();
+const market = config.markets.find((m) => m.baseSymbol === "aBTC" && m.quoteSymbol === "aUSD");
+const form = { side: "buy", inputAmount: 100_000_000n, limitPrice: "95000", baseDecimals: 8, quoteDecimals: 6 } as const;
+const preview = previewLimitOrder({ ...form, market, fillFeeLamports: config.fillFeeLamports });
+if (!market || preview.errors.length) throw new Error(preview.errors.map((e) => e.message).join(" "));
+
+const { instruction, order } = buildCreateLimitOrderInstruction({
+  ...form, network: "mainnet", owner, market,
+  orderId: generateLimitOrderId(), fillAllowanceLamports: preview.fillAllowanceLamports,
+});
+const message = compileRouterMessage([instruction], owner, recentBlockhash);
+// The owner signs and submits the message. Later, to cancel:
+const open = await loadLimitOrder(source, order, { network: "mainnet" });
+if (open?.status === "open") buildCancelLimitOrderInstruction(open, { network: "mainnet" });
+```
+
+`buildCreateLimitOrderInstruction` takes either `limitPrice` with both token
+decimals, or an explicit `minOutputAmount`. It returns `{ instruction, order,
+escrow, minOutputAmount }`. `buildCancelLimitOrderInstruction` needs the decoded
+open account, because the native refund destination comes from the order. Both
+instructions list the IDL's accounts in order, with payer = owner. The message
+compiler merges those duplicate keys into one writable signer. The SDK checks
+neither balances nor whether the owner's input ATA exists.
+
+`minimumOutputAtLimit(side, inputAmount, price, baseDecimals, quoteDecimals)`
+ports native `minimum_output_at_limit` exactly. The price is a positive plain
+decimal in whole quote tokens per whole base token, such as `"95000"` or
+`"0.00000292"`. Signs, exponents, whitespace, a bare `.` and non-ASCII digits
+are rejected. Both sides round up. A malformed price throws `INVALID_LIMIT_PRICE`,
+zero input throws `INVALID_AMOUNT`, and exceeding native u128/u64 bounds throws
+`MATH_OVERFLOW`. `/orders/config` does not report decimals, so supply them from
+the mints: aBTC 8, aUSD 6, aETH 9.
+
+`previewLimitOrder` is pure. It returns `minOutputAmount` (null when the
+price or input is invalid) and the default `fillAllowanceLamports`, which is the
+server's `fillFeeLamports`. It also returns every validation error:
+`UNSUPPORTED_MARKET` when no config entry is supplied, `BELOW_MINIMUM_INPUT`,
+and the three math codes. If an order's allowance is below `fillFeeLamports`,
+the trigger never fills it, and the owner must fill it through `fill`.
+
+### Order server provider
+
+`LimitOrderProvider` has three methods. Map each one to the order server as
+follows. Convert snake_case fields to camelCase and return every u64 as a
+`bigint`. The server sends u64 values as JSON numbers, so decode them
+losslessly or reject unsafe integers; the
+[aETH example](examples/aeth-usd.ts) shows a strict decoder. Error bodies are
+`{"error": message, "code": code}`. Reject on any non-2xx status.
+
+| Method | Endpoint | Result |
+| --- | --- | --- |
+| `config()` | `GET /orders/config` | `{ triggerEnabled, fillFeeLamports, markets: [{ baseMint, quoteMint, baseSymbol, quoteSymbol, minBuyInput, minSellInput }] }` |
+| `list({ owner, status?, cursor?, limit? })` | `POST /orders/list` with `{owner, status?: "open" \| "closed", cursor?, limit?}` | `{ orders: LimitOrderSummary[], nextCursor? }`, newest first. `orderId` stays 64-char hex; `closedAt` appears once terminal and `outputAmount` only once filled. |
+| `fill({ order, payer })` | `POST /orders/fill` with `{order, payer}` | `{ order, transaction, payerSignatureIndex, outputAmount, minOutputAmount, expiresAtMs }`. A 422 with `order_not_fillable` means the order is closed, missing, below the minimum, or the price or inventory is not met yet. |
+
+`list` reads history from chain. It pages with `nextCursor`, and `limit`
+defaults to 50 with a maximum of 100. Fills come from the server trigger when
+`triggerEnabled` is set and the allowance covers `fillFeeLamports`. Otherwise
+any payer, usually the owner, calls `fill`. Its `transaction` is a
+maker-signed `RuntimeTransaction`, with the payer's slot at `payerSignatureIndex`
+zeroed. Sign the message unchanged and fill that slot. Then send it to the
+node yourself before `expiresAtMs`; the server never sends it. The SDK does not
+validate this transaction. Before signing, check that it contains a single
+PropAMM `fill_limit_order` instruction for the expected order. The server's
+`POST /orders/create` and `/orders/cancel` builders are not needed.
+
+The ABI, layout, PDA and math tests use native PropAMM fixtures; see
+[tests/fixtures/limit-orders](tests/fixtures/limit-orders/README.md). They do
+not show that limit orders are deployed on either network.
