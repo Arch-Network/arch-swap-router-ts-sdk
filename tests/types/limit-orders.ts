@@ -1,5 +1,5 @@
 import {
-  buildCancelLimitOrderInstruction, buildCreateLimitOrderInstruction, generateLimitOrderId, loadLimitOrder,
+  buildCancelLimitOrderInstruction, buildCreateLimitOrderInstruction, generateLimitOrderId, loadLimitOrder, previewLimitOrder,
   type LimitOrderProvider, type RouterDataSource,
 } from "../../src/index.js";
 
@@ -7,6 +7,9 @@ import {
 export async function limitOrderLifecycle(source: RouterDataSource, provider: LimitOrderProvider, owner: string) {
   const { markets, fillFeeLamports } = await provider.config();
   const market = markets[0]!;
+  const { minOutputAmount } = previewLimitOrder({ market, side: "buy", inputAmount: market.minBuyInput, limitPrice: "1", fillFeeLamports });
+  // @ts-expect-error Decimals come from the market entry.
+  previewLimitOrder({ market, side: "buy", inputAmount: 1n, limitPrice: "1", fillFeeLamports, baseDecimals: 8 });
   const common = {
     network: "mainnet", owner, market, side: "buy", inputAmount: market.minBuyInput,
     orderId: generateLimitOrderId(), fillAllowanceLamports: fillFeeLamports,
@@ -23,5 +26,5 @@ export async function limitOrderLifecycle(source: RouterDataSource, provider: Li
   if (account?.status === "open") buildCancelLimitOrderInstruction(account, { network: "mainnet" });
   const { orders, nextCursor } = await provider.list({ owner, status: "closed", limit: 20 });
   const fill = await provider.fill({ order: orders[0]!.order, payer: owner });
-  return { nextCursor, payerSlot: fill.transaction.signatures[fill.payerSignatureIndex] };
+  return { minOutputAmount, nextCursor, payerSlot: fill.transaction.signatures[fill.payerSignatureIndex] };
 }

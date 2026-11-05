@@ -154,6 +154,9 @@ export interface LimitOrderMarketConfig {
   readonly quoteMint: Address;
   readonly baseSymbol: string;
   readonly quoteSymbol: string;
+  /** Mint decimals; needed to turn a limit price into a minimum output. */
+  readonly baseDecimals: number;
+  readonly quoteDecimals: number;
   /** Smallest buy input, in raw quote-token units. */
   readonly minBuyInput: bigint;
   /** Smallest sell input, in raw base-token units. */

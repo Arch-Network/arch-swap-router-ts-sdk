@@ -517,12 +517,13 @@ declare const recentBlockhash: Uint8Array;
 
 const config = await provider.config();
 const market = config.markets.find((m) => m.baseSymbol === "aBTC" && m.quoteSymbol === "aUSD");
-const form = { side: "buy", inputAmount: 100_000_000n, limitPrice: "95000", baseDecimals: 8, quoteDecimals: 6 } as const;
+const form = { side: "buy", inputAmount: 100_000_000n, limitPrice: "95000" } as const;
 const preview = previewLimitOrder({ ...form, market, fillFeeLamports: config.fillFeeLamports });
 if (!market || preview.errors.length) throw new Error(preview.errors.map((e) => e.message).join(" "));
 
 const { instruction, order } = buildCreateLimitOrderInstruction({
   ...form, network: "mainnet", owner, market,
+  baseDecimals: market.baseDecimals, quoteDecimals: market.quoteDecimals,
   orderId: generateLimitOrderId(), fillAllowanceLamports: preview.fillAllowanceLamports,
 });
 const message = compileRouterMessage([instruction], owner, recentBlockhash);
@@ -545,14 +546,17 @@ decimal in whole quote tokens per whole base token, such as `"95000"` or
 `"0.00000292"`. Signs, exponents, whitespace, a bare `.` and non-ASCII digits
 are rejected. Both sides round up. A malformed price throws `INVALID_LIMIT_PRICE`,
 zero input throws `INVALID_AMOUNT`, and exceeding native u128/u64 bounds throws
-`MATH_OVERFLOW`. `/orders/config` does not report decimals, so supply them from
-the mints: aBTC 8, aUSD 6, aETH 9.
+`MATH_OVERFLOW`. Each `/orders/config` market reports `baseDecimals` and
+`quoteDecimals`. The mint accounts hold the same values: aBTC 8, aUSD 6, aETH 9.
 
-`previewLimitOrder` is pure. It returns `minOutputAmount` (null when the
-price or input is invalid) and the default `fillAllowanceLamports`, which is the
-server's `fillFeeLamports`. It also returns every validation error:
-`UNSUPPORTED_MARKET` when no config entry is supplied, `BELOW_MINIMUM_INPUT`,
-and the three math codes. If an order's allowance is below `fillFeeLamports`,
+`previewLimitOrder` is pure. It takes the pair's `/orders/config` market entry,
+which supplies the decimals, along with `side`, `inputAmount`, `limitPrice` and
+`fillFeeLamports`. It returns `minOutputAmount` (null when the price or input is
+invalid) and the default `fillAllowanceLamports`, which is the server's
+`fillFeeLamports`. It also returns every validation error: `BELOW_MINIMUM_INPUT`
+and the three math codes. Pass `market: undefined` when the server lists no entry
+for the pair. The result is then only `UNSUPPORTED_MARKET` with a null minimum,
+because the server neither fills nor signs fills for that market. If an order's allowance is below `fillFeeLamports`,
 the trigger never fills it, and the owner must fill it through `fill`.
 
 ### Order server provider
@@ -566,7 +570,7 @@ losslessly or reject unsafe integers; the
 
 | Method | Endpoint | Result |
 | --- | --- | --- |
-| `config()` | `GET /orders/config` | `{ triggerEnabled, fillFeeLamports, markets: [{ baseMint, quoteMint, baseSymbol, quoteSymbol, minBuyInput, minSellInput }] }` |
+| `config()` | `GET /orders/config` | `{ triggerEnabled, fillFeeLamports, markets: [{ baseMint, quoteMint, baseSymbol, quoteSymbol, baseDecimals, quoteDecimals, minBuyInput, minSellInput }] }`. Decimals are u32 JSON numbers; return them as `number`. |
 | `list({ owner, status?, cursor?, limit? })` | `POST /orders/list` with `{owner, status?: "open" \| "closed", cursor?, limit?}` | `{ orders: LimitOrderSummary[], nextCursor? }`, newest first. `orderId` stays 64-char hex; `closedAt` appears once terminal and `outputAmount` only once filled. |
 | `fill({ order, payer })` | `POST /orders/fill` with `{order, payer}` | `{ order, transaction, payerSignatureIndex, outputAmount, minOutputAmount, expiresAtMs }`. A 422 with `order_not_fillable` means the order is closed, missing, below the minimum, or the price or inventory is not met yet. |
 

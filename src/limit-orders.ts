@@ -136,13 +136,15 @@ export async function loadLimitOrder(source: RouterDataSource, order: Address, o
 }
 
 export interface LimitOrderPreviewRequest {
-  /** The `/orders/config` entry for this pair; undefined when the server lists none. */
+  /**
+   * The `/orders/config` entry for this pair, which also supplies token decimals.
+   * Undefined when the server lists none: the server never fills such an order,
+   * so the preview reports only `UNSUPPORTED_MARKET`.
+   */
   readonly market: LimitOrderMarketConfig | undefined;
   readonly side: LimitOrderSide;
   readonly inputAmount: bigint;
   readonly limitPrice: string;
-  readonly baseDecimals: number;
-  readonly quoteDecimals: number;
   /** `/orders/config` `fillFeeLamports`. */
   readonly fillFeeLamports: bigint;
 }
@@ -165,20 +167,25 @@ export function previewLimitOrder(request: LimitOrderPreviewRequest): LimitOrder
   if (typeof fillFeeLamports !== "bigint" || fillFeeLamports < 0n || fillFeeLamports > U64_MAX) {
     throw new RouterSdkError("INVALID_REQUEST", "fillFeeLamports must be a u64 bigint.");
   }
+  if (!market) {
+    return {
+      minOutputAmount: null, fillAllowanceLamports: fillFeeLamports,
+      errors: [{ code: "UNSUPPORTED_MARKET", message: "The order server does not accept limit orders for this market." }],
+    };
+  }
   const errors: { code: LimitOrderPreviewErrorCode; message: string }[] = [];
-  if (!market) errors.push({ code: "UNSUPPORTED_MARKET", message: "The order server does not accept limit orders for this market." });
   let minOutputAmount: bigint | null = null;
   try {
-    minOutputAmount = minimumOutputAtLimit(side, inputAmount, request.limitPrice, request.baseDecimals, request.quoteDecimals);
+    minOutputAmount = minimumOutputAtLimit(side, inputAmount, request.limitPrice, market.baseDecimals, market.quoteDecimals);
   } catch (error) {
     if (!(error instanceof RouterSdkError) || !["INVALID_AMOUNT", "INVALID_LIMIT_PRICE", "MATH_OVERFLOW"].includes(error.code)) {
       throw error;
     }
     errors.push({ code: error.code as LimitOrderPreviewErrorCode, message: error.message });
   }
-  const minimum = market && (side === "buy" ? market.minBuyInput : market.minSellInput);
-  if (minimum !== undefined && inputAmount < minimum) {
-    errors.push({ code: "BELOW_MINIMUM_INPUT", message: `Input must be at least ${minimum} raw ${side === "buy" ? market!.quoteSymbol : market!.baseSymbol} units.` });
+  const [minimum, symbol] = side === "buy" ? [market.minBuyInput, market.quoteSymbol] : [market.minSellInput, market.baseSymbol];
+  if (inputAmount < minimum) {
+    errors.push({ code: "BELOW_MINIMUM_INPUT", message: `Input must be at least ${minimum} raw ${symbol} units.` });
   }
   return { minOutputAmount, fillAllowanceLamports: fillFeeLamports, errors };
 }

@@ -282,19 +282,29 @@ describe("minimumOutputAtLimit", () => {
 describe("previewLimitOrder", () => {
   const market: LimitOrderMarketConfig = {
     baseMint: cases[0]!.base_mint, quoteMint: cases[0]!.quote_mint, baseSymbol: "aBTC", quoteSymbol: "aUSD",
-    minBuyInput: 10_000_000n, minSellInput: 10_000n,
+    baseDecimals: 8, quoteDecimals: 6, minBuyInput: 10_000_000n, minSellInput: 10_000n,
   };
-  const request = {
-    market, side: "buy", inputAmount: 100_000_000n, limitPrice: "100000", baseDecimals: 8, quoteDecimals: 6, fillFeeLamports: 1_000n,
-  } as const;
+  const request = { market, side: "buy", inputAmount: 100_000_000n, limitPrice: "100000", fillFeeLamports: 1_000n } as const;
 
-  it("returns the minimum output and the trigger's default allowance", () => {
+  it("returns the minimum output, from the market's decimals, and the trigger's default allowance", () => {
     expect(previewLimitOrder(request)).toEqual({ minOutputAmount: 100_000n, fillAllowanceLamports: 1_000n, errors: [] });
     expect(previewLimitOrder({ ...request, side: "sell", inputAmount: 100_000n }).minOutputAmount).toBe(100_000_000n);
+    // The native 0.00000292 vector uses 5/6 decimals.
+    const scaled = { ...request, market: { ...market, baseDecimals: 5 }, limitPrice: "0.00000292" };
+    expect(previewLimitOrder({ ...scaled, inputAmount: 1_000_000n }).minOutputAmount).toBe(34_246_575_343n);
+    expect(previewLimitOrder({ ...scaled, side: "sell", inputAmount: 100_000n }).minOutputAmount).toBe(3n);
   });
 
-  it("reports unsupported markets, below-minimum input and invalid prices together", () => {
-    expect(previewLimitOrder({ ...request, market: undefined }).errors.map((e) => e.code)).toEqual(["UNSUPPORTED_MARKET"]);
+  it("reports only UNSUPPORTED_MARKET without a market entry", () => {
+    for (const limitPrice of ["100000", "1."]) {
+      expect(previewLimitOrder({ ...request, market: undefined, limitPrice })).toEqual({
+        minOutputAmount: null, fillAllowanceLamports: 1_000n,
+        errors: [{ code: "UNSUPPORTED_MARKET", message: expect.any(String) }],
+      });
+    }
+  });
+
+  it("reports below-minimum input and invalid prices together", () => {
     const below = previewLimitOrder({ ...request, side: "sell", inputAmount: 9_999n });
     expect(below.errors).toEqual([{ code: "BELOW_MINIMUM_INPUT", message: expect.stringMatching(/10000 raw aBTC/) }]);
     expect(below.minOutputAmount).toBe(9_999_000n);
@@ -302,11 +312,11 @@ describe("previewLimitOrder", () => {
     expect(invalid).toMatchObject({ minOutputAmount: null, fillAllowanceLamports: 1_000n });
     expect(invalid.errors.map((e) => e.code)).toEqual(["INVALID_AMOUNT", "BELOW_MINIMUM_INPUT"]);
     expect(previewLimitOrder({ ...request, limitPrice: "1.2.3" }).errors.map((e) => e.code)).toEqual(["INVALID_LIMIT_PRICE"]);
-    expect(previewLimitOrder({ ...request, baseDecimals: 39 }).errors.map((e) => e.code)).toEqual(["MATH_OVERFLOW"]);
+    expect(previewLimitOrder({ ...request, market: { ...market, baseDecimals: 39 } }).errors.map((e) => e.code)).toEqual(["MATH_OVERFLOW"]);
   });
 
-  it("throws for programmer errors", () => {
+  it("throws for programmer errors and malformed market decimals", () => {
     expect(() => previewLimitOrder({ ...request, fillFeeLamports: 1 as never })).toThrow(RouterSdkError);
-    expect(() => previewLimitOrder({ ...request, baseDecimals: -1 })).toThrow(sdkError("INVALID_REQUEST"));
+    expect(() => previewLimitOrder({ ...request, market: { ...market, quoteDecimals: -1 } })).toThrow(sdkError("INVALID_REQUEST"));
   });
 });
