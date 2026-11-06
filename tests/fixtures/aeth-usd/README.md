@@ -16,8 +16,8 @@ from prop-amm's `minting` revision
 bytes. The standalone exporter supplies only the server error type needed to
 compile `treasury_mint.rs` outside the server binary.
 
-Mainnet program/mint identities were refreshed against the 2026-11-02 deployment
-(aETH `7g1nPC…`, 9 decimals; bridge `5n1fsU…`). The user, blockhash, mint ID, quote
+Mainnet program/mint identities were refreshed against the 2026-11-03 deployment
+(aETH `7g1nPC…`, 9 decimals; bridge `F5uRFV…`; treasury authority `GPoZuM…`). The user, blockhash, mint ID, quote
 amounts and time are test values. No private keys or signatures are included.
 The fixed clock is `1800000000000` ms and expiry is 30 seconds later. These
 fixtures are for offline ABI tests, not transaction submission.
@@ -32,13 +32,15 @@ integer base units, and `signed_size` counts two placeholder signatures.
 Run from the SDK root with the pinned revision available in the local PropAMM
 repository. This creates only a temporary Rust build directory and the fixture
 JSON; the server checkout is read-only. Cargo dependencies must be cached for
-`--offline`.
+`--offline`. The PropAMM source is extracted outside the build directory: Cargo
+makes a path dependency under the generator's root a member of the generator's
+workspace, where PropAMM's `workspace = true` dependencies do not resolve.
 
 ```bash
 fixture_sdk="$PWD"
 fixture_propamm_repo="$HOME/Arch/prop-amm"
 fixture_build=$(mktemp -d /tmp/aeth-usd-fixtures.XXXXXX)
-fixture_source="$fixture_build/prop-amm"
+fixture_source=$(mktemp -d /tmp/aeth-usd-propamm.XXXXXX)
 mkdir -p "$fixture_build/src" "$fixture_source"
 git -C "$fixture_propamm_repo" archive dfdbc9a36646066cbec067fa9e9a700232804855 | tar -x -C "$fixture_source"
 cp "$fixture_sdk/tests/fixtures/aeth-usd/generate.rs" "$fixture_build/src/main.rs"

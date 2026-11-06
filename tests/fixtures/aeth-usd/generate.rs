@@ -30,8 +30,8 @@ fn main() {
     let program = key("5KMw4VNavLhM5wxTxyQGm8hs5ymFhqMCZ5BpkHybcEBV");
     let config = key("3jwSNH8P5tNFMY72ZwFi5z3gEkK1vVor3xcAFvr4DHzr");
     let maker = key("A97DopD3nWbcwj89Suma32AhGfGUiLYZZzKqpP3H1PiG");
-    let treasury = key("G31RGX9tmr7wE43aDPBHCLigAGn1EvvFQCvayZZm8kSK");
-    let bridge = key("5n1fsUDhPiaALmxpaFCJeFdyTkZkxWXecgurV6dSxMq3");
+    let treasury = key("GPoZuMS41Ct92nUUqWyu8dqCY74QkfHRX8N3RsYiTCAT");
+    let bridge = key("F5uRFVRuupfFgw1L5x7uWt41ug7MTZr2BfnfZiFj12fk");
     let base = key("7g1nPCjKW7zzZ4q7mcABeFXaPSLfBQ6syrz4HnPGAVYt");
     let quote_mint = key("DQcBfwHu8gr8KGt3BE5BDUfBjGgFuDJYm9ByVTDsrww9");
     let user = key("9CEiuSgdHtub59syFf4Usf5eEJaEN5eQqEjJNeCatrJs");
