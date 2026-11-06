@@ -125,7 +125,7 @@ export const NETWORKS = Object.freeze({
       config: "3jwSNH8P5tNFMY72ZwFi5z3gEkK1vVor3xcAFvr4DHzr",
       baseMint: MAINNET_MINTS.aBTC, quoteMint: MAINNET_MINTS.aUSD,
     }), Object.freeze({
-      id: "aeth-usd", sides: Object.freeze(["sell"] as const), allowClamm: true,
+      id: "aeth-usd", sides: Object.freeze(["sell", "buy"] as const), allowClamm: true,
       programId: MAINNET_AETH_USD.programId, config: MAINNET_AETH_USD.config,
       baseMint: MAINNET_AETH_USD.baseMint, quoteMint: MAINNET_AETH_USD.quoteMint,
     })]),

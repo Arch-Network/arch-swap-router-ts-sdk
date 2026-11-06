@@ -51,4 +51,6 @@ export type {
   ServerTransactionSwapQuote,
   SwapHop,
   SwapQuote,
+  TreasuryAuthorization,
+  TreasuryMintTerms,
 } from "./types.js";

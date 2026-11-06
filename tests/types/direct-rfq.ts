@@ -13,6 +13,8 @@ import {
   type RuntimeTransaction,
   type ServerTransactionSwapQuote,
   type SwapQuote,
+  type TreasuryAuthorization,
+  type TreasuryMintTerms,
 } from "../../src/index.js";
 
 // Checked by tsc only; no wallet, server or transaction execution.
@@ -34,13 +36,6 @@ export function clientWithProviders(source: RouterDataSource, transaction: Runti
 
 export async function consumeQuote(client: RouterClient, request: QuoteExactInRequest) {
   const quote = await client.quoteExactIn(request);
-  if (quote.execution === "serverTransaction") {
-    const server: ServerTransactionSwapQuote = quote;
-    const transaction: RuntimeTransaction = server.transaction;
-    // @ts-expect-error Server transactions must not expose rebuildable router instructions.
-    server.instructions;
-    return { message: transaction.message, quoteId: server.rfq.quoteId };
-  }
   const router: RouterSwapQuote = quote;
   // @ts-expect-error Router quotes contain instructions rather than a server transaction.
   router.transaction;
@@ -65,11 +60,13 @@ export async function receiveQuoteRemainsRouter(client: RouterClient, request: Q
   return quote.instructions;
 }
 
-export function clientWithComposableAethSells(source: RouterDataSource, directRfqQuoteProvider: DirectRfqQuoteProvider): RouterClient {
-  const options: RouterClientOptions = { source, network: "mainnet", directRfqQuoteProvider, composableAethSells: true };
-  // @ts-expect-error The explicit opt-in must be boolean.
-  const invalid: RouterClientOptions = { ...options, composableAethSells: "true" };
-  void invalid;
+export function clientWithNativeAethSwaps(source: RouterDataSource, directRfqQuoteProvider: DirectRfqQuoteProvider): RouterClient {
+  const options: RouterClientOptions = { source, network: "mainnet", directRfqQuoteProvider };
+  // @ts-expect-error Composable sells are always enabled with the mainnet provider.
+  const invalidSells: RouterClientOptions = { ...options, composableAethSells: false };
+  // @ts-expect-error Composable buys are always enabled with the mainnet provider.
+  const invalidBuys: RouterClientOptions = { ...options, composableAethBuys: false };
+  void invalidSells; void invalidBuys;
   return createRouterClient(options);
 }
 
@@ -77,4 +74,15 @@ export function serverQuoteRequiresId(quote: Omit<ServerTransactionSwapQuote, "r
   // @ts-expect-error Every server transaction needs RFQ submission metadata.
   const invalid: SwapQuote = quote;
   return invalid;
+}
+
+export function boundedTreasuryResponse(quote: DirectRfqQuote): DirectRfqQuote {
+  const treasuryAuthorization: TreasuryAuthorization = { version: 1, minAmountIn: 995n, maxAmountIn: 1005n };
+  // @ts-expect-error HTTP decimal strings must be decoded before entering the SDK.
+  const invalid: TreasuryAuthorization = { version: 1, minAmountIn: "995", maxAmountIn: "1005" };
+  const terms: TreasuryMintTerms = { issuanceId: new Uint8Array(32), quotedInput: 1000n,
+    quotedOutput: 500n, minInput: treasuryAuthorization.minAmountIn, maxInput: treasuryAuthorization.maxAmountIn,
+    expiryMs: quote.expiresAtMs };
+  void invalid; void terms;
+  return { ...quote, treasuryAuthorization };
 }
