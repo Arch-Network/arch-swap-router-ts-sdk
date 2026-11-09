@@ -86,8 +86,15 @@ configured capabilities; a quote still depends on valid state and liquidity.
 Match pairs by their mint addresses; list order follows deterministic graph node
 order and is not an application identifier.
 
-Mainnet's router, CLAMM pool/program, PropAMM deployment and aBTC/aUSD mints are
-configured in [src/config/networks.ts](src/config/networks.ts). Its CLAMM pool
+The exported `MAINNET_MINTS` is the shared source for aBTC, aUSD, primeBTC,
+primeUSD, aETH and aHYPE. Mainnet `router.mints` exposes all six; testnet
+exposes its four deployed core tokens. `NetworkMints` marks aETH/aHYPE as
+optional because they are absent on testnet. Mint metadata alone does not
+activate an RFQ route; `supportedPairs` reflects the supplied providers.
+
+Mainnet's router, CLAMM pool/program and PropAMM deployment are configured in
+[src/config/networks.ts](src/config/networks.ts), with token mint identities in
+[src/config/mainnet-mints.ts](src/config/mainnet-mints.ts). Its CLAMM pool
 orders aBTC as token A and aUSD as token B. Its vaults and prime-token mints
 match the mainnet-v2 deployment. The BTC RFQ and aETH market use the same
 PropAMM program and config. The client exposes all 12 core pairs, plus sixteen
@@ -560,3 +567,41 @@ PropAMM `fill_limit_order` instruction for the expected order. The server's
 The ABI, layout, PDA and math tests use native PropAMM fixtures; see
 [tests/fixtures/limit-orders](tests/fixtures/limit-orders/README.md). They do
 not show that limit orders are deployed on either network.
+
+
+### Prime sells with built-in markets
+
+On mainnet, supplying `directRfqQuoteProvider` enables the router's built-in
+primeBTC/aUSD and primeUSD/aUSD inventory sell markets, alongside ETH/HYPE.
+The SDK owns the mints, custody accounts and trusted PropMM identities.
+Apps supply no market list, deployment addresses or treasury settings.
+`createDirectRfqProvider` in `examples/aeth-usd.ts` handles these sells too.
+
+For exact-input Prime sells to aUSD, `routePreference` defaults to `"auto"`:
+
+- `"auto"` compares available routes and selects the highest output. A vault
+  route wins a tie against a PropMM route.
+- `"vault"` requires redemption first. For primeBTC this includes a subsequent
+  BTC/USD swap, through CLAMM or the legacy BTC/USD provider when supplied.
+  The direct Prime sell provider is never queried.
+- `"propamm"` requires a direct Prime/aUSD sale and never falls back to the vault.
+
+```ts
+const router = createRouterClient({
+  network: "mainnet", source, directRfqQuoteProvider,
+});
+const quote = await router.quoteExactIn({
+  inputMint: router.mints!.primeBTC,
+  outputMint: router.mints!.aUSD,
+  amountIn: 1_000n, user, slippageBps: 50,
+  deadlineMs: Date.now() + 30_000,
+  routePreference: "auto",
+});
+```
+
+The deployed primeBTC market settles in aUSD, not aBTC. Direct Prime buys use a
+separate execution ABI and are not enabled here. Existing vault mint/redeem
+routes remain available without an RFQ provider. Account errors stay local to
+affected candidates, reads are bounded, and expired sell quotes are rejected.
+The quote retains its RFQ identity for PropMM co-signing. This SDK change does
+not add an automatic redemption loop for PropMM's acquired shares.

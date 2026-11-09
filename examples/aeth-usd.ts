@@ -1,7 +1,8 @@
 import { TransactionUtil } from "@arch-network/arch-sdk";
 import { base58, hex } from "@scure/base";
+import { MAINNET_DIRECT_RFQ_MARKETS } from "../src/config/direct-rfq-markets.js";
 import {
-  compileRouterMessage, createRouterClient, MAINNET_AETH_USD as market, MAINNET_AHYPE_USD, RouterSdkError,
+  compileRouterMessage, createRouterClient, MAINNET_AETH_USD as market, RouterSdkError,
   type DirectRfqQuoteProvider, type QuoteExactInRequest, type RouterDataSource, type TreasuryAuthorization,
   type RuntimeTransaction, type RouterSwapQuote,
 } from "../src/index.js";
@@ -132,10 +133,10 @@ export function createDirectRfqProvider(rfqUrl: string, post: AethUsdExampleOpti
   const url = `${rfqUrl.replace(/\/+$/, "")}/quote`;
   return {
     async quoteExactIn(input) {
-      const selected = [market, MAINNET_AHYPE_USD].find(candidate =>
-        (input.inputMint === candidate.quoteMint && input.outputMint === candidate.baseMint)
-        || (input.inputMint === candidate.baseMint && input.outputMint === candidate.quoteMint));
-      if (!selected) throw new RouterSdkError("UNSUPPORTED_PAIR", "This provider supports mainnet aUSD ↔ aETH/aHYPE.");
+      const selected = MAINNET_DIRECT_RFQ_MARKETS.find(({ deployment: candidate, sides }) =>
+        (sides.some(side => side === "buy") && input.inputMint === candidate.quoteMint && input.outputMint === candidate.baseMint)
+        || (sides.some(side => side === "sell") && input.inputMint === candidate.baseMint && input.outputMint === candidate.quoteMint))?.deployment;
+      if (!selected) throw new RouterSdkError("UNSUPPORTED_PAIR", "This provider supports mainnet aUSD ↔ aETH/aHYPE and Prime → aUSD sells.");
       const buy = input.inputMint === selected.quoteMint;
       // Encode the u64 amount as a JSON numeric literal without a Number conversion.
       // All interpolated strings below are hex or fixed literals, and the SDK has
@@ -149,7 +150,7 @@ export function createDirectRfqProvider(rfqUrl: string, post: AethUsdExampleOpti
   };
 }
 
-/** Compatibility name; the provider handles both configured mainnet RFQ markets. */
+/** Compatibility name; the provider handles the built-in mainnet RFQ markets. */
 export const createAethUsdRfqProvider = createDirectRfqProvider;
 
 /** Quote first so the caller can review the amount before invoking the wallet. */

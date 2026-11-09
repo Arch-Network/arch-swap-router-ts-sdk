@@ -31,7 +31,7 @@ it.each(["buy", "sell"] as const)("uses aHYPE's mint and native amount in a %s H
   expect(quote.estimatedAmountOut).toBe(state.rfq.estimatedAmountOut);
 });
 
-it.each(Object.values(NETWORKS.mainnet.mints))("quotes aHYPE through HTTP after a prefix from %s", async inputMint => {
+it.each((["aBTC", "aUSD", "primeBTC", "primeUSD"] as const).map(symbol => NETWORKS.mainnet.mints[symbol]))("quotes aHYPE through HTTP after a prefix from %s", async inputMint => {
   const state = setupComposableAhype(inputMint, "buy");
   const post = vi.fn(async (_url: string, body: string) => {
     const amountIn = BigInt(JSON.parse(body).amount);

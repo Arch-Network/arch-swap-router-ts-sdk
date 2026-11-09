@@ -29,7 +29,7 @@ describe("composable aETH sell discovery", () => {
       expect.objectContaining({ inputMint: market.baseMint, outputMint: market.quoteMint, allowClamm: true }),
       expect.objectContaining({ inputMint: market.quoteMint, outputMint: market.baseMint, allowClamm: true }),
     ]));
-    expect(config.propammMarkets.map((entry) => entry.config)).toEqual([market.config, market.config, market.config]);
+    expect(config.propammMarkets.map((entry) => entry.config)).toEqual(Array(5).fill(market.config));
     expect(config.propammMarkets.every((entry) => Object.isFrozen(entry) && Object.isFrozen(entry.sides))).toBe(true);
     expect(findRoutes(graph, market.baseMint, usd.shareMint)[0]!.steps.map((step) => step.operation)).toEqual(["propamm", "vaultMint"]);
     expect(supportedPairs(graph)).toHaveLength(20);
@@ -207,7 +207,11 @@ describe("composable aETH quotes", () => {
     expect(state.propAmmQuoteProvider.quoteExactIn).toHaveBeenCalledExactlyOnceWith({
       inputMint: request.inputMint, outputMint: request.outputMint, amountIn: request.amountIn, user: request.user,
     });
-    expect(state.directRfqQuoteProvider.quoteExactIn).not.toHaveBeenCalled();
+    // The graph can also mint Prime shares and sell them. That candidate must
+    // request Prime/USD, never send the BTC/USD quote to the direct provider.
+    expect(state.directRfqQuoteProvider.quoteExactIn).toHaveBeenCalledExactlyOnceWith({
+      ...request, inputMint: config.mints.primeBTC, amountIn: 990_000n,
+    });
   });
 
   it("preserves u64-scale native inputs without number conversion", async () => {

@@ -14,7 +14,7 @@ function wire(quote: DirectRfqQuote) {
 beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(native.now_ms); });
 afterEach(() => { vi.restoreAllMocks(); });
 
-it.each(Object.values(NETWORKS.mainnet.mints))("decodes a metadata-free native HTTP buy after a prefix from %s", async inputMint => {
+it.each((["aBTC", "aUSD", "primeBTC", "primeUSD"] as const).map(symbol => NETWORKS.mainnet.mints[symbol]))("decodes a metadata-free native HTTP buy after a prefix from %s", async inputMint => {
   const state = setupComposableAethBuy(inputMint);
   let response: DirectRfqQuote | undefined;
   let original: string | undefined;

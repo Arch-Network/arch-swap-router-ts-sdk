@@ -4,7 +4,9 @@
 
 `quote.e2e.test.ts` contains 28 live cases: the 12 core directed pairs plus
 eight buy/sell routes for each of aETH and aHYPE (treasury buys and native sells).
-A configured mainnet direct RFQ provider automatically enables both markets; no composability flags are required.
+The direct RFQ provider also enables the built-in Prime sell markets.
+`prime-sells.e2e.test.ts` adds two live cases for primeBTC/aUSD and primeUSD/aUSD.
+No app-supplied deployment, market list or composability flags are required.
 
 | Route type | Pairs |
 | --- | --- |
@@ -290,3 +292,25 @@ See the dynamic routing plan's Step 5 log for commands and temporary artifacts.
 This audit does not launch an actual browser or consumer frontend. Step 6 covers
 final offline validation and live quote-only construction. No current fixture
 proves live executability or adequate compute provisioning.
+
+
+## Built-in Prime sell validation
+
+On 2026-11-09, both cases in `prime-sells.e2e.test.ts` passed against mainnet
+RPC and the public PropMM service. Each test compares Auto routing with the
+returned maker quote, then forces that same quote through the router. For
+1,000 raw primeBTC and 100,000 raw primeUSD, Auto selected vault redemption
+plus CLAMM and vault redemption respectively. Both forced maker bundles
+compiled to 756 bytes with signature space reserved. These are unsigned quote
+checks, not funded execution or server co-signing tests.
+
+```sh
+ARCH_RPC_URL=https://rpc.mainnet.arch.network \
+  corepack pnpm exec vitest run tests/prime-sells.e2e.test.ts
+```
+
+Captured responses in `fixtures/prime-sells/quotes.json` also run offline
+through the HTTP adapter and pinned router validators. The offline routing
+tests cover both deployed pairs, vault/direct preference isolation, provider
+and reserve failures, reserve-plus-BTC/USD RFQs, expiry, custody substitution,
+and the unsupported primeBTC/aBTC direct maker pair.

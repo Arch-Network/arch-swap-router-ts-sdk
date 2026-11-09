@@ -13,6 +13,8 @@ export interface QuoteExactInRequest {
   readonly inputMint: Address;
   readonly outputMint: Address;
   readonly amountIn: bigint;
+  /** Mainnet Prime → aUSD sells: compare exits, require redemption, or require the direct maker. */
+  readonly routePreference?: "auto" | "vault" | "propamm";
   readonly slippageBps: number;
   readonly user: Address;
   /** Absolute Unix milliseconds: encoded by router instructions, a client submission deadline for server transactions. */
@@ -119,13 +121,13 @@ export interface RouterClientOptions {
   readonly source: RouterDataSource;
   /** Optional exact-input alternative to CLAMM; must use the selected network. Each RFQ waits at most 2s. */
   readonly propAmmQuoteProvider?: PropAmmQuoteProvider;
-  /** aETH/aUSD and aHYPE/aUSD native or treasury packets; enables both markets' mainnet graph routes. */
+  /** Enables built-in mainnet ETH/HYPE routes and Prime → aUSD inventory sells. */
   readonly directRfqQuoteProvider?: DirectRfqQuoteProvider;
 }
 
 export interface RouterClient {
   readonly network: Network;
-  /** Null until the selected network's deployment is configured. */
+  /** Network mint registry, including aETH/aHYPE on mainnet. Null if the network is unconfigured. */
   readonly mints: NetworkMints | null;
   readonly supportedPairs: readonly { readonly inputMint: Address; readonly outputMint: Address }[];
   quoteExactIn(request: QuoteExactInRequest): Promise<RouterSwapQuote>;

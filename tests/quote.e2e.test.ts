@@ -170,8 +170,10 @@ for (const [symbol, market] of [["aETH", ethUsd], ["aHYPE", hypeUsd]] as const) 
         return rfq;
       }) };
       const router = createRouterClient({ source, network: "mainnet", directRfqQuoteProvider });
-      const mints = { ...router.mints!, aETH: ethUsd.baseMint, aHYPE: hypeUsd.baseMint };
-      const request = { inputMint: mints[input], outputMint: mints[output], amountIn: amounts[input],
+      const mints = router.mints!;
+      const inputMint = mints[input], outputMint = mints[output];
+      if (!inputMint || !outputMint) throw new Error("Mainnet mint missing from router metadata");
+      const request = { inputMint, outputMint, amountIn: amounts[input],
         user, slippageBps: 100, deadlineMs: Date.now() + 30_000 };
       const quote = await router.quoteExactIn(request);
 

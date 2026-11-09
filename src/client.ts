@@ -36,7 +36,22 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
     if (!config || !graph) throw new RouterSdkError("NETWORK_NOT_CONFIGURED", `${network} deployment is not configured.`);
     const { inputMint, outputMint, slippageBps, user, deadlineMs } = request;
     validateRequest(request, amount, forOutput);
-    const candidates = findRoutes(graph, inputMint, outputMint, { forOutput });
+    const preference = request.routePreference ?? "auto";
+    if (!["auto", "vault", "propamm"].includes(preference)) {
+      throw new RouterSdkError("INVALID_REQUEST", "Unknown route preference.");
+    }
+    const primeSell = network === "mainnet" && outputMint === config.mints.aUSD
+      && (inputMint === config.mints.primeBTC || inputMint === config.mints.primeUSD);
+    if (preference !== "auto" && (forOutput || !primeSell)) {
+      throw new RouterSdkError("UNSUPPORTED_PAIR", "Route preference requires an exact-input Prime sell to aUSD.");
+    }
+    if (primeSell && deadlineMs <= Date.now()) throw new RouterSdkError("RFQ_EXPIRED", "Sell deadline has expired.");
+    const candidates = findRoutes(graph, inputMint, outputMint, { forOutput }).filter(route => {
+      if (preference === "auto") return true;
+      // primeBTC's vault exit includes a subsequent BTC/USD swap.
+      return preference === "vault" ? route.steps[0]!.operation === "vaultRedeem"
+        : route.steps.length === 1 && route.steps[0]!.venue === "propamm";
+    });
     const directMarket = directMarkets.find(({ deployment }) => inputMint === deployment.baseMint || outputMint === deployment.baseMint);
     if (!candidates.length) {
       throw new RouterSdkError("UNSUPPORTED_PAIR", forOutput && directMarket
@@ -54,10 +69,12 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
         return composableDirectRfqSwap(swap, await directProvider.quoteExactIn({ ...swap }), deployment);
       },
     });
-    return quoteCandidates({
+    const result = await quoteCandidates({
       candidates, state, config, request: { inputMint, outputMint, slippageBps, user, deadlineMs },
       amount, forOutput, propAmmQuoteProviders: providers,
     });
+    if (primeSell && result.deadlineMs <= Date.now()) throw new RouterSdkError("RFQ_EXPIRED", "Sell quote expired during selection.");
+    return result;
   }
   return Object.freeze<RouterClient>({
     network,
