@@ -2,113 +2,64 @@
 
 ## Live quote smoke test
 
-`quote.e2e.test.ts` contains 18 live quote cases: the original 14 directions
-among aBTC, aUSD, primeBTC, primeUSD and aETH, plus four opted-in composable
-aETH sell cases (aUSD, primeUSD, aBTC and primeBTC output):
+`quote.e2e.test.ts` contains 28 live cases: the 12 core directed pairs plus
+eight buy/sell routes for each of aETH and aHYPE (treasury buys and native sells).
+A configured mainnet direct RFQ provider automatically enables both markets; no composability flags are required.
 
 | Route type | Pairs |
 | --- | --- |
 | Asset swap | aBTC ↔ aUSD |
-| Direct server RFQ | aETH ↔ aUSD |
 | Direct vault mint/redeem | aBTC ↔ primeBTC; aUSD ↔ primeUSD |
 | Vault plus swap | primeBTC ↔ aUSD; primeUSD ↔ aBTC |
 | Redeem, swap, mint | primeBTC ↔ primeUSD |
-| Composable aETH sell | aETH → aUSD/primeUSD/aBTC/primeBTC |
+| aETH native swap or treasury mint | aETH ↔ aUSD/primeUSD/aBTC/primeBTC |
+| aHYPE native swap or treasury mint | aHYPE ↔ aUSD/primeUSD/aBTC/primeBTC |
 
-Inputs are 1 aUSD/primeUSD, 0.00001 aBTC/primeBTC, or 0.001 aETH. aETH uses
-9 decimals; aUSD uses 6. Each test checks an explicit expected token path and
-operation sequence and positive estimated/minimum output. Router quotes must
-contain instructions, every hop must consume the preceding hop's estimated
-output, and the final hop must match the overall estimate.
+Inputs are 1 aUSD/primeUSD, 0.00001 aBTC/primeBTC or 0.001 aETH/aHYPE. Tests assert
+explicit mint paths, operations, hop amounts, final-only slippage, RFQ terms
+and quote IDs, deadline clamping, signer privileges and transaction limits.
+Bundles are compiled with a zero blockhash and reserved signature bytes for
+measurement against the dependency's 4,096-byte and 50-account limits.
+No wallet signing or transaction submission occurs.
 
-Router instruction bundles are compiled with a zero blockhash for size
-measurement. ETH/USD quotes retain the original server transaction and are
-measured without recompilation. All routes are checked against the dependency's
-**4,096-byte** and **50-account-key** limits, including program keys and one
-64-byte signature for CLAMM/vault-only routes or both signatures for PropAMM/direct
-RFQ. Placeholder signatures are used only
-for size measurement; the tests do not sign or submit transactions.
-
-BTC/USD swap legs also request PropAMM quotes from
-`https://vaults.veloxapi.net/propamm/rfq/quote`, using the test-only HTTP adapter
-in `helpers/propamm-rfq.ts`. The SDK compares CLAMM and PropAMM by final output;
-CLAMM wins ties. The tests require exactly one fresh RFQ for the swap leg using
-its actual asset mints and net input after any vault redemption. Direct vault
-mint/redeem routes must make no RFQ requests. A selected PropAMM hop must match
-the received RFQ's quote ID and estimate. For routes ending in a swap, the final
-estimate must be at least the RFQ estimate. A vault suffix changes output units
-from assets to shares, so these raw amounts are not compared across that suffix.
-
-ETH/USD routes use the separate `directRfqQuoteProvider` and the HTTP decoder
-exported as `createAethUsdRfqProvider` by `examples/aeth-usd.ts`, at the same RFQ
-endpoint. The tests request 1 aUSD → aETH and 0.001 aETH → aUSD with 100 BPS
-slippage. They require one HTTP quote call, no account reads or BTC/USD RFQ calls,
-an unsigned `serverTransaction` result, the original message bytes and quote ID,
-and a fresh deadline. Buys must use `treasuryMint`; sells must use `propamm`.
-
-It uses a dummy public key and only reads state; no wallet, funded balance,
-signing or transaction submission is needed.
-The reader normalizes JSON byte arrays and supplies an empty legacy `utxo`
-field when the RPC omits it; quote calculation does not use that field.
-
-Each test prints the selected route from `quote.hops`, a table of each hop's raw
-input/output, the final estimate, and the serialized transaction size with its
-signature count. BTC/USD swap routes also print the PropAMM RFQ estimate.
-Depending on prices, the routes can differ by direction, for example:
-
-```text
-Route: aUSD --[propamm]--> aBTC
-Route: aBTC --[clamm]--> aUSD
-Route: aBTC --[vaultMint]--> primeBTC
-Route: primeUSD --[vaultRedeem]--> aUSD --[propamm]--> aBTC --[vaultMint]--> primeBTC
-Route: aUSD --[treasuryMint]--> aETH
-Route: aETH --[propamm]--> aUSD
-```
-
-All live tests are skipped unless `ARCH_RPC_URL` is set. Run them with a mainnet RPC:
+Core BTC/USD swaps compare CLAMM with the optional native PropAMM provider.
+RFQ HTTP/decoding/expiry failures fail the smoke checks even when the SDK can
+fall back to CLAMM. Vault-only routes make no RFQ requests. The shared HTTP
+adapter is the exported `createDirectRfqProvider` from `examples/aeth-usd.ts`;
+every aETH/aHYPE route must use exactly one native RFQ. Account-read budgets are
+zero/one/two/two for the USD/primeUSD/BTC/primeBTC counterpart, with no repeated
+successfully fetched addresses. Buys use net aUSD input after any prefix.
 
 ```sh
 ARCH_RPC_URL=https://rpc.mainnet.arch.network \
   corepack pnpm exec vitest run tests/quote.e2e.test.ts
 ```
 
-Append `-t aETH` to run all six ETH cases.
-Use `-t 'composable aETH'` to run only the four composable sell cases. These
-require zero/one/two/two account-reader calls for aUSD/primeUSD/aBTC/primeBTC,
-respectively, and one fresh native aETH sell
-RFQ, preserved terms/quote ID and original response, router instruction bundles,
-final-only slippage, and both transaction limits. BTC outputs must use CLAMM
-after the native sell; primeBTC adds a final vault mint. The tests assert the
-explicit mint path, hop amounts, native compact terms, signer privileges,
-deduplicated account reads and deadline clamping. `-t aETH` also includes the
-original two direct ETH directions.
+All live tests are skipped without `ARCH_RPC_URL`. Set `ARCH_RFQ_URL` to override
+the default `https://vaults.veloxapi.net/propamm/rfq` base (including `/rfq`,
+without `/quote`). The HTTP adapter aborts after 1.8 seconds, within the SDK's
+two-second RFQ budget, without retries. The RPC must match mainnet.
 
-The targeted composable run on **2026-11-03** passed **3/4**: aUSD and both
-new BTC outputs passed; primeUSD failed with `STALE_NAV` from the USD vault.
-The other 14 cases were filtered out. Both BTC outputs used two account-reader
-calls, with 1,105/1,338 bytes, respectively. The USD vault
-needs a fresh NAV before the primeUSD mint quote can pass. The report is
-`/tmp/router-aeth-clamm-smoke.log`. This run checks live quoting and instruction
-construction; server co-signing and transaction execution remain unverified.
+Use `-t 'composable aETH'` or `-t aETH` for all eight ETH cases,
+`-t 'composable aETH buy'` for four buys, or `-t 'composable aETH sell'` for
+four sells. Use `-t aHYPE` for all eight HYPE cases, or
+`-t 'composable aHYPE buy'` / `-t 'composable aHYPE sell'` for either side.
 
-The RPC endpoint must match the client's `mainnet` network. Set `ARCH_RFQ_URL`
-to override the default RFQ base URL (including `/rfq`, without `/quote`). The
-HTTP adapter preserves native u64 terms, rejects unsafe numeric JSON output
-metadata, and validates the returned trade's program, config, user, mints and
-encoded input. It aborts HTTP requests after 1.8 seconds, within the SDK's
-2-second RFQ budget, without retries.
+The last native buy run on **2026-11-03**, before removing the flags, executed
+all four cases and failed all four with `INVALID_RFQ`: the deployed service
+returned a token transfer (tag 3) plus bridge mint (tag 21). Native routes reject
+those packets. Its actual market configuration/deployment must serve native
+buys and have aETH inventory before rerunning. Report:
+`/tmp/router-native-aeth-buy-smoke.log`.
 
-Output depends on live liquidity, so the tests check positive amounts rather
-than a fixed price. RFQ HTTP/decoding/expiry failures fail the smoke tests even
-when the SDK falls back to CLAMM; they cannot silently pass without RFQ coverage.
-This includes ETH/USD `quote_not_executable` inventory errors; neither direction
-is skipped or marked as an expected failure when its provider is unavailable.
-RPC, deployment and liquidity failures also fail the tests. Vault mint quotes
-can reject stale NAV, paused vaults or deposit caps; immediate redeem quotes
-can reject a nonempty queue or insufficient reserves. These failures remain
-visible rather than being skipped. This verifies live quote generation and
-instruction construction. Funded signing, submission and confirmation tests
-are still needed to establish transaction execution.
+The previous sell-only run passed 3/4: aUSD and both BTC outputs passed, while
+primeUSD reported `STALE_NAV`. BTC outputs used two reads and 1,105/1,338 signed
+bytes. Report: `/tmp/router-aeth-clamm-smoke.log`. These historical live runs
+have not been repeated for the default-composition change. RPC, liquidity,
+NAV, queue, cap and deployment failures remain visible; they are not skipped.
+Funded signing, server co-signing and confirmation remain separate checks.
+
+## Historical routing validation
 
 The final routing validation on **2026-11-03** passed typecheck, build, and all
 **825 offline tests** (14 live cases skipped for that offline run). The separate
@@ -131,39 +82,33 @@ native Buy/Sell trade bytes. It covers both payload lengths, account-index
 resolution, adjusted estimates, full-u64 precision, substituted identities,
 malformed payloads and HTTP errors without retries.
 
-## aETH/aUSD direct RFQ coverage
+## aETH and aHYPE routing coverage
 
-`composable-aeth.test.ts` has 44 offline cases for the explicit sell opt-in,
-market-specific edges/providers, shared-config edge identities, server capability
-filtering, deduplicated 17-pair metadata, and unchanged direct buys/defaults.
-It reuses the independent native aETH sell transaction and Rust vault-layout
-fixtures to verify original compact terms, native vault/nonce identities,
-the router's read-only maker signer, suffix fees and final slippage, u64 input
-precision, byte/account limits, expiry/timeout handling, malformed quotes,
-request snapshotting, actionable vault errors and no direct fallback. aUSD
-outputs read no accounts; primeUSD outputs use one four-account batch with
-no pool/tick reads. BTC outputs cover PropAMM → CLAMM and the optional BTC
-vault mint, both within two reads, including expiry during tick loading and
-tick/cap failures without direct-sell fallback. Unsupported reverse/receive
-paths reject before I/O.
-Public consumer type tests cover the optional boolean flag.
+`composable-aeth.test.ts` has 42 sell/graph tests and
+`composable-aeth-buy.test.ts` has 28 buy tests. They cover all eight routes,
+28-pair metadata without switches, market/provider identity, prefix/suffix
+amounts, final slippage, native terms, two-read batching, u64 precision,
+expiry, malformed packets and provider failures without direct fallback.
+Treasury buys are covered separately by `composable-aeth-treasury.test.ts`.
+All four input routes preserve the server-issued authorization, including
+explicit fixed bounds and bounded ranges. Missing authorization rejects with
+`INVALID_RFQ` after one provider call; no bounds are synthesized and no fallback
+is attempted. The HTTP/signing example also verifies that rejection occurs before
+fetching a blockhash, opening the wallet or submitting a transaction.
+Clients without a direct RFQ provider retain the 12 core pairs;
+testnet ignores that provider.
 
-The CLAMM follow-up passes typecheck, build, and **901 offline tests** (18 live
-cases and the optional Rust interoperability test skipped). The HTTP example
-tests cover native sells without redundant expiry metadata, full-u64 encoded
-expiry and mismatched metadata, including both mixed BTC destinations.
-
-`propamm-clamm.interop.test.ts` separately passes all four SDK router packets
-through the external server's unmodified Rust validator and Arch 0.13 runtime
-sanitizer. See [the replay instructions](fixtures/propamm-clamm/README.md).
-It validates quote/account contracts and packet limits; it does not co-sign,
-submit or execute. Both BTC quote-only smoke cases now pass live; server
-co-signing and execution remain unverified.
-
-The earlier targeted live composable USD sell run passed both
-cases: zero/one reader calls and 756/989 bytes with required signatures reserved.
-The other 14 live cases were filtered out, not rerun. Reports and the native
-validator replay are recorded in the plan's composable-sell follow-up.
+`examples/aeth-native-buy.test.ts` retains 10 HTTP cases for metadata-free
+native buys, full-u64 fields, unsafe metadata and all four buy prefixes.
+`propamm-clamm.interop.test.ts` passes sixteen native SDK router packets and all
+four treasury routes per asset with fixed and bounded issued authorization (32 packets total)
+through the unmodified external Rust validator and Arch 0.13 runtime sanitizer.
+It uses the real server authorization module and native payment/mint builder.
+It rejects altered treasury terms/accounts/privileges, missing issued authorization
+and substituted nominal-only bounds, while retaining native and CLAMM mutation
+checks. See [the replay instructions](fixtures/propamm-clamm/README.md).
+The largest packet is 1,511 bytes with two signature slots and 36 accounts.
+This validates structural contracts, not signatures, transaction submission or execution.
 
 `config/aeth-usd.test.ts` replays unsigned buy/sell fixtures generated by the
 pinned Rust `minting` builders. It checks programs, account order, PDA/ATA
@@ -191,23 +136,28 @@ PropAMM coverage retains the native fixture byte
 comparisons and verifies that a 1,257-byte bundle with distinct fee destinations
 is now eligible under the higher limit.
 
-`direct-rfq-client.test.ts` covers opt-in mainnet metadata and public dispatch,
-both original server transactions, alternate valid account ordering/blockhashes,
-earlier client deadlines (one millisecond before and exactly at expiry), invalid
-responses, provider errors, timeout cleanup and absence of retries/fallback or
-account reads. Unsupported ETH combinations and receive sizing reject; clients
-without the provider and testnet clients retain their existing routes.
-`types/direct-rfq.ts` checks the public provider contract and quote-result
-narrowing with positive and negative consumer type assertions.
+`direct-rfq-client.test.ts` covers automatic mainnet graph dispatch, frozen
+28-pair metadata, native packet preservation with alternate account ordering
+and blockhashes, request validation, deadlines, timeout cleanup, provider
+failures and rejection of treasury/direct fallback. `types/direct-rfq.ts`
+checks that client results are directly usable as `RouterSwapQuote` and that
+the removed flags are rejected by TypeScript.
 
-These tests validate message layouts offline. Missing-output-account creation,
-funded balances and execution against deployed programs still need runtime smoke
-coverage. `examples/aeth-usd.test.ts` runs the working example through mocked HTTP,
-wallet signing, submission and confirmation in both directions. It checks original
-message preservation, full-u64 input JSON encoding, safe metadata decoding,
-malformed bytes, deadline checks around the wallet, unchanged retry payloads,
-known-hash confirmation retries, concurrency and failure propagation. It does not
-execute deployed programs or simulate their account-creation CPIs.
+`examples/aeth-usd.test.ts` has 56 mocked HTTP/wallet/submission cases. The
+example compiles the new router bundle with an application-provided fresh
+blockhash, while retaining the original quote packet unchanged. Tests cover
+blockhash format/fetch expiry, request snapshotting, full-u64 encoding, safe
+metadata decoding, mutation checks, exact-body retries, known-hash confirmation,
+concurrency and failure propagation. No deployed programs or CPIs are executed.
+
+`composable-ahype.test.ts` covers all eight HYPE directions, optional native-buy
+resolution, one quote ID, the 0/1/2/2 read budget, required treasury authorization,
+expiry and receive-sizing rejection, provider gating, timeouts and ETH/HYPE packet
+substitution. Metadata contains 28 unique pairs and excludes both two-RFQ ETH/HYPE
+directions. `examples/ahype-usd.test.ts` exercises the shared HTTP adapter's HYPE
+mints, prefix-sized amounts, treasury metadata and native expiry decoding.
+`config/ahype-usd.test.ts` verifies the mint, vault and bridge asset against the
+[captured public accounts and unsigned quotes](fixtures/ahype-usd/README.md).
 
 ## Existing router coverage
 

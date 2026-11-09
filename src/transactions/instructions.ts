@@ -8,6 +8,14 @@ import type { BuildSwapInput, ResolvedStep } from "./types.js";
 import { assertMessageLimits } from "./size.js";
 
 function venueAccounts(step: ResolvedStep, programs: ProgramIds): AccountMeta[] {
+  if (step.kind === "treasuryMint") {
+    return [
+      account(step.bridgeProgramId), account(step.treasuryAuthority, true, true),
+      account(step.bridgeConfig), account(step.assetConfig), account(step.issuanceReceipt, true),
+      account(step.mintAuthority), account(step.propammConfig), account(step.paymentVault, true),
+      account(programs.associatedTokenProgramId), account(programs.systemProgramId),
+    ];
+  }
   if (step.kind === "propamm") {
     return [
       account(step.programId), account(step.config), account(step.maker, false, true),
@@ -53,12 +61,12 @@ export function buildRouterInstruction(input: BuildSwapInput, programs: ProgramI
       aToB: step.aToB,
       sqrtPriceLimit: step.sqrtPriceLimit,
       supplementalTickArrayCount: step.supplementalTickArrays.length,
-    } : step.kind === "propamm" ? { kind: step.kind, terms: step.terms } : { kind: step.kind }),
+    } : step.kind === "propamm" || step.kind === "treasuryMint" ? step : { kind: step.kind }),
   });
   const mints = [input.inputMint, ...input.steps.map((step) => step.outputMint)];
   const writableMints = new Set<Address>();
   for (const [index, step] of input.steps.entries()) {
-    if (step.kind === "vaultMint") writableMints.add(step.outputMint);
+    if (step.kind === "vaultMint" || step.kind === "treasuryMint") writableMints.add(step.outputMint);
     if (step.kind === "vaultRedeem") writableMints.add(mints[index]!);
   }
   const accounts = [account(input.user, true, true), account(programs.tokenProgramId)];
@@ -74,14 +82,15 @@ export function buildRouterInstruction(input: BuildSwapInput, programs: ProgramI
   return { program_id: decodeAddress(programs.routerProgramId), accounts, data };
 }
 
-/** Native RFQ layout: input ATA + router, measured with both required signatures. */
+/** Server-quoted layout: input ATA + router, measured with both required signatures. */
 export function buildPropAmmInstructions(input: BuildSwapInput, programs: ProgramIds): Instruction[] {
   const router = buildRouterInstruction(input, programs);
-  const step = input.steps.find((step) => step.kind === "propamm");
-  if (!step) throw new RouterSdkError("INVALID_RFQ", "Missing PropAMM step.");
-  const maker = decodeAddress(step.maker);
+  const step = input.steps.find((step) => step.kind === "propamm" || step.kind === "treasuryMint");
+  if (!step) throw new RouterSdkError("INVALID_RFQ", "Missing server-quoted step.");
+  const treasury = step.kind === "treasuryMint";
+  const maker = decodeAddress(treasury ? step.treasuryAuthority : step.maker);
   if (router.accounts.filter((meta) => meta.pubkey.every((b, i) => b === maker[i])).length !== 1) {
-    throw new RouterSdkError("INVALID_RFQ", "Maker must appear only in the PropAMM account group.");
+    throw new RouterSdkError("INVALID_RFQ", "Server signer must appear only in its venue account group.");
   }
   const instructions = [{
     program_id: decodeAddress(programs.associatedTokenProgramId),
@@ -96,9 +105,9 @@ export function buildPropAmmInstructions(input: BuildSwapInput, programs: Progra
   // Placeholders are for measurement only; callers compile with a fresh blockhash.
   const message = compileRouterMessage(instructions, input.user, new Uint8Array(32));
   if (message.header.num_required_signatures !== 2
-    || message.header.num_readonly_signed_accounts !== 1) {
-    throw new RouterSdkError("INVALID_RFQ", "RFQ requires a writable user and a read-only maker signer.");
+    || message.header.num_readonly_signed_accounts !== (treasury ? 0 : 1)) {
+    throw new RouterSdkError("INVALID_RFQ", "RFQ user and server signer privileges are invalid.");
   }
-  assertMessageLimits(message, "PropAMM transaction");
+  assertMessageLimits(message, treasury ? "Treasury mint transaction" : "PropAMM transaction");
   return instructions;
 }

@@ -61,12 +61,11 @@ export function buildRouteGraph({ venues, propammMarkets }: NetworkConfig, enabl
   return new Map([...adjacency].map(([mint, outgoing]) => [mint, Object.freeze(outgoing)]));
 }
 
-/** Enumerate simple executable paths, keeping registry order (CLAMM before RFQ). */
-export function findRoutes<Step extends RouteStep>(
-  graph: RouteGraph<Step>, inputMint: Address, outputMint: Address,
-  { forOutput = false }: { readonly forOutput?: boolean } = {},
-): readonly Route<Step>[] {
-  const routes: Route<Step>[] = [];
+/** Depth-first simple paths from one mint, in registry order (CLAMM before RFQ). */
+function walkRoutes<Step extends RouteStep>(
+  graph: RouteGraph<Step>, inputMint: Address, forOutput: boolean,
+  outputMint: Address | undefined, emit: (route: Route<Step>) => void,
+): void {
   const steps: Step[] = [];
   const visited = new Set([inputMint]);
   const visit = (mint: Address, hasRfq: boolean): void => {
@@ -77,9 +76,11 @@ export function findRoutes<Step extends RouteStep>(
       if ((rfq && !edge.allowClamm && steps.some((step) => step.operation === "clamm"))
         || (edge.operation === "clamm" && steps.some((step) => step.operation === "propamm" && !step.allowClamm))) continue;
       steps.push(edge);
-      if (edge.outputMint === outputMint) {
-        routes.push(Object.freeze({ inputMint, outputMint, steps: Object.freeze([...steps]) }));
-      } else {
+      if (outputMint === undefined || edge.outputMint === outputMint) {
+        emit(Object.freeze({ inputMint, outputMint: edge.outputMint, steps: Object.freeze([...steps]) }));
+      }
+      // A targeted search stops at its output; a full search keeps extending the path.
+      if (edge.outputMint !== outputMint) {
         visited.add(edge.outputMint);
         visit(edge.outputMint, hasRfq || rfq);
         visited.delete(edge.outputMint);
@@ -87,28 +88,52 @@ export function findRoutes<Step extends RouteStep>(
       steps.pop();
     }
   };
-  if (inputMint !== outputMint) visit(inputMint, false);
+  visit(inputMint, false);
+}
+
+/** Enumerate simple executable paths, keeping registry order (CLAMM before RFQ). */
+export function findRoutes<Step extends RouteStep>(
+  graph: RouteGraph<Step>, inputMint: Address, outputMint: Address,
+  { forOutput = false }: { readonly forOutput?: boolean } = {},
+): readonly Route<Step>[] {
+  const routes: Route<Step>[] = [];
+  if (inputMint !== outputMint) walkRoutes(graph, inputMint, forOutput, outputMint, (route) => routes.push(route));
   return Object.freeze(routes);
 }
 
-/** Reachability metadata, independent of account state and deduplicated across venues. */
-export function supportedPairs(graph: RouteGraph) {
-  const mints = new Set([...graph.values()].flatMap((edges) => edges.flatMap((edge) => [edge.inputMint, edge.outputMint])));
-  const pairs: { readonly inputMint: Address; readonly outputMint: Address }[] = [];
+/** Every exact-input route, grouped by pair in mint-registry order. One search per input mint. */
+function routesByPair<Step extends RouteStep>(graph: RouteGraph<Step>): readonly (readonly Route<Step>[])[] {
+  const mints = [...new Set([...graph.values()].flatMap((edges) => edges.flatMap((edge) => [edge.inputMint, edge.outputMint])))];
+  const groups: (readonly Route<Step>[])[] = [];
   for (const inputMint of mints) {
+    const byOutput = new Map<Address, Route<Step>[]>();
+    walkRoutes(graph, inputMint, false, undefined, (route) => {
+      const routes = byOutput.get(route.outputMint) ?? [];
+      routes.push(route);
+      byOutput.set(route.outputMint, routes);
+    });
     for (const outputMint of mints) {
-      if (findRoutes(graph, inputMint, outputMint).length) pairs.push(Object.freeze({ inputMint, outputMint }));
+      const routes = byOutput.get(outputMint);
+      if (routes) groups.push(Object.freeze(routes));
     }
   }
-  return Object.freeze(pairs);
+  return groups;
+}
+
+const pairsOf = (groups: readonly (readonly Route[])[]) =>
+  Object.freeze(groups.map(([route]) => Object.freeze({ inputMint: route!.inputMint, outputMint: route!.outputMint })));
+
+/** Reachability metadata, independent of account state and deduplicated across venues. */
+export function supportedPairs(graph: RouteGraph) {
+  return pairsOf(routesByPair(graph));
 }
 
 /** All non-RFQ paths for the selected deployment, generated without a pair table. */
 export function coreRoutes(config: NetworkConfig): readonly Route<CoreRouteStep>[] {
-  const graph = buildRouteGraph(config);
-  return Object.freeze(supportedPairs(graph).flatMap(({ inputMint, outputMint }) => findRoutes(graph, inputMint, outputMint)));
+  return Object.freeze(routesByPair(buildRouteGraph(config)).flat());
 }
 
+const TESTNET_ROUTE_GROUPS = routesByPair(buildRouteGraph(NETWORKS.testnet));
 /** Testnet metadata retained for existing callers; the graph remains package-internal. */
-export const TESTNET_ROUTES = coreRoutes(NETWORKS.testnet);
-export const SUPPORTED_PAIRS = supportedPairs(buildRouteGraph(NETWORKS.testnet));
+export const TESTNET_ROUTES = Object.freeze(TESTNET_ROUTE_GROUPS.flat());
+export const SUPPORTED_PAIRS = pairsOf(TESTNET_ROUTE_GROUPS);

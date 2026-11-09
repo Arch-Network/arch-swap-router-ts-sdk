@@ -1,9 +1,10 @@
-import type { PropAmmQuote } from "../types.js";
+import type { PropAmmQuote, TreasuryMintTerms } from "../types.js";
 
 export type StepArgs =
   | { readonly kind: "vaultMint" }
   | { readonly kind: "vaultRedeem" }
   | { readonly kind: "propamm"; readonly terms: PropAmmQuote["terms"] }
+  | { readonly kind: "treasuryMint"; readonly terms: TreasuryMintTerms }
   | {
       readonly kind: "clamm";
       readonly aToB: boolean;

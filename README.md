@@ -8,26 +8,17 @@ instructions, sized from either a fixed input or an approximate receive amount.
 Supported pairs use graph-generated one-to-three-hop paths
 through the two vaults and the aBTC/aUSD CLAMM, with optional PropAMM RFQs for
 exact-input swaps on either network. An optional mainnet direct RFQ provider adds
-aUSD ↔ aETH exact-input swaps using the original server transactions.
-Opting into `composableAethSells` instead builds router instructions for aETH
-sales to aUSD or primeUSD, using the same direct RFQ provider.
+aETH and aHYPE exact-input buys and sells against aUSD, primeUSD, aBTC and primeBTC.
+All client quotes return router instructions. A validated buy packet resolves
+into a native swap or a terminal treasury mint according to the server response.
 
 **Current status:** all 12 core directions support exact-input quotes and receive
-sizing. An opted-in mainnet direct RFQ provider adds the two aETH/aUSD exact-input
-directions. Unsupported or identical mint pairs reject with `UNSUPPORTED_PAIR`
+sizing. A configured mainnet direct RFQ provider enables eight directions for each asset,
+for 28 unique pairs overall. Unsupported or identical mint pairs reject with `UNSUPPORTED_PAIR`
 before account or provider calls.
-With `composableAethSells: true`, mainnet exposes 15 unique directed pairs:
-aETH → aUSD uses the router and aETH → primeUSD becomes available. Buys retain
-the original direct treasury transaction.
-
-**Latest offline validation (2026-11-03):** typecheck, build, and 882 tests pass,
-including composable aETH sells and the two-call account-loading budget. Both
-new composable sell cases also pass live, using zero/one reader calls and
-756/989 bytes with signatures reserved. Earlier live quote-only tests
-passed 13/14 directions, before the batching follow-up: all twelve core pairs and
-aETH → aUSD. aUSD → aETH rejects because the server's treasury authority and
-bridge program differ from the SDK's pinned deployment. The existing validator
-also rejects that response; deployment alignment remains outstanding.
+Treasury routing requires the server-issued authorization; providers must preserve
+its exact bounds. The removed composability flags are no longer needed.
+See [tests/README.md](tests/README.md) for validation commands and coverage.
 
 Current routing scope, progress, and validation are recorded in
 [DYNAMIC_ROUTING_IMPLEMENTATION_PLAN.md](DYNAMIC_ROUTING_IMPLEMENTATION_PLAN.md).
@@ -42,11 +33,10 @@ output, with CLAMM winning ties; receive sizing selects the smallest valid input
 using only local vault/CLAMM estimates. Every returned bundle fits the dependency's
 transaction byte and account limits.
 The internal graph uses the selected registry, simple paths of at most three
-hops, and at most one PropAMM step. Markets come from the fixed registry, with
-no automatic discovery or public graph configuration. The co-signing server's
-current capabilities exclude routes mixing CLAMM and PropAMM. Default aETH
-server transactions stay on their separate dispatch path; opted-in sells reuse
-validated native quote terms in newly compiled router transactions.
+hops, and at most one server-quoted step. Markets come from the fixed registry,
+with no automatic discovery or public graph configuration. aETH and aHYPE routes can combine
+CLAMM and one native RFQ or terminal treasury step. Co-signing and execution require
+compatible server/router deployments with the matching venue bindings.
 
 ## Frontend API
 
@@ -100,25 +90,22 @@ Mainnet's router, CLAMM pool/program, PropAMM deployment and aBTC/aUSD mints are
 configured in [src/config/networks.ts](src/config/networks.ts). Its CLAMM pool
 orders aBTC as token A and aUSD as token B. Its vaults and prime-token mints
 match the mainnet-v2 deployment. The BTC RFQ and aETH market use the same
-PropAMM program and config. The client exposes all 12 core pairs, plus the two
-optional mainnet aETH/aUSD directions when `directRfqQuoteProvider` is configured.
+PropAMM program and config. The client exposes all 12 core pairs, plus sixteen
+mainnet aETH/aHYPE directions when `directRfqQuoteProvider` is configured.
 Supply a reader and optional RFQ providers for the selected
 network; there is no testnet fallback.
 Account validation, PDA/ATA derivation and instructions use the selected deployment.
 
-`SwapQuote` is a union of `RouterSwapQuote` and `ServerTransactionSwapQuote`.
-Both contain `inputMint`, `outputMint`, `amountIn`, `estimatedAmountOut`,
-`minAmountOut`, `hops`, and `deadlineMs`. Amounts use raw `bigint` units and
+Both client methods return `RouterSwapQuote`, containing `inputMint`, `outputMint`,
+`amountIn`, `estimatedAmountOut`, `minAmountOut`, `hops`, and `deadlineMs`. Amounts use raw `bigint` units and
 addresses use base58 strings.
 
-- `RouterSwapQuote` contains `instructions` and optional `rfq: { quoteId }` when
-  PropAMM wins. Existing quote objects omit `execution`; its optional value is `"router"`.
-- `ServerTransactionSwapQuote` has `execution: "serverTransaction"`, the original
-  unsigned `transaction`, and required `rfq: { quoteId }`. It has no `instructions`.
-
-Check `quote.execution === "serverTransaction"` before accessing router
-instructions. See [Direct RFQ transaction contracts](#direct-rfq-transaction-contracts)
-for the direct provider contract and submission behavior.
+`instructions` is the complete SDK bundle. `rfq: { quoteId }` is present when
+server co-signing is required, including treasury mints. Returned quotes omit
+`execution`; its optional type value is `"router"`. `SwapQuote` and
+`ServerTransactionSwapQuote` remain exported as compatibility types; the client
+does not return the server's original transaction.
+See [the direct RFQ provider contract](#direct-rfq-provider-contract) for submission behavior.
 
 `hops` is an ordered `SwapHop[]` for the selected route. Each hop contains `kind`
 (`vaultMint`, `vaultRedeem`, `clamm`, `propamm`, or `treasuryMint`), `inputMint`, `outputMint`,
@@ -136,7 +123,7 @@ This is approximate receive sizing: execution spends the fixed input and may
 receive less than the target within slippage. It is not exact-output execution
 with a maximum-input allowance.
 
-Both methods support all 12 existing pairs. The two optional ETH/USD directions
+Both methods support all 12 core pairs. The sixteen optional aETH/aHYPE directions
 support `quoteExactIn` only. Receive sizing reuses the fetched, decoded
 state for a bounded local search; the read counts below are unchanged. Targets
 outside the vault/CLAMM limits reject instead of returning a partial quote.
@@ -157,10 +144,9 @@ These budgets apply with or without an RFQ provider and to every
 `quoteForOutput` call. All SDK quotes use at most two account-reader calls;
 failures can stop loading earlier. The first batch contains every known vault,
 pool, and mint account; the second contains the derived CLAMM tick arrays.
-With PropAMM enabled, a swap quote also makes one RFQ provider call. aETH quotes
-on the default direct path make no SDK account reads. Composable aETH sells
-make zero account reads for aUSD output or one four-account USD-vault batch for
-primeUSD output. Both use one direct RFQ provider call.
+With PropAMM enabled, a swap quote also makes one RFQ provider call. aETH/aHYPE buys
+and sells make zero account reads for aUSD, one four-account USD-vault batch for
+primeUSD, and two batches for aBTC or primeBTC. Each uses one direct RFQ provider call.
 Overlapping account requests share pending reads and confirmed absence within a
 quote. Decoded venue state is reused for that quote; subsequent quotes fetch
 fresh state. Each successfully read account is fetched only once. Malformed
@@ -237,12 +223,8 @@ declare const recentBlockhash: Uint8Array; // Fetched by the application.
 
 const router = createRouterClient({ source, propAmmQuoteProvider });
 const quote = await router.quoteExactIn(request);
-if (quote.execution === "serverTransaction") {
-  // Sign quote.transaction.message unchanged and submit under quote.rfq.quoteId.
-} else {
-  const message = compileRouterMessage(quote.instructions, request.user, recentBlockhash);
-  // Sign this message with the user's wallet. quote.rfq selects RFQ server submission.
-}
+const message = compileRouterMessage(quote.instructions, request.user, recentBlockhash);
+// Sign this message with the user's wallet. quote.rfq selects RFQ server submission.
 ```
 
 `quoteExactIn` compares at most two graph candidates for the requested pair.
@@ -329,9 +311,10 @@ tests do not establish live compatibility.
 The packed SDK's public entry point has been checked in Node and an ES2022
 browser-targeted bundle running in an isolated V8 context without Node globals.
 Both runs cover all 12 core exact-input paths, all 12 receive-sizing paths, eight
-router RFQ paths, and both aETH server-transaction directions using offline
-fixtures. Consumer type checks cover the packed declarations and private graph
-boundary. This is package/runtime compatibility coverage; actual-browser app
+router RFQ paths, and the earlier aETH server-transaction API using offline
+fixtures. That historical check predates automatic aETH routing. Consumer type
+checks cover the packed declarations and private graph boundary. This is
+package/runtime compatibility coverage; actual-browser app
 integration and live quote generation are separate checks.
 The package stays private and exports only its root entry point. Wallet signing
 and transport remain application-owned, and graph construction/evaluation stay
@@ -339,9 +322,10 @@ internal to the SDK. Step 6 in the dynamic routing plan records final offline
 validation and live quote-only results; its two-call follow-up log records the
 latest loading changes and offline checks.
 
-## Composable aETH sells
+## Mainnet aETH and aHYPE routing
 
-Enable the mainnet sell routes explicitly using the existing direct provider:
+Configure the direct RFQ provider to enable aETH and aHYPE buys and sells against
+all four core assets. There are no composability flags.
 
 ```ts
 import {
@@ -355,46 +339,40 @@ declare const user: string;
 
 const router = createRouterClient({
   network: "mainnet", source, directRfqQuoteProvider,
-  composableAethSells: true,
 });
 const quote = await router.quoteExactIn({
   inputMint: MAINNET_AETH_USD.baseMint,
-  outputMint: router.mints!.primeUSD, // Or MAINNET_AETH_USD.quoteMint for aUSD.
+  outputMint: router.mints!.primeUSD,
   amountIn: 1_000_000n, // 0.001 aETH, with 9 decimals.
   slippageBps: 100, user, deadlineMs: Date.now() + 30_000,
 });
-if (quote.execution === "serverTransaction") throw new Error("Expected a router sell");
 // Compile quote.instructions with compileRouterMessage and a fresh blockhash.
 // User-sign that complete message and submit it with quote.rfq!.quoteId.
 ```
 
-The direct provider always receives a native aETH → aUSD sell request, even
-when the final output is primeUSD. The SDK applies the existing strict sell
-validator, preserves its compact terms/quote ID, and constructs `[input ATA,
-router]`. The native response is left unchanged. A primeUSD suffix consumes the
-sell estimate, including vault fees/rounding; slippage applies once to final
-output. The server accepts a router-level final minimum instead of the direct
-trade's minimum. Existing quote/result/provider shapes remain unchanged; the
-new option defaults to false and requires a mainnet direct provider.
+Use the exported `MAINNET_AHYPE_USD` metadata for HYPE requests; both assets
+have 9 decimals. For example, with the same router/provider:
 
-These sells return `RouterSwapQuote`, taking precedence over direct sell
-dispatch only when opted in. Buys still return the original
-`ServerTransactionSwapQuote`. Pair metadata is deduplicated. aETH receive
-sizing, reverse primeUSD → aETH, BTC compositions, and treasury-mint graph
-steps remain unsupported and reject before account/provider calls. A failed
-composable sell propagates its error without retrying it as a direct sell.
+```ts
+import { MAINNET_AHYPE_USD } from "@arch-network/swap-router-sdk";
 
-Use the existing HTTP decoder from [examples/aeth-usd.ts](examples/aeth-usd.ts).
-For submission, compile and user-sign the new router message and send the flat
-transaction with `quote_id` to the RFQ server's `/rfq/swap`; the server adds its
-quote-signer signature. The server must trust this router and, for primeUSD,
-enable the matching vault program. Fresh RFQ and vault state, available aUSD
-inventory, and user balances remain execution prerequisites.
+const hypeBuy = await router.quoteExactIn({
+  inputMint: router.mints!.primeUSD, outputMint: MAINNET_AHYPE_USD.baseMint,
+  amountIn: 1_000_000n, slippageBps: 100, user, deadlineMs: Date.now() + 30_000,
+});
+```
 
-## Direct RFQ transaction contracts
+The provider receives the selected native aETH/aUSD or aHYPE/aUSD leg, including its estimated input
+after any redemption or CLAMM prefix. Sells always use native PropAMM terms;
+buys resolve into a native swap or terminal treasury mint according to the
+validated server packet. The original response remains unchanged. Each route
+makes one quote request, with slippage applied once to the final output.
+aETH/aHYPE receive sizing remains unsupported. aETH ↔ aHYPE requires two
+RFQs and remains excluded by the single-quoted-step contract.
 
-`DirectRfqQuoteProvider` defines an application-owned provider for the fixed
-`MAINNET_AETH_USD` market. Its `quoteExactIn` receives the full
+## Direct RFQ provider contract
+
+`DirectRfqQuoteProvider` is application-owned. Its `quoteExactIn` receives a full
 `QuoteExactInRequest`, including `slippageBps` and `deadlineMs`, and returns:
 
 ```ts
@@ -403,62 +381,56 @@ interface DirectRfqQuote {
   quoteId: string;
   expiresAtMs: bigint; // Unix milliseconds from the server.
   estimatedAmountOut: bigint; // Raw output token units.
+  treasuryAuthorization?: { // Required on treasury packets; omitted on native swaps.
+    version: 1;
+    minAmountIn: bigint;
+    maxAmountIn: bigint;
+  };
 }
 ```
 
-Supply `directRfqQuoteProvider` with `network: "mainnet"` to add exactly two
-directions to `supportedPairs` (14 total): aUSD → aETH and aETH → aUSD.
-Use `MAINNET_AETH_USD.quoteMint` and `.baseMint` for these requests. Its aUSD
-mint is also `router.mints.aUSD`. aETH uses 9 decimal places; aUSD uses 6.
+For treasury buys, copy the server's `treasury_authorization.version`,
+`min_amount_in` and `max_amount_in` into this object, decoding the decimal-string
+amounts losslessly. Missing authorization rejects with `INVALID_RFQ` before a
+routed quote is returned. The SDK preserves the exact issued bounds, including
+an explicitly issued fixed interval. It never infers bounds from the nominal
+payment or the current policy. Existing HTTP providers must forward this new
+metadata. Native packets must omit it.
+
+The client validates the original packet's programs, accounts, amounts, signer
+privileges, expiry and transaction limits before building `[input ATA, router]`.
+Each provider call has a two-second timeout. Invalid packets, missing metadata,
+provider errors and expiry propagate without retries or a direct fallback.
+Clients without this provider retain the 12 core pairs; testnet ignores it.
+
+Both quote methods return `RouterSwapQuote`. Existing consumers should remove
+`composableAethSells`/`composableAethBuys` and compile `quote.instructions` instead
+of signing `quote.transaction`. For example:
 
 ```ts
-import { createRouterClient, MAINNET_AETH_USD, type DirectRfqQuoteProvider,
-  type RouterDataSource } from "@arch-network/swap-router-sdk";
+import { compileRouterMessage, type RouterSwapQuote } from "@arch-network/swap-router-sdk";
 
-declare const source: RouterDataSource;
-declare const directRfqQuoteProvider: DirectRfqQuoteProvider;
-declare const user: string;
-
-const router = createRouterClient({ network: "mainnet", source, directRfqQuoteProvider });
-const buy = await router.quoteExactIn({
-  inputMint: MAINNET_AETH_USD.quoteMint, outputMint: MAINNET_AETH_USD.baseMint,
-  amountIn: 1_000_000n, slippageBps: 100, user, deadlineMs: Date.now() + 30_000,
-});
-// For a sell, reverse the mints and provide the raw aETH input amount.
-```
-
-The client validates the request before calling the provider once, with a
-two-second timeout. It validates the response's fixed programs, accounts, amounts,
-signers, expiry and transaction byte/account limits before returning it. Buys
-return the exact encoded mint payout as both estimate and minimum; sells return
-the signed output minimum after checking the requested slippage floor. Provider errors,
-invalid transactions and expiry errors propagate without retries or fallback.
-There are no account-reader calls on this path.
-
-Clients without this provider retain their existing pairs. The direct provider
-is inactive on testnet. ETH/USD receive sizing and other ETH combinations reject
-with `UNSUPPORTED_PAIR`. Existing `propAmmQuoteProvider` behavior is unchanged.
-
-Consumers must narrow the quote result before deciding how to sign:
-
-```ts
-import { compileRouterMessage, type SwapQuote } from "@arch-network/swap-router-sdk";
-
-declare const quote: SwapQuote;
+declare const quote: RouterSwapQuote;
 declare const user: string;
 declare const recentBlockhash: Uint8Array;
 
-if (quote.execution === "serverTransaction") {
-  const { transaction, rfq } = quote;
-  // Sign transaction.message exactly as returned, then submit the user-signed
-  // transaction to /rfq/swap with quote_id: rfq.quoteId before quote.deadlineMs.
-  // Do not replace its blockhash, recompile its message or append instructions.
-} else {
-  const message = compileRouterMessage(quote.instructions, user, recentBlockhash);
-  // Existing router signing/submission path.
-}
+const message = compileRouterMessage(quote.instructions, user, recentBlockhash);
+// Sign this complete message with the user's wallet, then submit the flat
+// transaction to /rfq/swap with quote_id: quote.rfq!.quoteId.
 ```
 
+The signing server must trust the matching router and any vault/CLAMM venues.
+It adds a read-only quote-signer signature for native swaps or a writable
+treasury-authority signature for treasury mints. Treasury deadlines are clamped
+to the start of the quote's expiry second, matching on-chain execution.
+The SDK does not own HTTP transport, wallet signing, submission or confirmation.
+
+The [working example](examples/README.md) wires those callbacks and supports
+explicit retries. Its provider can also be used with `createRouterClient` for
+all sixteen aETH/aHYPE routes. `createDirectRfqProvider` handles both markets;
+`createAethUsdRfqProvider` remains an alias for existing consumers. See [validator replay coverage](tests/fixtures/propamm-clamm/README.md)
+for structural checks against the server. Signature verification and funded
+execution are separate from that replay.
 `deadlineMs` on a server-transaction result is a client submission deadline;
 it must not be written into the original message. The SDK does not own HTTP
 transport, wallet signing or submission.

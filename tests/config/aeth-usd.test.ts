@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAINNET_AETH_USD as market } from "../../src/index.js";
 import { decodeAddress, deriveAddress, deriveProgramAddress } from "../../src/utils.js";
 import fixtures from "../fixtures/aeth-usd/transactions.json" with { type: "json" };
+import deployment from "../fixtures/treasury-mainnet-v2/deployment.json" with { type: "json" };
 
 import { nativeTransaction } from "../fixtures/aeth-usd/transactions.js";
 
@@ -27,6 +28,39 @@ describe("fixed mainnet aETH/aUSD market", () => {
     expect(deriveAddress(market.programId, "config_v2", decodeAddress(market.quoteSigner))).toBe(market.config);
     expect(deriveAddress(market.programId, "vault", decodeAddress(market.config), decodeAddress(market.baseMint))).toBe(market.baseVault);
     expect(deriveAddress(market.programId, "vault", decodeAddress(market.config), decodeAddress(market.quoteMint))).toBe(market.quoteVault);
+  });
+
+  it("binds the treasury quote signer to the bridge asset and actual mint authority", () => {
+    const asset = deployment.accounts.bridgeAsset;
+    const data = hex.decode(asset.data_hex);
+    const authority = deriveAddress(market.bridgeProgramId, "mint-authority", decodeAddress(market.baseMint));
+    expect(asset.owner).toBe(market.bridgeProgramId);
+    expect(asset.address).toBe(deriveAddress(market.bridgeProgramId, "asset", decodeAddress(market.baseMint)));
+    expect(data).toHaveLength(77);
+    expect(data[0]).toBe(11);
+    expect(base58.encode(data.subarray(2, 34))).toBe(market.baseMint);
+    expect(data[34]).toBe(market.baseDecimals);
+    expect(data[44]).toBe(1); // Treasury minting is enabled for this asset.
+    expect(base58.encode(data.subarray(45, 77))).toBe(market.treasuryAuthority);
+
+    const mint = hex.decode(deployment.accounts.aETH.data_hex);
+    expect(deployment.accounts.aETH.owner).toBe(market.tokenProgramId);
+    expect(new DataView(mint.buffer, mint.byteOffset, mint.byteLength).getUint32(0, true)).toBe(1);
+    expect(base58.encode(mint.subarray(4, 36))).toBe(authority);
+
+    const message = deployment.buy_quote.response.message;
+    const keys = message.account_keys.map(key => base58.encode(Uint8Array.from(key)));
+    const treasury = message.instructions[1]!;
+    expect(keys[1]).toBe(market.treasuryAuthority);
+    expect(keys[treasury.program_id_index]).toBe(market.bridgeProgramId);
+    expect(treasury.accounts.map(index => keys[index]).slice(0, 6)).toEqual([
+      market.treasuryAuthority,
+      deriveAddress(market.bridgeProgramId, "config"),
+      asset.address,
+      deriveAddress(market.bridgeProgramId, "treasury_mint", Uint8Array.from(treasury.data.slice(1, 33))),
+      market.baseMint,
+      authority,
+    ]);
   });
 
   it.each(fixtures.cases)("replays the unsigned Rust $side fixture, with the original message and signer roles", (fixture) => {

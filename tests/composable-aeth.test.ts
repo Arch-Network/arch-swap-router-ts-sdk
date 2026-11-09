@@ -21,14 +21,18 @@ describe("composable aETH sell discovery", () => {
   it("registers distinct market edges even when BTC and ETH share a config", () => {
     const graph = buildRouteGraph(config, ["btc-usd", "aeth-usd"]);
     const edges = [...graph.values()].flat();
-    expect(edges).toHaveLength(9);
-    expect(new Set(edges.map((edge) => edge.id)).size).toBe(9);
+    expect(edges).toHaveLength(10);
+    expect(new Set(edges.map((edge) => edge.id)).size).toBe(10);
     const eth = edges.filter((edge) => edge.venue === "propamm" && edge.marketId === "aeth-usd");
-    expect(eth).toMatchObject([{ inputMint: market.baseMint, outputMint: market.quoteMint, allowClamm: true }]);
-    expect(config.propammMarkets.map((entry) => entry.config)).toEqual([market.config, market.config]);
+    expect(eth).toHaveLength(2);
+    expect(eth).toEqual(expect.arrayContaining([
+      expect.objectContaining({ inputMint: market.baseMint, outputMint: market.quoteMint, allowClamm: true }),
+      expect.objectContaining({ inputMint: market.quoteMint, outputMint: market.baseMint, allowClamm: true }),
+    ]));
+    expect(config.propammMarkets.map((entry) => entry.config)).toEqual([market.config, market.config, market.config]);
     expect(config.propammMarkets.every((entry) => Object.isFrozen(entry) && Object.isFrozen(entry.sides))).toBe(true);
     expect(findRoutes(graph, market.baseMint, usd.shareMint)[0]!.steps.map((step) => step.operation)).toEqual(["propamm", "vaultMint"]);
-    expect(supportedPairs(graph)).toHaveLength(16);
+    expect(supportedPairs(graph)).toHaveLength(20);
   });
 
   it("requires market opt-in and never creates a testnet ETH market", () => {
@@ -37,7 +41,7 @@ describe("composable aETH sell discovery", () => {
       expect(graph.has(market.baseMint)).toBe(false);
     }
     const graph = buildRouteGraph(config, ["aeth-usd"]);
-    expect([...graph.values()].flat().filter((edge) => edge.venue === "propamm")).toHaveLength(1);
+    expect([...graph.values()].flat().filter((edge) => edge.venue === "propamm")).toHaveLength(2);
   });
 
   it.each([config.mints.aBTC, config.mints.primeBTC])("discovers a single mixed CLAMM/RFQ path to %s", (output) => {
@@ -51,13 +55,14 @@ describe("composable aETH sell discovery", () => {
     expect(findRoutes(buildRouteGraph(config, ["btc-usd", "aeth-usd"]), market.baseMint, market.baseMint)).toEqual([]);
   });
 
-  it.each([false, true])("adds all three composable sell destinations without duplicates, BTC RFQ enabled=%s", (btcEnabled) => {
+  it.each([false, true])("automatically adds both aETH directions without duplicates, BTC RFQ enabled=%s", (btcEnabled) => {
     const state = setup();
     const { propAmmQuoteProvider: _btc, ...base } = state.options;
     const client = createRouterClient({ ...base, ...(btcEnabled && { propAmmQuoteProvider: state.propAmmQuoteProvider }) });
-    const legacy = createRouterClient({ ...state.options, composableAethSells: false });
-    expect(client.supportedPairs).toHaveLength(17);
-    expect(new Set(client.supportedPairs.map((pair) => `${pair.inputMint}:${pair.outputMint}`)).size).toBe(17);
+    const { directRfqQuoteProvider: _eth, ...withoutEth } = state.options;
+    const legacy = createRouterClient(withoutEth);
+    expect(client.supportedPairs).toHaveLength(28);
+    expect(new Set(client.supportedPairs.map((pair) => `${pair.inputMint}:${pair.outputMint}`)).size).toBe(28);
     expect(client.supportedPairs).toEqual(expect.arrayContaining([...legacy.supportedPairs]));
     for (const outputMint of [usd.shareMint, config.mints.aBTC, config.mints.primeBTC]) {
       expect(client.supportedPairs).toContainEqual({ inputMint: market.baseMint, outputMint });
@@ -69,14 +74,7 @@ describe("composable aETH sell discovery", () => {
     expect(state.directRfqQuoteProvider.quoteExactIn).not.toHaveBeenCalled();
   });
 
-  it.each(["mainnet", "testnet"] as const)("requires a mainnet direct provider for the explicit opt-in on %s", (network) => {
-    const state = setup();
-    expect(() => createRouterClient({ source: state.source, network, composableAethSells: true }))
-      .toThrow(expect.objectContaining({ code: "INVALID_REQUEST" }));
-    if (network === "testnet") expect(() => createRouterClient({ ...state.options, network }))
-      .toThrow(expect.objectContaining({ code: "INVALID_REQUEST" }));
-    expect(state.source.getAccounts).not.toHaveBeenCalled();
-  });
+
 });
 
 describe("composable aETH quotes", () => {
@@ -89,7 +87,7 @@ describe("composable aETH quotes", () => {
     state.source.getAccounts.mockClear();
     const original = hex.encode(TransactionUtil.serialize(state.rfq.transaction));
     const quote = await state.client.quoteExactIn(state.request);
-    if (quote.execution === "serverTransaction") throw new Error("Expected composable router instructions");
+
     expect(quote.estimatedAmountOut).toBe(local.estimatedAmountOut);
     expect(quote.minAmountOut).toBe(local.minAmountOut);
     expect(quote.deadlineMs).toBe(Number(state.rfq.expiresAtMs));
@@ -148,7 +146,7 @@ describe("composable aETH quotes", () => {
     const state = setup(outputMint);
     const original = hex.encode(TransactionUtil.serialize(state.rfq.transaction));
     const quote = await state.client.quoteExactIn(state.request);
-    if (quote.execution === "serverTransaction") throw new Error("Expected a composable router quote");
+
     const minted = outputMint === usd.shareMint;
     const expectedOutput = state.rfq.estimatedAmountOut * (minted ? 990n : 1n);
     expect(quote).toMatchObject({ amountIn: 1_000_000n, estimatedAmountOut: expectedOutput,
@@ -183,15 +181,15 @@ describe("composable aETH quotes", () => {
     expect(state.rfq.transaction.signatures).toEqual([]);
   });
 
-  it("keeps treasury buys on the unchanged direct path", async () => {
+  it("resolves an authorized treasury buy using the same provider", async () => {
     const state = setup();
     const buy = fixtures.cases.find((fixture) => fixture.side === "buy")!;
     const transaction = nativeTransaction(buy.transaction_hex);
-    state.directRfqQuoteProvider.quoteExactIn.mockResolvedValue({ ...state.rfq, transaction, estimatedAmountOut: BigInt(buy.estimated_amount_out) });
+    state.directRfqQuoteProvider.quoteExactIn.mockResolvedValue({ ...state.rfq, transaction, estimatedAmountOut: BigInt(buy.estimated_amount_out),
+      treasuryAuthorization: { version: 1, minAmountIn: 995_000n, maxAmountIn: 1_005_000n } });
     const quote = await state.client.quoteExactIn({ ...state.request, inputMint: market.quoteMint, outputMint: market.baseMint });
-    if (quote.execution !== "serverTransaction") throw new Error("Expected the original treasury buy");
-    expect(quote.transaction).toBe(transaction);
-    expect(quote.hops[0]!.kind).toBe("treasuryMint");
+    expect(quote.hops.map(hop => hop.kind)).toEqual(["treasuryMint"]);
+    expect(quote).not.toHaveProperty("transaction");
     expect(state.source.getAccounts).not.toHaveBeenCalled();
     expect(state.propAmmQuoteProvider.quoteExactIn).not.toHaveBeenCalled();
   });
@@ -218,7 +216,7 @@ describe("composable aETH quotes", () => {
     const data = state.rfq.transaction.message.instructions[0]!.data;
     for (const offset of [2, 34]) setU64(data, offset, amountIn);
     const quote = await state.client.quoteExactIn({ ...state.request, amountIn });
-    if (quote.execution === "serverTransaction") throw new Error("Expected router instructions");
+
     expect(quote.amountIn).toBe(amountIn);
     expect(new DataView(quote.instructions[1]!.data.buffer).getBigUint64(28, true)).toBe(amountIn);
   });
@@ -257,9 +255,10 @@ describe("composable aETH quotes", () => {
     expect(state.directRfqQuoteProvider.quoteExactIn).not.toHaveBeenCalled();
   });
 
-  it.each([[usd.shareMint, market.baseMint], [config.mints.aBTC, market.baseMint], [config.mints.primeBTC, market.baseMint]])("rejects unsupported composition %s -> %s before I/O", async (inputMint, outputMint) => {
+  it.each([[usd.shareMint, market.baseMint], [config.mints.aBTC, market.baseMint], [config.mints.primeBTC, market.baseMint]])("rejects aETH composition without its provider %s -> %s before I/O", async (inputMint, outputMint) => {
     const state = setup();
-    await expect(state.client.quoteExactIn({ ...state.request, inputMint: inputMint!, outputMint: outputMint! }))
+    const client = createRouterClient({ source: state.source, network: "mainnet" });
+    await expect(client.quoteExactIn({ ...state.request, inputMint: inputMint!, outputMint: outputMint! }))
       .rejects.toMatchObject({ code: "UNSUPPORTED_PAIR" });
     expect(state.source.getAccounts).not.toHaveBeenCalled();
     expect(state.directRfqQuoteProvider.quoteExactIn).not.toHaveBeenCalled();

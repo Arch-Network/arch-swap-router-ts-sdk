@@ -6,10 +6,11 @@ import { createRouterClient, MAINNET_AETH_USD as market } from "../../src/index.
 import { NETWORKS } from "../../src/config/networks.js";
 import { setupComposableAeth } from "../fixtures/composable-aeth.js";
 import fixtures from "../fixtures/aeth-usd/transactions.json" with { type: "json" };
+import nativeBuy from "../fixtures/aeth-usd/native-buy.json" with { type: "json" };
 import { nativeTransaction } from "../fixtures/aeth-usd/transactions.js";
 
 function setup(side = "buy") {
-  const fixture = fixtures.cases.find(value => value.side === side)!;
+  const fixture = side === "buy" ? nativeBuy : fixtures.cases.find(value => value.side === side)!;
   const transaction = nativeTransaction(fixture.transaction_hex);
   const wire = {
     ...TransactionUtil.toNumberArray(transaction), quote_id: `${side}-quote`, expires_at_ms: fixture.expires_at_ms,
@@ -26,20 +27,52 @@ function setup(side = "buy") {
   const source = { getAccounts: vi.fn(async () => { throw new Error("Unexpected account read"); }) };
   const signMessage = vi.fn(async (_message: typeof transaction.message): Promise<Uint8Array> => signature);
   const confirm = vi.fn(async (_hash: string) => {});
-  const options = { serverUrl: "http://example.invalid:3002/", source, post, signMessage, confirm };
-  return { fixture, transaction, wire, request, signature, options, post, source, signMessage, confirm };
+  const blockhash = new Uint8Array(32).fill(0x44);
+  const getRecentBlockhash = vi.fn(async (): Promise<Uint8Array> => blockhash);
+  const options = { getRecentBlockhash, serverUrl: "http://example.invalid:3002/", source, post, signMessage, confirm };
+  return { blockhash, getRecentBlockhash, fixture, transaction, wire, request, signature, options, post, source, signMessage, confirm };
 }
 
 beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(fixtures.now_ms); });
 afterEach(() => { vi.restoreAllMocks(); });
 
 describe("aETH/aUSD HTTP, wallet and submission example (mocked)", () => {
+  it.each([31, 33, "array"])("rejects an invalid compilation blockhash (%s) before opening the wallet", async length => {
+    const state = setup();
+    state.getRecentBlockhash.mockResolvedValue((length === "array" ? new Array(32).fill(0) : new Uint8Array(length as number)) as Uint8Array);
+    await expect(prepareAethUsdSwap(state.options, state.request)).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+    expect(state.signMessage).not.toHaveBeenCalled();
+    expect(state.post).toHaveBeenCalledOnce();
+  });
+
+  it("rejects an RFQ that expires while fetching the blockhash", async () => {
+    const state = setup();
+    state.getRecentBlockhash.mockImplementation(async () => {
+      vi.mocked(Date.now).mockReturnValue(state.fixture.expires_at_ms);
+      return state.blockhash;
+    });
+    await expect(prepareAethUsdSwap(state.options, state.request)).rejects.toMatchObject({ code: "RFQ_EXPIRED" });
+    expect(state.signMessage).not.toHaveBeenCalled();
+    expect(state.post).toHaveBeenCalledOnce();
+  });
+
+  it("compiles for the validated user if the caller mutates its request during blockhash loading", async () => {
+    const state = setup();
+    state.getRecentBlockhash.mockImplementation(async () => {
+      state.request.user = market.quoteSigner;
+      return state.blockhash;
+    });
+    const prepared = await prepareAethUsdSwap(state.options, state.request);
+    expect(base58.encode(prepared.transaction.message.account_keys[0]!)).toBe(fixtures.user);
+    expect(prepared.quote.amountIn).toBe(BigInt(state.fixture.amount_in));
+  });
+
   it("derives a native sell's expiry when the server omits the metadata", async () => {
     const state = setup("sell");
     Reflect.deleteProperty(state.wire, "expires_at_ms");
     const prepared = await prepareAethUsdSwap(state.options, state.request);
     expect(prepared.quote.deadlineMs).toBe(state.fixture.expires_at_ms);
-    expect(hex.encode(TransactionUtil.serialize(prepared.quote.transaction))).toBe(state.fixture.transaction_hex);
+    expect(hex.encode(TransactionUtil.serialize(state.transaction))).toBe(state.fixture.transaction_hex);
     expect(state.signMessage).not.toHaveBeenCalled();
   });
 
@@ -74,10 +107,15 @@ describe("aETH/aUSD HTTP, wallet and submission example (mocked)", () => {
     expect(prepared.quote.deadlineMs).toBe(state.request.deadlineMs);
   });
 
-  it("still requires expiry metadata for treasury buys", async () => {
+  it("prepares authorized treasury buys for router signing", async () => {
     const state = setup("buy");
-    Reflect.deleteProperty(state.wire, "expires_at_ms");
-    await expect(prepareAethUsdSwap(state.options, state.request)).rejects.toMatchObject({ code: "INVALID_RFQ" });
+    Object.assign(state.wire, TransactionUtil.toNumberArray(nativeTransaction(fixtures.cases.find(value => value.side === "buy")!.transaction_hex)));
+    Object.assign(state.wire, { treasury_authorization: { version: 1, min_amount_in: "995000", max_amount_in: "1005000" } });
+    const prepared = await prepareAethUsdSwap(state.options, state.request);
+    expect(prepared.quote.hops[0]!.kind).toBe("treasuryMint");
+    expect(prepared.transaction.message.header).toMatchObject({ num_required_signatures: 2, num_readonly_signed_accounts: 0 });
+    expect(state.getRecentBlockhash).toHaveBeenCalledOnce();
+    expect(state.signMessage).not.toHaveBeenCalled();
   });
 
   it.each(["mismatch", "null", "truncated", "extra instruction", "wrong program", "wrong side"])("rejects invalid sell expiry source: %s", async field => {
@@ -96,11 +134,13 @@ describe("aETH/aUSD HTTP, wallet and submission example (mocked)", () => {
     expect(state.signMessage).not.toHaveBeenCalled();
   });
 
-  it.each(["buy", "sell"])("quotes, validates, signs, submits and confirms a %s without changing the message", async side => {
+  it.each(["buy", "sell"])("compiles, signs, submits and confirms a %s router message while preserving the RFQ", async side => {
     const state = setup(side);
     const prepared = await prepareAethUsdSwap(state.options, state.request);
     expect(state.signMessage).not.toHaveBeenCalled(); // The quote is available for review first.
-    expect(prepared.quote.execution).toBe("serverTransaction");
+    expect(prepared.quote.instructions).toHaveLength(2);
+    expect(prepared.transaction.message.recent_blockhash).toEqual(state.blockhash);
+    expect(state.getRecentBlockhash).toHaveBeenCalledOnce();
     expect(prepared.quote.minAmountOut).toBe(BigInt(state.fixture.min_amount_out));
     expect(await prepared.submitAndConfirm()).toBe("mock-transaction-hash");
     expect(state.post.mock.calls[0]![0]).toBe("http://example.invalid:3002/rfq/quote");
@@ -108,12 +148,12 @@ describe("aETH/aUSD HTTP, wallet and submission example (mocked)", () => {
       base_mint: hex.encode(base58.decode(market.baseMint)), quote_mint: hex.encode(base58.decode(market.quoteMint)),
       side, amount: Number(state.fixture.amount_in), user_pubkey: hex.encode(base58.decode(fixtures.user)), slippage_bps: 100,
     });
-    expect(state.signMessage.mock.calls[0]![0]).toBe(prepared.quote.transaction.message);
+    expect(state.signMessage.mock.calls[0]![0]).toBe(prepared.transaction.message);
     expect(state.post.mock.calls[1]![0]).toBe("http://example.invalid:3002/rfq/swap");
     expect(JSON.parse(state.post.mock.calls[1]![1])).toEqual({ quote_id: state.wire.quote_id,
-      ...TransactionUtil.toNumberArray({ ...state.transaction, signatures: [state.signature] }) });
-    expect(hex.encode(TransactionUtil.serialize(prepared.quote.transaction))).toBe(state.fixture.transaction_hex);
-    expect(prepared.quote.transaction.signatures).toEqual([]);
+      ...TransactionUtil.toNumberArray({ ...prepared.transaction, signatures: [state.signature] }) });
+    expect(hex.encode(TransactionUtil.serialize(state.transaction))).toBe(state.fixture.transaction_hex);
+    expect(prepared.transaction.signatures).toEqual([]);
     expect(state.signMessage).toHaveBeenCalledTimes(1);
     expect(state.post).toHaveBeenCalledTimes(2);
     expect(state.confirm.mock.calls).toEqual([["mock-transaction-hash"]]);
@@ -125,13 +165,13 @@ describe("aETH/aUSD HTTP, wallet and submission example (mocked)", () => {
     state.request.amountIn = (1n << 64n) - 1n;
     const data = state.transaction.message.instructions[0]!.data;
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-    for (const offset of side === "buy" ? [1] : [2, 34]) view.setBigUint64(offset, state.request.amountIn, true);
+    for (const offset of side === "buy" ? [10, 34] : [2, 34]) view.setBigUint64(offset, state.request.amountIn, true);
     state.wire.message = TransactionUtil.toNumberArray(state.transaction).message;
     const prepared = await prepareAethUsdSwap(state.options, state.request);
     expect(state.post.mock.calls[0]![1]).toContain('"amount":18446744073709551615');
     expect(prepared.quote.amountIn).toBe(state.request.amountIn);
     await prepared.submitAndConfirm();
-    expect(JSON.parse(state.post.mock.calls[1]![1]).message).toEqual(state.wire.message);
+    expect(JSON.parse(state.post.mock.calls[1]![1]).message).toEqual(TransactionUtil.toNumberArray(prepared.transaction).message);
   });
 
   it.each(["buy", "sell"])("rejects unsafe numeric %s metadata before wallet signing", async side => {
@@ -219,13 +259,14 @@ describe("aETH/aUSD HTTP, wallet and submission example (mocked)", () => {
     state.post.mockRejectedValueOnce(uncertain);
     await expect(prepared.submitAndConfirm()).rejects.toBe(uncertain);
     expect(state.confirm).not.toHaveBeenCalled();
+    const submittedMessage = JSON.parse(state.post.mock.calls[1]![1]).message;
     // Even later changes to exposed objects must not change the cached retry body.
-    prepared.quote.transaction.message.recent_blockhash.fill(0x88);
+    prepared.transaction.message.recent_blockhash.fill(0x88);
     state.signature.fill(0x99);
     expect(await prepared.submitAndConfirm()).toBe("mock-transaction-hash");
     expect(state.post.mock.calls[2]![1]).toBe(state.post.mock.calls[1]![1]);
     expect(JSON.parse(state.post.mock.calls[2]![1]).quote_id).toBe(state.wire.quote_id);
-    expect(JSON.parse(state.post.mock.calls[2]![1]).message).toEqual(state.wire.message);
+    expect(JSON.parse(state.post.mock.calls[2]![1]).message).toEqual(submittedMessage);
     expect(state.signMessage).toHaveBeenCalledTimes(1);
     expect(state.post).toHaveBeenCalledTimes(3); // One quote, two explicit submission attempts.
   });
@@ -277,7 +318,7 @@ describe("aETH/aUSD HTTP, wallet and submission example (mocked)", () => {
   it.each(["before signing", "during signing"])("rejects message mutation %s", async phase => {
     const state = setup();
     const prepared = await prepareAethUsdSwap(state.options, state.request);
-    if (phase === "before signing") prepared.quote.transaction.message.recent_blockhash.fill(0x88);
+    if (phase === "before signing") prepared.transaction.message.recent_blockhash.fill(0x88);
     else state.signMessage.mockImplementation(async message => { message.recent_blockhash.fill(0x88); return state.signature; });
     await expect(prepared.submitAndConfirm()).rejects.toMatchObject({ code: "MESSAGE_CHANGED" });
     expect(state.post).toHaveBeenCalledTimes(1);

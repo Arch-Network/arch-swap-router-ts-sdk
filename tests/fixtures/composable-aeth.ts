@@ -4,8 +4,9 @@ import { vi } from "vitest";
 import { createRouterClient, MAINNET_AETH_USD as market,
   type DirectRfqQuote, type PropAmmQuote, type QuoteExactInRequest } from "../../src/index.js";
 import { NETWORKS } from "../../src/config/networks.js";
-import { decodeAddress, deriveAddress } from "../../src/utils.js";
+import { decodeAddress, deriveAddress, U64_MAX } from "../../src/utils.js";
 import fixtures from "./aeth-usd/transactions.json" with { type: "json" };
+import nativeBuy from "./aeth-usd/native-buy.json" with { type: "json" };
 import mainnet from "./mainnet-v2/accounts.json" with { type: "json" };
 import { nativeTransaction } from "./aeth-usd/transactions.js";
 import { setup as coreFixture } from "./quotes.js";
@@ -57,6 +58,51 @@ export function setupComposableAeth(outputMint: string = market.quoteMint) {
   const source = { getAccounts: vi.fn(async (keys: readonly string[]) => keys.map((key) => accounts.get(key) ?? null)) };
   const directRfqQuoteProvider = { quoteExactIn: vi.fn(async (_request: QuoteExactInRequest) => rfq) };
   const propAmmQuoteProvider = { quoteExactIn: vi.fn(async (): Promise<PropAmmQuote> => { throw new Error("Unexpected BTC/USD RFQ"); }) };
-  const options = { source, network: "mainnet" as const, directRfqQuoteProvider, propAmmQuoteProvider, composableAethSells: true };
+  const options = { source, network: "mainnet" as const, directRfqQuoteProvider, propAmmQuoteProvider };
   return { request, rfq, source, accounts, directRfqQuoteProvider, propAmmQuoteProvider, options, client: createRouterClient(options) };
+}
+
+/** Vary native Rust fixture terms for a mocked quote of the measured prefix output. */
+export function nativeAethBuyQuote(amountIn = BigInt(nativeBuy.amount_in), slippageBps = 100): DirectRfqQuote {
+  const transaction = nativeTransaction(nativeBuy.transaction_hex);
+  const data = transaction.message.instructions[0]!.data;
+  const estimatedAmountOut = amountIn * BigInt(nativeBuy.estimated_amount_out) / BigInt(nativeBuy.amount_in);
+  for (const [offset, amount] of [[2, estimatedAmountOut], [10, amountIn], [34, amountIn],
+    [42, estimatedAmountOut * BigInt(10_000 - slippageBps) / 10_000n]] as const) setU64(data, offset, amount);
+  return { transaction, quoteId: "native-aeth-buy", expiresAtMs: BigInt(nativeBuy.expires_at_ms), estimatedAmountOut };
+}
+
+export function setupComposableAethBuy(inputMint: string = market.quoteMint) {
+  const state = setupComposableAeth();
+  const config = NETWORKS.mainnet;
+  const request = { ...state.request, inputMint, outputMint: market.baseMint,
+    amountIn: inputMint === config.mints.aBTC ? 1_000n : inputMint === config.mints.primeBTC ? 1_000_000n : 1_000_000n };
+  const rfq = nativeAethBuyQuote();
+  const directRfqQuoteProvider = { quoteExactIn: vi.fn(async (request: QuoteExactInRequest) =>
+    nativeAethBuyQuote(request.amountIn, request.slippageBps)) };
+  const options = { ...state.options, directRfqQuoteProvider };
+  return { ...state, request, rfq, directRfqQuoteProvider, options, client: createRouterClient(options) };
+}
+
+/** Original Rust payment/mint fixture, resized for the estimated prefix credit. */
+export function treasuryAethBuyQuote(amountIn = 1_000_000n, bounded = true): DirectRfqQuote {
+  const fixture = fixtures.cases.find(item => item.side === "buy")!;
+  const transaction = nativeTransaction(fixture.transaction_hex);
+  const estimatedAmountOut = amountIn * BigInt(fixture.estimated_amount_out) / BigInt(fixture.amount_in);
+  setU64(transaction.message.instructions[0]!.data, 1, amountIn);
+  setU64(transaction.message.instructions[1]!.data, 33, estimatedAmountOut);
+  const maximum = amountIn * 10050n / 10_000n;
+  return { transaction, quoteId: "treasury-aeth-buy", expiresAtMs: BigInt(fixture.expires_at_ms), estimatedAmountOut,
+    treasuryAuthorization: { version: 1,
+      minAmountIn: bounded ? (amountIn * 9950n + 9999n) / 10_000n : amountIn,
+      maxAmountIn: bounded ? maximum < U64_MAX ? maximum : U64_MAX : amountIn } };
+}
+
+export function setupComposableAethTreasuryBuy(inputMint: string = market.quoteMint, bounded = true) {
+  const state = setupComposableAethBuy(inputMint);
+  const rfq = treasuryAethBuyQuote(state.request.amountIn, bounded);
+  const directRfqQuoteProvider = { quoteExactIn: vi.fn(async (request: QuoteExactInRequest) =>
+    treasuryAethBuyQuote(request.amountIn, bounded)) };
+  const options = { ...state.options, directRfqQuoteProvider };
+  return { ...state, rfq, directRfqQuoteProvider, options, client: createRouterClient(options) };
 }

@@ -1,6 +1,6 @@
 import { SystemInstruction } from "@arch-network/arch-sdk";
 import { RouterSdkError } from "../errors.js";
-import { assertIntegerRange, U64_MAX, U128_MAX } from "../utils.js";
+import { assertIntegerRange, rfqExpiryBoundaryMs, U64_MAX, U128_MAX } from "../utils.js";
 import type { RouteExactInV1Args, StepArgs } from "./types.js";
 
 const ROUTE_HEADER_LEN = 26;
@@ -11,6 +11,24 @@ function encodeStep(step: StepArgs): Uint8Array {
       return Uint8Array.of(0);
     case "vaultRedeem":
       return Uint8Array.of(1);
+    case "treasuryMint": {
+      const terms = step.terms;
+      if (!(terms?.issuanceId instanceof Uint8Array) || terms.issuanceId.length !== 32) {
+        throw new RouterSdkError("INVALID_INSTRUCTION", "Treasury issuanceId must contain 32 bytes.");
+      }
+      const data = new Uint8Array(73);
+      data[0] = 4;
+      data.set(terms.issuanceId, 1);
+      const view = new DataView(data.buffer);
+      for (const [index, field] of (["quotedInput", "quotedOutput", "minInput", "maxInput", "expiryMs"] as const).entries()) {
+        assertIntegerRange(terms[field], `Treasury ${field}`, 1n, U64_MAX);
+        view.setBigUint64(33 + index * 8, terms[field], true);
+      }
+      if (terms.minInput > terms.quotedInput || terms.maxInput < terms.quotedInput) {
+        throw new RouterSdkError("INVALID_INSTRUCTION", "Treasury bounds must contain the nominal input.");
+      }
+      return data;
+    }
     case "propamm": {
       const terms = step.terms;
       if (terms?.side !== "buy" && terms?.side !== "sell") {
@@ -65,8 +83,18 @@ export function encodeRouteExactInV1(args: RouteExactInV1Args): Uint8Array {
     );
   }
   const steps = Array.from(args.steps, encodeStep);
-  if (args.steps.filter((step) => step.kind === "propamm").length > 1) {
-    throw new RouterSdkError("INVALID_INSTRUCTION", "A route may contain only one PropAMM step.");
+  if (args.steps.filter((step) => step.kind === "propamm" || step.kind === "treasuryMint").length > 1) {
+    throw new RouterSdkError("INVALID_INSTRUCTION", "A route may contain only one server-quoted step.");
+  }
+  const treasury = args.steps.find((step) => step.kind === "treasuryMint");
+  if (treasury) {
+    const shape = args.steps.map(step => step.kind).join(",");
+    if (!["treasuryMint", "vaultRedeem,treasuryMint", "clamm,treasuryMint", "vaultRedeem,clamm,treasuryMint"].includes(shape)) {
+      throw new RouterSdkError("INVALID_INSTRUCTION", "Treasury minting requires a supported terminal route shape.");
+    }
+    if (args.deadlineMs > rfqExpiryBoundaryMs(treasury.terms.expiryMs)) {
+      throw new RouterSdkError("INVALID_INSTRUCTION", "Route deadline exceeds the treasury expiry.");
+    }
   }
   const data = new Uint8Array(
     ROUTE_HEADER_LEN + steps.reduce((length, step) => length + step.length, 0),

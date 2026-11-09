@@ -26,6 +26,9 @@ export function u256(value: bigint): bigint {
   return value;
 }
 
+/** Native RFQ programs reject execution from the start of the expiry second. */
+export const rfqExpiryBoundaryMs = (expiryMs: bigint): bigint => expiryMs / 1000n * 1000n;
+
 export const divRoundUp = (value: bigint, divisor: bigint): bigint => (value + divisor - 1n) / divisor;
 
 export function readU128(view: DataView, offset: number, signed = false): bigint {
