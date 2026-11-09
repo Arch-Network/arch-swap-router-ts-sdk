@@ -98,7 +98,7 @@ describe("automatic ETH/USD router dispatch", () => {
     expect(router.supportedPairs).toEqual(expect.arrayContaining([...core.supportedPairs]));
     expect(router.supportedPairs).toHaveLength(28);
     expect(new Set(router.supportedPairs.map(pair => `${pair.inputMint}/${pair.outputMint}`)).size).toBe(28);
-    for (const mint of Object.values(MAINNET_MINTS)) {
+    for (const mint of [MAINNET_MINTS.aBTC, MAINNET_MINTS.aUSD, MAINNET_MINTS.primeBTC, MAINNET_MINTS.primeUSD]) {
       expect(router.supportedPairs).toContainEqual({ inputMint: mint, outputMint: market.baseMint });
       expect(router.supportedPairs).toContainEqual({ inputMint: market.baseMint, outputMint: mint });
     }

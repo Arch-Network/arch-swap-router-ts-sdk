@@ -69,7 +69,9 @@ export const MAINNET_VENUES = Object.freeze({
 });
 
 export type Network = "testnet" | "mainnet";
-export type NetworkMints = Readonly<Record<keyof typeof TESTNET_MINTS, Address>>;
+/** Core tokens exist on both networks; additional mainnet tokens are absent on testnet. */
+export type NetworkMints = Readonly<Record<keyof typeof TESTNET_MINTS, Address>
+  & Partial<Record<Exclude<keyof typeof MAINNET_MINTS, keyof typeof TESTNET_MINTS>, Address>>>;
 export type ProgramIds = Readonly<Record<keyof typeof TESTNET, Address>>;
 export interface VaultVenue {
   readonly address: Address;

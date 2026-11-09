@@ -1,6 +1,8 @@
+import { MAINNET_MINTS } from "./mainnet-mints.js";
+
 /** Shared mainnet maker and treasury identities; markets bind their own base mint/vault. */
 export const MAINNET_RFQ_DEPLOYMENT = Object.freeze({
-  quoteMint: "DQcBfwHu8gr8KGt3BE5BDUfBjGgFuDJYm9ByVTDsrww9",
+  quoteMint: MAINNET_MINTS.aUSD,
   quoteDecimals: 6,
   programId: "5KMw4VNavLhM5wxTxyQGm8hs5ymFhqMCZ5BpkHybcEBV",
   config: "3jwSNH8P5tNFMY72ZwFi5z3gEkK1vVor3xcAFvr4DHzr",

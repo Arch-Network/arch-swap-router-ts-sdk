@@ -18,7 +18,7 @@ function wire(quote: DirectRfqQuote) {
 beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(fixtures.now_ms); });
 afterEach(() => { vi.restoreAllMocks(); });
 
-it.each(Object.values(NETWORKS.mainnet.mints))("preserves issued treasury HTTP authorization after a prefix from %s", async input => {
+it.each((["aBTC", "aUSD", "primeBTC", "primeUSD"] as const).map(symbol => NETWORKS.mainnet.mints[symbol]))("preserves issued treasury HTTP authorization after a prefix from %s", async input => {
   const state = setupComposableAethTreasuryBuy(input);
   const post = vi.fn(async (_url: string, body: string) => JSON.stringify(wire(treasuryAethBuyQuote(BigInt(JSON.parse(body).amount)))));
   const client = createRouterClient({ ...state.options,

@@ -86,8 +86,15 @@ configured capabilities; a quote still depends on valid state and liquidity.
 Match pairs by their mint addresses; list order follows deterministic graph node
 order and is not an application identifier.
 
-Mainnet's router, CLAMM pool/program, PropAMM deployment and aBTC/aUSD mints are
-configured in [src/config/networks.ts](src/config/networks.ts). Its CLAMM pool
+The exported `MAINNET_MINTS` is the shared source for aBTC, aUSD, primeBTC,
+primeUSD, aETH and aHYPE. Mainnet `router.mints` exposes all six; testnet
+exposes its four deployed core tokens. `NetworkMints` marks aETH/aHYPE as
+optional because they are absent on testnet. Mint metadata alone does not
+activate an RFQ route; `supportedPairs` reflects the supplied providers.
+
+Mainnet's router, CLAMM pool/program and PropAMM deployment are configured in
+[src/config/networks.ts](src/config/networks.ts), with token mint identities in
+[src/config/mainnet-mints.ts](src/config/mainnet-mints.ts). Its CLAMM pool
 orders aBTC as token A and aUSD as token B. Its vaults and prime-token mints
 match the mainnet-v2 deployment. The BTC RFQ and aETH market use the same
 PropAMM program and config. The client exposes all 12 core pairs, plus sixteen

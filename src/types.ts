@@ -127,7 +127,7 @@ export interface RouterClientOptions {
 
 export interface RouterClient {
   readonly network: Network;
-  /** Null until the selected network's deployment is configured. */
+  /** Network mint registry, including aETH/aHYPE on mainnet. Null if the network is unconfigured. */
   readonly mints: NetworkMints | null;
   readonly supportedPairs: readonly { readonly inputMint: Address; readonly outputMint: Address }[];
   quoteExactIn(request: QuoteExactInRequest): Promise<RouterSwapQuote>;

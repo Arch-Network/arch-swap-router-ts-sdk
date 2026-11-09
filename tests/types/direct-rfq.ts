@@ -1,7 +1,7 @@
 import {
   compileRouterMessage,
   createRouterClient,
-  MAINNET_AHYPE_USD,
+  MAINNET_MINTS,
   type DirectRfqQuote,
   type DirectRfqQuoteProvider,
   type PropAmmQuoteProvider,
@@ -19,7 +19,15 @@ import {
 } from "../../src/index.js";
 
 export async function quoteHype(client: RouterClient, user: string): Promise<RouterSwapQuote> {
-  return client.quoteExactIn({ inputMint: MAINNET_AHYPE_USD.quoteMint, outputMint: MAINNET_AHYPE_USD.baseMint,
+  const mints = client.mints;
+  if (!mints?.aHYPE) throw new Error("HYPE is not deployed on this network");
+  // Mainnet constants are always strings; a general client must guard network-only entries.
+  const eth: string = MAINNET_MINTS.aETH;
+  void eth;
+  // @ts-expect-error aETH is absent on testnet and needs its own guard.
+  const unguardedEth: string = mints.aETH;
+  void unguardedEth;
+  return client.quoteExactIn({ inputMint: mints.aUSD, outputMint: mints.aHYPE,
     amountIn: 1_000_000n, slippageBps: 100, user, deadlineMs: Date.now() + 30_000 });
 }
 

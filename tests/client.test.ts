@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { createRouterClient, SUPPORTED_PAIRS, TESTNET_MINTS } from "../src/index.js";
-import { MAINNET, MAINNET_MINTS, MAINNET_VENUES, TESTNET } from "../src/config/networks.js";
+import { createRouterClient, MAINNET_MINTS, SUPPORTED_PAIRS, TESTNET_MINTS } from "../src/index.js";
+import { MAINNET, MAINNET_VENUES, TESTNET } from "../src/config/networks.js";
 import { decodeAddress } from "../src/utils.js";
 import type { Network } from "../src/index.js";
 import type { QuoteExactInRequest, QuoteForOutputRequest } from "../src/types.js";
@@ -25,6 +25,23 @@ describe("compact router client", () => {
     expect(Reflect.set(router.mints!, "aBTC", "changed")).toBe(false);
     expect(Object.isFrozen(router.supportedPairs)).toBe(true);
     expect(router.supportedPairs.every(Object.isFrozen)).toBe(true);
+  });
+
+  it("exposes the complete mainnet mint registry without enabling RFQs", () => {
+    const reader = source();
+    const mainnet = createRouterClient({ source: reader, network: "mainnet" });
+    const testnet = createRouterClient({ source: reader });
+    expect(mainnet.mints).toBe(MAINNET_MINTS);
+    expect(Object.keys(mainnet.mints!)).toEqual(["aBTC", "aUSD", "primeBTC", "primeUSD", "aETH", "aHYPE"]);
+    expect(mainnet.mints).toMatchObject({
+      aETH: "7g1nPCjKW7zzZ4q7mcABeFXaPSLfBQ6syrz4HnPGAVYt",
+      aHYPE: "e1nbE9knw6fS1TwDixC3ZuXhDJpBf874WErswvqvMes",
+    });
+    expect(Reflect.set(mainnet.mints!, "aETH", "changed")).toBe(false);
+    expect(testnet.mints).not.toHaveProperty("aETH");
+    expect(testnet.mints).not.toHaveProperty("aHYPE");
+    expect(mainnet.supportedPairs).toHaveLength(12);
+    expect(reader.getAccounts).not.toHaveBeenCalled();
   });
 
   it("uses mainnet deployments and propagates account failures", async () => {
