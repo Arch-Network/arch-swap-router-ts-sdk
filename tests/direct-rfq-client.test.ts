@@ -96,8 +96,8 @@ describe("automatic ETH/USD router dispatch", () => {
     const { router, source } = setup();
     const core = createRouterClient({ network: "mainnet", source });
     expect(router.supportedPairs).toEqual(expect.arrayContaining([...core.supportedPairs]));
-    expect(router.supportedPairs).toHaveLength(20);
-    expect(new Set(router.supportedPairs.map(pair => `${pair.inputMint}/${pair.outputMint}`)).size).toBe(20);
+    expect(router.supportedPairs).toHaveLength(28);
+    expect(new Set(router.supportedPairs.map(pair => `${pair.inputMint}/${pair.outputMint}`)).size).toBe(28);
     for (const mint of Object.values(MAINNET_MINTS)) {
       expect(router.supportedPairs).toContainEqual({ inputMint: mint, outputMint: market.baseMint });
       expect(router.supportedPairs).toContainEqual({ inputMint: market.baseMint, outputMint: mint });
@@ -107,14 +107,14 @@ describe("automatic ETH/USD router dispatch", () => {
     expect(router.mints).toBe(core.mints);
   });
 
-  it("resolves a legacy treasury packet into router instructions", async () => {
+  it("rejects a legacy treasury packet without server-issued authorization", async () => {
     const state = setup();
     state.directRfqQuoteProvider.quoteExactIn.mockResolvedValue({ ...state.rfq,
       transaction: nativeTransaction(fixtures.cases.find(value => value.side === "buy")!.transaction_hex) });
-    const quote = await state.router.quoteExactIn(state.request);
-    expect(quote.hops.map(hop => hop.kind)).toEqual(["treasuryMint"]);
-    expect(quote.instructions[1]!.data[26]).toBe(4);
-    expect(quote).not.toHaveProperty("transaction");
+    await expect(state.router.quoteExactIn(state.request)).rejects.toMatchObject({
+      code: "INVALID_RFQ", message: "Treasury routing requires server-issued authorization.",
+    });
+    expect(state.directRfqQuoteProvider.quoteExactIn).toHaveBeenCalledOnce();
     expectNoFallback(state);
   });
 

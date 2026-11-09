@@ -1,5 +1,6 @@
 import { base58 } from "@scure/base";
-import { MAINNET_AETH_USD as market } from "./config/aeth-usd.js";
+import { MAINNET_AETH_USD as ethMarket } from "./config/aeth-usd.js";
+import type { DirectRfqMarketDeployment } from "./config/direct-rfq-markets.js";
 import { RouterSdkError } from "./errors.js";
 import type { DirectRfqQuote, PropAmmQuote, QuoteExactInRequest, ServerTransactionSwapQuote } from "./types.js";
 import type { TreasuryMintQuote } from "./treasury-mint.js";
@@ -57,7 +58,7 @@ function readDirectRfq(request: QuoteExactInRequest, quote: DirectRfqQuote, serv
   return { user, deadlineMs, transaction, message, header, keys };
 }
 
-function userAta(user: Uint8Array, mint: string): string {
+function userAta(user: Uint8Array, mint: string, market: DirectRfqMarketDeployment): string {
   return deriveProgramAddress([
     user, decodeAddress(market.tokenProgramId), decodeAddress(mint),
   ], market.associatedTokenProgramId)[0];
@@ -72,9 +73,9 @@ function validateAccounts(keys: readonly string[], readonlyUnsigned: number, exp
 }
 
 /** Decode the canonical native template shared by direct and composable mints. */
-function decodeAethTreasuryTemplate(request: QuoteExactInRequest, quote: DirectRfqQuote) {
+function decodeTreasuryTemplate(request: QuoteExactInRequest, quote: DirectRfqQuote, market: DirectRfqMarketDeployment) {
   if (request.inputMint !== market.quoteMint || request.outputMint !== market.baseMint) {
-    throw new RouterSdkError("UNSUPPORTED_PAIR", "Treasury buys require mainnet aUSD → aETH.");
+    throw new RouterSdkError("UNSUPPORTED_PAIR", "Treasury buys require the configured quote → base mint pair.");
   }
   const { user, deadlineMs, transaction, message, header, keys } = readDirectRfq(request, quote, market.treasuryAuthority, 2);
   const payment = message.instructions[0]!;
@@ -90,7 +91,7 @@ function decodeAethTreasuryTemplate(request: QuoteExactInRequest, quote: DirectR
   requireRfq(amountOut > 0n && amountOut === quote.estimatedAmountOut, "Mint payout differs from the quoted output.");
   requireRfq(base58.encode(mint.data.subarray(41)) === request.user, "Mint data names another recipient.");
 
-  const paymentKeys = [userAta(user, market.quoteMint), market.quoteVault, request.user];
+  const paymentKeys = [userAta(user, market.quoteMint, market), market.quoteVault, request.user];
   const mintKeys = [
     market.treasuryAuthority,
     deriveAddress(market.bridgeProgramId, "config"),
@@ -98,7 +99,7 @@ function decodeAethTreasuryTemplate(request: QuoteExactInRequest, quote: DirectR
     deriveAddress(market.bridgeProgramId, "treasury_mint", mint.data.subarray(1, 33)),
     market.baseMint,
     deriveAddress(market.bridgeProgramId, "mint-authority", decodeAddress(market.baseMint)),
-    request.user, userAta(user, market.baseMint), market.tokenProgramId,
+    request.user, userAta(user, market.baseMint, market), market.tokenProgramId,
     market.associatedTokenProgramId, market.systemProgramId,
   ];
   requireRfq(payment.accounts.every((index, i) => keys[index] === paymentKeys[i])
@@ -113,7 +114,7 @@ function decodeAethTreasuryTemplate(request: QuoteExactInRequest, quote: DirectR
 
 /** Validate the fixed treasury-buy template without recompiling the server's message. */
 export function normalizeAethUsdBuy(request: QuoteExactInRequest, quote: DirectRfqQuote): ServerTransactionSwapQuote {
-  const { transaction, deadlineMs, amountOut } = decodeAethTreasuryTemplate(request, quote);
+  const { transaction, deadlineMs, amountOut } = decodeTreasuryTemplate(request, quote, ethMarket);
 
   return {
     execution: "serverTransaction",
@@ -126,11 +127,11 @@ export function normalizeAethUsdBuy(request: QuoteExactInRequest, quote: DirectR
 }
 
 /** Pinned native ExecuteTrade for either side, with explicit minimum and creation accounts. */
-function normalizeNativeAethUsdSwap(request: QuoteExactInRequest, quote: DirectRfqQuote): ServerTransactionSwapQuote {
+function normalizeNativeSwap(request: QuoteExactInRequest, quote: DirectRfqQuote, market: DirectRfqMarketDeployment): ServerTransactionSwapQuote {
   const buy = request.inputMint === market.quoteMint && request.outputMint === market.baseMint;
   const sell = request.inputMint === market.baseMint && request.outputMint === market.quoteMint;
   if (!buy && !sell) {
-    throw new RouterSdkError("UNSUPPORTED_PAIR", "Native swaps require mainnet aETH ↔ aUSD.");
+    throw new RouterSdkError("UNSUPPORTED_PAIR", "Native swaps require the configured base/quote mint pair.");
   }
   const { user, deadlineMs, transaction, message, header, keys } = readDirectRfq(request, quote, market.quoteSigner, 1);
   const trade = message.instructions[0]!;
@@ -150,7 +151,7 @@ function normalizeNativeAethUsdSwap(request: QuoteExactInRequest, quote: DirectR
   const tradeKeys = [
     market.config, market.quoteSigner, request.user,
     deriveAddress(market.programId, "user_nonce", decodeAddress(market.config), user),
-    market.baseVault, market.quoteVault, userAta(user, market.baseMint), userAta(user, market.quoteMint),
+    market.baseVault, market.quoteVault, userAta(user, market.baseMint, market), userAta(user, market.quoteMint, market),
     market.baseMint, market.quoteMint, market.tokenProgramId, market.systemProgramId, market.associatedTokenProgramId,
   ];
   requireRfq(trade.accounts.every((index, i) => keys[index] === tradeKeys[i]), "Unexpected native swap accounts.");
@@ -169,29 +170,28 @@ function normalizeNativeAethUsdSwap(request: QuoteExactInRequest, quote: DirectR
 
 /** Preserve the direct sell contract; direct buys retain their treasury validator. */
 export function normalizeAethUsdSell(request: QuoteExactInRequest, quote: DirectRfqQuote): ServerTransactionSwapQuote {
-  if (request.inputMint !== market.baseMint || request.outputMint !== market.quoteMint) {
+  if (request.inputMint !== ethMarket.baseMint || request.outputMint !== ethMarket.quoteMint) {
     throw new RouterSdkError("UNSUPPORTED_PAIR", "Direct sells require mainnet aETH → aUSD.");
   }
-  return normalizeNativeAethUsdSwap(request, quote);
+  return normalizeNativeSwap(request, quote, ethMarket);
 }
 
-/** Resolve the one returned packet; legacy treasury quotes authorize nominal input only. */
-export function composableAethSwap(request: QuoteExactInRequest, quote: DirectRfqQuote): PropAmmQuote | TreasuryMintQuote {
+/** Resolve the returned packet, preserving the server's required treasury authorization. */
+export function composableDirectRfqSwap(request: QuoteExactInRequest, quote: DirectRfqQuote, market: DirectRfqMarketDeployment): PropAmmQuote | TreasuryMintQuote {
   if (request.inputMint === market.quoteMint && request.outputMint === market.baseMint
     && quote?.transaction?.message?.instructions?.length === 2) {
-    const { amountOut, issuanceId } = decodeAethTreasuryTemplate(request, quote);
+    const { amountOut, issuanceId } = decodeTreasuryTemplate(request, quote, market);
     const authorization = quote.treasuryAuthorization;
-    let minInput = request.amountIn, maxInput = request.amountIn;
-    if (authorization !== undefined) {
-      requireRfq(authorization !== null && authorization.version === 1
-        && positiveU64(authorization.minAmountIn) && positiveU64(authorization.maxAmountIn)
-        && authorization.minAmountIn <= request.amountIn && authorization.maxAmountIn >= request.amountIn,
-      "Invalid treasury authorization version or input bounds.");
-      minInput = authorization.minAmountIn;
-      maxInput = authorization.maxAmountIn;
-      requireRfq(minInput * amountOut / request.amountIn > 0n
-        && maxInput * amountOut / request.amountIn <= U64_MAX, "Treasury range produces a zero or overflowing mint.");
+    if (authorization === undefined) {
+      throw new RouterSdkError("INVALID_RFQ", "Treasury routing requires server-issued authorization.");
     }
+    requireRfq(authorization !== null && authorization.version === 1
+      && positiveU64(authorization.minAmountIn) && positiveU64(authorization.maxAmountIn)
+      && authorization.minAmountIn <= request.amountIn && authorization.maxAmountIn >= request.amountIn,
+    "Invalid treasury authorization version or input bounds.");
+    const { minAmountIn: minInput, maxAmountIn: maxInput } = authorization;
+    requireRfq(minInput * amountOut / request.amountIn > 0n
+      && maxInput * amountOut / request.amountIn <= U64_MAX, "Treasury range produces a zero or overflowing mint.");
     // The native program expires at the start of the expiry second. Do not
     // advertise the last partial second as time available for wallet signing.
     const expiryBoundary = quote.expiresAtMs / 1000n * 1000n;
@@ -203,7 +203,7 @@ export function composableAethSwap(request: QuoteExactInRequest, quote: DirectRf
     };
   }
   requireRfq(quote?.treasuryAuthorization === undefined, "Native swaps cannot carry treasury authorization.");
-  normalizeNativeAethUsdSwap(request, quote);
+  normalizeNativeSwap(request, quote, market);
   const data = quote.transaction.message.instructions[0]!.data;
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   return {

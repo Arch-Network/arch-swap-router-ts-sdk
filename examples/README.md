@@ -1,7 +1,7 @@
-# aETH/aUSD router swap example
+# aETH/aHYPE RFQ provider and aETH signing example
 
-[aeth-usd.ts](aeth-usd.ts) exports `createAethUsdRfqProvider` and
-`prepareAethUsdSwap`. It performs no work on import. HTTP, account reading,
+[aeth-usd.ts](aeth-usd.ts) exports `createDirectRfqProvider` for both markets,
+its compatibility alias `createAethUsdRfqProvider`, and `prepareAethUsdSwap`. It performs no work on import. HTTP, account reading,
 fresh blockhashes, wallet signing and confirmation are supplied by the app.
 Native swaps and treasury buys use router instructions automatically.
 
@@ -9,11 +9,11 @@ Native swaps and treasury buys use router instructions automatically.
 
 ```ts
 import { createRouterClient, MAINNET_AETH_USD } from "@arch-network/swap-router-sdk";
-import { createAethUsdRfqProvider } from "./aeth-usd.js";
+import { createDirectRfqProvider } from "./aeth-usd.js";
 
 const router = createRouterClient({
   network: "mainnet", source,
-  directRfqQuoteProvider: createAethUsdRfqProvider(`${options.serverUrl}/rfq`, options.post),
+  directRfqQuoteProvider: createDirectRfqProvider(`${options.serverUrl}/rfq`, options.post),
 });
 const sell = await router.quoteExactIn({
   inputMint: MAINNET_AETH_USD.baseMint, outputMint: router.mints!.primeBTC,
@@ -25,23 +25,25 @@ const buy = await router.quoteExactIn({
 });
 ```
 
-The mainnet provider automatically enables all eight aETH directions and
-20 unique pairs overall. There are no `composableAethSells` or
+The mainnet provider automatically enables eight directions for each of aETH and aHYPE,
+for 28 unique pairs overall. There are no `composableAethSells` or
 `composableAethBuys` options. Both results contain `instructions` ready for
-router compilation. aETH receive sizing remains unsupported.
+router compilation. aETH/aHYPE receive sizing and the two-RFQ aETH ↔ aHYPE pair remain unsupported.
 
-The aETH/aUSD native RFQ uses one HTTP request per route. Account reads are
-zero for direct aETH/aUSD, one for primeUSD and two for either BTC asset.
+Each selected asset/aUSD native RFQ uses one HTTP request per route. Account reads are
+zero for direct asset/aUSD, one for primeUSD and two for either BTC asset.
 The provider receives the native leg's amount after any prefix and the SDK
 applies slippage once to final output. It preserves the original RFQ response.
 
 The current service's treasury buys resolve into terminal `treasuryMint` steps.
-An omitted `treasury_authorization` selects fixed input bounds. When the server
-returns that field, its decimal-string amounts are decoded losslessly and carried
-into the router step. Native buy packets still resolve into ordinary swaps.
-The pending router/server upgrades are required for treasury co-signing and
-execution; those server changes remain unmerged. Fixed bounds also mean that
-prefix input changes cannot be absorbed until bounded quotes are available.
+The server's `treasury_authorization` is required. Its decimal-string amounts
+are decoded losslessly and copied unchanged into the router step. Missing
+authorization rejects with `INVALID_RFQ` before fetching a blockhash or opening
+the wallet. A fixed input interval is accepted only when the server explicitly
+issues equal bounds. Existing providers must forward this metadata; the SDK
+cannot reconstruct it from the payment/mint packet. Native buy packets still
+resolve into ordinary swaps and omit this metadata. Treasury co-signing and
+execution require compatible router/server deployments.
 
 ## Wire the callbacks
 
@@ -79,8 +81,9 @@ const transactionHash = await prepared.submitAndConfirm();
 ```
 
 Reverse the mints to sell, using the raw aETH amount (9 decimals; aUSD has 6).
-The helper supports the fixed aETH/aUSD pair; use `createRouterClient` directly
-for routes to/from BTC and prime tokens.
+The signing helper supports the fixed aETH/aUSD pair. Use `createDirectRfqProvider`
+with `createRouterClient` for aHYPE and routes to/from BTC and prime tokens; use
+`MAINNET_AHYPE_USD.baseMint` for aHYPE, also with 9 decimals.
 
 `getRecentBlockhash` returns a fresh 32-byte `Uint8Array`. The helper compiles
 the complete router bundle with that hash and the validated user, and returns
@@ -114,7 +117,7 @@ is rejected. Use a lossless decoder for output values above the safe-integer
 range. Byte arrays and account indexes are validated before normalization.
 
 User input must be funded. The router handles missing intermediate/output ATAs.
-Native buys require aETH maker inventory; sells require aUSD inventory. The
+Native buys require the selected asset's maker inventory; sells require aUSD inventory. The
 server must trust the matching router, vault and CLAMM deployments. The original
 native server message is validated and retained unchanged while the helper
 constructs the router message that the user signs.

@@ -5,7 +5,7 @@ import type { PropAmmQuote, PropAmmQuoteProvider, QuoteExactInRequest } from "./
 import { resolveTreasuryMint, type TreasuryMintQuote } from "./treasury-mint.js";
 import { decodeAddress, deriveAddress, U64_MAX } from "./utils.js";
 
-/** Internal providers also resolve validated aETH treasury templates. */
+/** Internal providers also resolve validated treasury templates for the selected market. */
 export interface RoutedRfqQuoteProvider {
   quoteExactIn(request: Parameters<PropAmmQuoteProvider["quoteExactIn"]>[0]): Promise<PropAmmQuote | TreasuryMintQuote>;
 }

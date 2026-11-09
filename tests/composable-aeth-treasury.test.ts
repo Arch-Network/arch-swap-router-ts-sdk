@@ -51,8 +51,8 @@ describe.each([false, true])("aETH treasury routing, bounded authorization=%s", 
     expect(step.subarray(1, 33)).toEqual(rfq.transaction.message.instructions[1]!.data.subarray(1, 33));
     const view = new DataView(step.buffer, step.byteOffset, step.byteLength);
     expect([33, 41, 49, 57, 65].map(offset => view.getBigUint64(offset, true))).toEqual([
-      amountIn, rfq.estimatedAmountOut, rfq.treasuryAuthorization?.minAmountIn ?? amountIn,
-      rfq.treasuryAuthorization?.maxAmountIn ?? amountIn, rfq.expiresAtMs,
+      amountIn, rfq.estimatedAmountOut, rfq.treasuryAuthorization!.minAmountIn,
+      rfq.treasuryAuthorization!.maxAmountIn, rfq.expiresAtMs,
     ]);
     const group = 2 + 2 * (kinds.length + 1) + prefixAccounts;
     const issuance = step.subarray(1, 33);
@@ -76,6 +76,20 @@ describe.each([false, true])("aETH treasury routing, bounded authorization=%s", 
     expect(message.account_keys.length).toBeLessThanOrEqual(50);
     expect(TransactionUtil.serializedSize({ version: 0, message, signatures: [new Uint8Array(64), new Uint8Array(64)] })).toBeLessThanOrEqual(4096);
   });
+});
+
+it.each(cases)("rejects missing treasury authorization from $input without inventing bounds or retrying", async ({ input }) => {
+  const state = setup(input);
+  const issue = state.directRfqQuoteProvider.quoteExactIn.getMockImplementation()!;
+  state.directRfqQuoteProvider.quoteExactIn.mockImplementation(async request => {
+    const { treasuryAuthorization: _authorization, ...quote } = await issue(request);
+    return quote;
+  });
+  await expect(state.client.quoteExactIn(state.request)).rejects.toMatchObject({
+    code: "INVALID_RFQ", message: "Treasury routing requires server-issued authorization.",
+  });
+  expect(state.directRfqQuoteProvider.quoteExactIn).toHaveBeenCalledOnce();
+  expect(state.propAmmQuoteProvider.quoteExactIn).not.toHaveBeenCalled();
 });
 
 it.each(cases)("rejects expired requests and receive sizing before I/O from $input", async ({ input }) => {
@@ -124,15 +138,15 @@ it("clamps to an earlier caller deadline", async () => {
   expect((await state.client.quoteExactIn({ ...state.request, deadlineMs })).deadlineMs).toBe(deadlineMs);
 });
 
-it("preserves full-u64 legacy amounts without Number conversion", async () => {
-  const state = setup();
+it("preserves full-u64 amounts with explicitly issued fixed bounds without Number conversion", async () => {
+  const state = setup(market.quoteMint, false);
   const quote = await state.client.quoteExactIn({ ...state.request, amountIn: U64_MAX });
   const view = new DataView(quote.instructions[1]!.data.buffer);
   expect([59, 75, 83].map(offset => view.getBigUint64(offset, true))).toEqual([U64_MAX, U64_MAX, U64_MAX]);
   expect(quote.estimatedAmountOut).toBe(U64_MAX * 2n / 5n);
 });
 
-it.each(["payment", "output", "recipient", "bridge", "receipt", "authority", "privileges", "signed"])("validates the original legacy treasury template: %s", async field => {
+it.each(["payment", "output", "recipient", "bridge", "receipt", "authority", "privileges", "signed"])("validates the original treasury template: %s", async field => {
   const state = setup();
   const message = state.rfq.transaction.message;
   const [payment, mint] = message.instructions;

@@ -131,7 +131,7 @@ describe("parallel RFQ candidates", () => {
     const provider = { quoteExactIn: vi.fn(async () => { throw new Error("Unexpected RFQ"); }) };
     for (const network of ["testnet", "mainnet"] as const) {
       const client = createRouterClient({ network, source, propAmmQuoteProvider: provider, directRfqQuoteProvider: provider });
-      expect(client.supportedPairs).toHaveLength(network === "mainnet" ? 20 : 12);
+      expect(client.supportedPairs).toHaveLength(network === "mainnet" ? 28 : 12);
     }
     expect(source.getAccounts).not.toHaveBeenCalled();
     expect(provider.quoteExactIn).not.toHaveBeenCalled();

@@ -2,9 +2,9 @@
 
 ## Live quote smoke test
 
-`quote.e2e.test.ts` contains 20 live cases: the 12 core directed pairs plus
-all eight native aETH buy/sell routes. Each configured mainnet aETH provider
-automatically enables both directions; no composability flags are required.
+`quote.e2e.test.ts` contains 28 live cases: the 12 core directed pairs plus
+eight buy/sell routes for each of aETH and aHYPE (treasury buys and native sells).
+A configured mainnet direct RFQ provider automatically enables both markets; no composability flags are required.
 
 | Route type | Pairs |
 | --- | --- |
@@ -12,9 +12,10 @@ automatically enables both directions; no composability flags are required.
 | Direct vault mint/redeem | aBTC ↔ primeBTC; aUSD ↔ primeUSD |
 | Vault plus swap | primeBTC ↔ aUSD; primeUSD ↔ aBTC |
 | Redeem, swap, mint | primeBTC ↔ primeUSD |
-| Native aETH swap | aETH ↔ aUSD/primeUSD/aBTC/primeBTC |
+| aETH native swap or treasury mint | aETH ↔ aUSD/primeUSD/aBTC/primeBTC |
+| aHYPE native swap or treasury mint | aHYPE ↔ aUSD/primeUSD/aBTC/primeBTC |
 
-Inputs are 1 aUSD/primeUSD, 0.00001 aBTC/primeBTC or 0.001 aETH. Tests assert
+Inputs are 1 aUSD/primeUSD, 0.00001 aBTC/primeBTC or 0.001 aETH/aHYPE. Tests assert
 explicit mint paths, operations, hop amounts, final-only slippage, RFQ terms
 and quote IDs, deadline clamping, signer privileges and transaction limits.
 Bundles are compiled with a zero blockhash and reserved signature bytes for
@@ -23,9 +24,9 @@ No wallet signing or transaction submission occurs.
 
 Core BTC/USD swaps compare CLAMM with the optional native PropAMM provider.
 RFQ HTTP/decoding/expiry failures fail the smoke checks even when the SDK can
-fall back to CLAMM. Vault-only routes make no RFQ requests. The aETH HTTP
-adapter is the exported `createAethUsdRfqProvider` from `examples/aeth-usd.ts`;
-every aETH route must use exactly one native RFQ. Account-read budgets are
+fall back to CLAMM. Vault-only routes make no RFQ requests. The shared HTTP
+adapter is the exported `createDirectRfqProvider` from `examples/aeth-usd.ts`;
+every aETH/aHYPE route must use exactly one native RFQ. Account-read budgets are
 zero/one/two/two for the USD/primeUSD/BTC/primeBTC counterpart, with no repeated
 successfully fetched addresses. Buys use net aUSD input after any prefix.
 
@@ -41,7 +42,8 @@ two-second RFQ budget, without retries. The RPC must match mainnet.
 
 Use `-t 'composable aETH'` or `-t aETH` for all eight ETH cases,
 `-t 'composable aETH buy'` for four buys, or `-t 'composable aETH sell'` for
-four sells. These test names are retained while composition is now automatic.
+four sells. Use `-t aHYPE` for all eight HYPE cases, or
+`-t 'composable aHYPE buy'` / `-t 'composable aHYPE sell'` for either side.
 
 The last native buy run on **2026-11-03**, before removing the flags, executed
 all four cases and failed all four with `INVALID_RFQ`: the deployed service
@@ -80,29 +82,33 @@ native Buy/Sell trade bytes. It covers both payload lengths, account-index
 resolution, adjusted estimates, full-u64 precision, substituted identities,
 malformed payloads and HTTP errors without retries.
 
-## aETH routing coverage
+## aETH and aHYPE routing coverage
 
 `composable-aeth.test.ts` has 42 sell/graph tests and
 `composable-aeth-buy.test.ts` has 28 buy tests. They cover all eight routes,
-20-pair metadata without switches, market/provider identity, prefix/suffix
+28-pair metadata without switches, market/provider identity, prefix/suffix
 amounts, final slippage, native terms, two-read batching, u64 precision,
 expiry, malformed packets and provider failures without direct fallback.
-Treasury packets are rejected. Clients without an aETH provider retain the
-12 core pairs; testnet ignores that provider.
-
-The current change passes typecheck, build and **939 offline tests**, with
-20 live cases and one optional Rust replay skipped. The lower count replaces
-obsolete optional-mode/direct-dispatch cases and adds fresh-blockhash checks.
-Report: `/tmp/router-aeth-always-offline.log`.
+Treasury buys are covered separately by `composable-aeth-treasury.test.ts`.
+All four input routes preserve the server-issued authorization, including
+explicit fixed bounds and bounded ranges. Missing authorization rejects with
+`INVALID_RFQ` after one provider call; no bounds are synthesized and no fallback
+is attempted. The HTTP/signing example also verifies that rejection occurs before
+fetching a blockhash, opening the wallet or submitting a transaction.
+Clients without a direct RFQ provider retain the 12 core pairs;
+testnet ignores that provider.
 
 `examples/aeth-native-buy.test.ts` retains 10 HTTP cases for metadata-free
 native buys, full-u64 fields, unsafe metadata and all four buy prefixes.
-`propamm-clamm.interop.test.ts` separately passes all eight SDK router packets
+`propamm-clamm.interop.test.ts` passes sixteen native SDK router packets and all
+four treasury routes per asset with fixed and bounded issued authorization (32 packets total)
 through the unmodified external Rust validator and Arch 0.13 runtime sanitizer.
-See [the replay instructions](fixtures/propamm-clamm/README.md). The largest
-packet is 1,405 bytes with two signature slots and 34 accounts. Report:
-`/tmp/router-aeth-always-interop.log`. This validates structural contracts,
-not signatures, transaction submission or execution.
+It uses the real server authorization module and native payment/mint builder.
+It rejects altered treasury terms/accounts/privileges, missing issued authorization
+and substituted nominal-only bounds, while retaining native and CLAMM mutation
+checks. See [the replay instructions](fixtures/propamm-clamm/README.md).
+The largest packet is 1,511 bytes with two signature slots and 36 accounts.
+This validates structural contracts, not signatures, transaction submission or execution.
 
 `config/aeth-usd.test.ts` replays unsigned buy/sell fixtures generated by the
 pinned Rust `minting` builders. It checks programs, account order, PDA/ATA
@@ -131,7 +137,7 @@ comparisons and verifies that a 1,257-byte bundle with distinct fee destinations
 is now eligible under the higher limit.
 
 `direct-rfq-client.test.ts` covers automatic mainnet graph dispatch, frozen
-20-pair metadata, native packet preservation with alternate account ordering
+28-pair metadata, native packet preservation with alternate account ordering
 and blockhashes, request validation, deadlines, timeout cleanup, provider
 failures and rejection of treasury/direct fallback. `types/direct-rfq.ts`
 checks that client results are directly usable as `RouterSwapQuote` and that
@@ -143,6 +149,15 @@ blockhash, while retaining the original quote packet unchanged. Tests cover
 blockhash format/fetch expiry, request snapshotting, full-u64 encoding, safe
 metadata decoding, mutation checks, exact-body retries, known-hash confirmation,
 concurrency and failure propagation. No deployed programs or CPIs are executed.
+
+`composable-ahype.test.ts` covers all eight HYPE directions, optional native-buy
+resolution, one quote ID, the 0/1/2/2 read budget, required treasury authorization,
+expiry and receive-sizing rejection, provider gating, timeouts and ETH/HYPE packet
+substitution. Metadata contains 28 unique pairs and excludes both two-RFQ ETH/HYPE
+directions. `examples/ahype-usd.test.ts` exercises the shared HTTP adapter's HYPE
+mints, prefix-sized amounts, treasury metadata and native expiry decoding.
+`config/ahype-usd.test.ts` verifies the mint, vault and bridge asset against the
+[captured public accounts and unsigned quotes](fixtures/ahype-usd/README.md).
 
 ## Existing router coverage
 

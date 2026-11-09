@@ -29,7 +29,7 @@ describe("composable aETH sell discovery", () => {
       expect.objectContaining({ inputMint: market.baseMint, outputMint: market.quoteMint, allowClamm: true }),
       expect.objectContaining({ inputMint: market.quoteMint, outputMint: market.baseMint, allowClamm: true }),
     ]));
-    expect(config.propammMarkets.map((entry) => entry.config)).toEqual([market.config, market.config]);
+    expect(config.propammMarkets.map((entry) => entry.config)).toEqual([market.config, market.config, market.config]);
     expect(config.propammMarkets.every((entry) => Object.isFrozen(entry) && Object.isFrozen(entry.sides))).toBe(true);
     expect(findRoutes(graph, market.baseMint, usd.shareMint)[0]!.steps.map((step) => step.operation)).toEqual(["propamm", "vaultMint"]);
     expect(supportedPairs(graph)).toHaveLength(20);
@@ -61,8 +61,8 @@ describe("composable aETH sell discovery", () => {
     const client = createRouterClient({ ...base, ...(btcEnabled && { propAmmQuoteProvider: state.propAmmQuoteProvider }) });
     const { directRfqQuoteProvider: _eth, ...withoutEth } = state.options;
     const legacy = createRouterClient(withoutEth);
-    expect(client.supportedPairs).toHaveLength(20);
-    expect(new Set(client.supportedPairs.map((pair) => `${pair.inputMint}:${pair.outputMint}`)).size).toBe(20);
+    expect(client.supportedPairs).toHaveLength(28);
+    expect(new Set(client.supportedPairs.map((pair) => `${pair.inputMint}:${pair.outputMint}`)).size).toBe(28);
     expect(client.supportedPairs).toEqual(expect.arrayContaining([...legacy.supportedPairs]));
     for (const outputMint of [usd.shareMint, config.mints.aBTC, config.mints.primeBTC]) {
       expect(client.supportedPairs).toContainEqual({ inputMint: market.baseMint, outputMint });
@@ -181,11 +181,12 @@ describe("composable aETH quotes", () => {
     expect(state.rfq.transaction.signatures).toEqual([]);
   });
 
-  it("resolves a legacy treasury buy using the same provider", async () => {
+  it("resolves an authorized treasury buy using the same provider", async () => {
     const state = setup();
     const buy = fixtures.cases.find((fixture) => fixture.side === "buy")!;
     const transaction = nativeTransaction(buy.transaction_hex);
-    state.directRfqQuoteProvider.quoteExactIn.mockResolvedValue({ ...state.rfq, transaction, estimatedAmountOut: BigInt(buy.estimated_amount_out) });
+    state.directRfqQuoteProvider.quoteExactIn.mockResolvedValue({ ...state.rfq, transaction, estimatedAmountOut: BigInt(buy.estimated_amount_out),
+      treasuryAuthorization: { version: 1, minAmountIn: 995_000n, maxAmountIn: 1_005_000n } });
     const quote = await state.client.quoteExactIn({ ...state.request, inputMint: market.quoteMint, outputMint: market.baseMint });
     expect(quote.hops.map(hop => hop.kind)).toEqual(["treasuryMint"]);
     expect(quote).not.toHaveProperty("transaction");

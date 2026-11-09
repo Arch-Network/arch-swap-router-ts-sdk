@@ -1,5 +1,4 @@
 import type { PropAmmDeployment } from "./config/networks.js";
-import { MAINNET_AETH_USD as market } from "./config/aeth-usd.js";
 import { RouterSdkError } from "./errors.js";
 import type { ResolvedStep } from "./transactions/types.js";
 import type { TreasuryMintTerms } from "./types.js";
@@ -15,18 +14,18 @@ export interface TreasuryMintQuote {
 
 /** Canonical addresses are derived locally; treasury routing adds no account read. */
 export function resolveTreasuryMint(quote: TreasuryMintQuote, deployment: PropAmmDeployment): ResolvedStep {
-  if (deployment.programId !== market.programId || deployment.config !== market.config
-    || deployment.baseMint !== market.baseMint || deployment.quoteMint !== market.quoteMint) {
-    throw new RouterSdkError("INVALID_RFQ", "Treasury quote does not match the aETH deployment.");
+  const { treasuryAuthority, bridgeProgramId } = deployment;
+  if (!treasuryAuthority || !bridgeProgramId) {
+    throw new RouterSdkError("INVALID_RFQ", "Treasury execution is not configured for this market.");
   }
   return {
     kind: "treasuryMint", outputMint: deployment.baseMint,
     terms: { ...quote.terms, issuanceId: quote.terms.issuanceId.slice() },
-    bridgeProgramId: market.bridgeProgramId, treasuryAuthority: market.treasuryAuthority,
-    bridgeConfig: deriveAddress(market.bridgeProgramId, "config"),
-    assetConfig: deriveAddress(market.bridgeProgramId, "asset", decodeAddress(deployment.baseMint)),
-    issuanceReceipt: deriveAddress(market.bridgeProgramId, "treasury_mint", quote.terms.issuanceId),
-    mintAuthority: deriveAddress(market.bridgeProgramId, "mint-authority", decodeAddress(deployment.baseMint)),
+    bridgeProgramId, treasuryAuthority,
+    bridgeConfig: deriveAddress(bridgeProgramId, "config"),
+    assetConfig: deriveAddress(bridgeProgramId, "asset", decodeAddress(deployment.baseMint)),
+    issuanceReceipt: deriveAddress(bridgeProgramId, "treasury_mint", quote.terms.issuanceId),
+    mintAuthority: deriveAddress(bridgeProgramId, "mint-authority", decodeAddress(deployment.baseMint)),
     propammConfig: deployment.config,
     paymentVault: deriveAddress(deployment.programId, "vault", decodeAddress(deployment.config), decodeAddress(deployment.quoteMint)),
   };

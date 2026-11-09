@@ -1,5 +1,5 @@
 import type { Address } from "../types.js";
-import { MAINNET_AETH_USD } from "./aeth-usd.js";
+import { MAINNET_DIRECT_RFQ_MARKETS } from "./direct-rfq-markets.js";
 
 /** Fixed deployments; callers select a network rather than supplying addresses. */
 export const TESTNET = Object.freeze({
@@ -85,6 +85,8 @@ export interface PropAmmDeployment {
   readonly config: Address;
   readonly baseMint: Address;
   readonly quoteMint: Address;
+  readonly treasuryAuthority?: Address;
+  readonly bridgeProgramId?: Address;
 }
 export interface PropAmmMarket extends PropAmmDeployment {
   readonly id: string;
@@ -124,10 +126,8 @@ export const NETWORKS = Object.freeze({
       programId: "5KMw4VNavLhM5wxTxyQGm8hs5ymFhqMCZ5BpkHybcEBV",
       config: "3jwSNH8P5tNFMY72ZwFi5z3gEkK1vVor3xcAFvr4DHzr",
       baseMint: MAINNET_MINTS.aBTC, quoteMint: MAINNET_MINTS.aUSD,
-    }), Object.freeze({
-      id: "aeth-usd", sides: Object.freeze(["sell", "buy"] as const), allowClamm: true,
-      programId: MAINNET_AETH_USD.programId, config: MAINNET_AETH_USD.config,
-      baseMint: MAINNET_AETH_USD.baseMint, quoteMint: MAINNET_AETH_USD.quoteMint,
-    })]),
+    }), ...MAINNET_DIRECT_RFQ_MARKETS.map(({ id, deployment }) => Object.freeze({
+      ...deployment, id, sides: Object.freeze(["sell", "buy"] as const), allowClamm: true,
+    }))]),
   }),
 } satisfies Record<Network, NetworkConfig | null>);

@@ -1,6 +1,7 @@
 import {
   compileRouterMessage,
   createRouterClient,
+  MAINNET_AHYPE_USD,
   type DirectRfqQuote,
   type DirectRfqQuoteProvider,
   type PropAmmQuoteProvider,
@@ -16,6 +17,11 @@ import {
   type TreasuryAuthorization,
   type TreasuryMintTerms,
 } from "../../src/index.js";
+
+export async function quoteHype(client: RouterClient, user: string): Promise<RouterSwapQuote> {
+  return client.quoteExactIn({ inputMint: MAINNET_AHYPE_USD.quoteMint, outputMint: MAINNET_AHYPE_USD.baseMint,
+    amountIn: 1_000_000n, slippageBps: 100, user, deadlineMs: Date.now() + 30_000 });
+}
 
 // Checked by tsc only; no wallet, server or transaction execution.
 export function clientWithProviders(source: RouterDataSource, transaction: RuntimeTransaction, propAmmQuoteProvider: PropAmmQuoteProvider): RouterClient {

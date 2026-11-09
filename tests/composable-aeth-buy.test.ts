@@ -56,10 +56,10 @@ describe("native aETH buy routing", () => {
     expect(rfq.transaction.signatures).toEqual([]);
   });
 
-  it("reaches all 20 directions without a BTC RFQ provider", () => {
+  it("reaches all 28 directions without a BTC RFQ provider", () => {
     const state = setup();
     const { propAmmQuoteProvider: _unused, ...options } = state.options;
-    expect(createRouterClient(options).supportedPairs).toHaveLength(20);
+    expect(createRouterClient(options).supportedPairs).toHaveLength(28);
   });
 
   it.each(cases)("rejects expired requests and receive sizing before I/O from $input", async ({ input }) => {

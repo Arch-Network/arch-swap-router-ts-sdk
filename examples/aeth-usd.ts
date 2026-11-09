@@ -1,7 +1,7 @@
 import { TransactionUtil } from "@arch-network/arch-sdk";
 import { base58, hex } from "@scure/base";
 import {
-  compileRouterMessage, createRouterClient, MAINNET_AETH_USD as market, RouterSdkError,
+  compileRouterMessage, createRouterClient, MAINNET_AETH_USD as market, MAINNET_AHYPE_USD, RouterSdkError,
   type DirectRfqQuoteProvider, type QuoteExactInRequest, type RouterDataSource, type TreasuryAuthorization,
   type RuntimeTransaction, type RouterSwapQuote,
 } from "../src/index.js";
@@ -70,7 +70,7 @@ function authorizationAmount(value: unknown): bigint {
   return amount;
 }
 
-function decodeQuote(raw: string, buy: boolean) {
+function decodeQuote(raw: string, buy: boolean, selected: { readonly programId: string }) {
   let parsed: unknown;
   try { parsed = JSON.parse(raw); }
   catch (cause) { throw new RouterSdkError("INVALID_RFQ", "Malformed RFQ JSON.", { cause }); }
@@ -103,9 +103,9 @@ function decodeQuote(raw: string, buy: boolean) {
     const trade = transaction.message.instructions[0];
     const program = trade && transaction.message.account_keys[trade.program_id_index];
     if (transaction.message.instructions.length !== 1 || !trade || !program
-      || base58.encode(program) !== market.programId || trade.data.length !== 50
+      || base58.encode(program) !== selected.programId || trade.data.length !== 50
       || trade.data[0] !== 2 || trade.data[1] !== (buy ? 0 : 1)) {
-      throw new RouterSdkError("INVALID_RFQ", "Expected a native aETH swap with an explicit minimum output.");
+      throw new RouterSdkError("INVALID_RFQ", "Expected a native RFQ swap with an explicit minimum output.");
     }
     expiresAtMs = new DataView(trade.data.buffer, trade.data.byteOffset, trade.data.byteLength).getBigUint64(18, true);
     if (wire.expires_at_ms !== undefined && safeU64(wire.expires_at_ms) !== expiresAtMs) {
@@ -128,24 +128,29 @@ function decodeQuote(raw: string, buy: boolean) {
 }
 
 /** Quote-only HTTP provider; rfqUrl includes /rfq, without /quote. */
-export function createAethUsdRfqProvider(rfqUrl: string, post: AethUsdExampleOptions["post"]): DirectRfqQuoteProvider {
+export function createDirectRfqProvider(rfqUrl: string, post: AethUsdExampleOptions["post"]): DirectRfqQuoteProvider {
   const url = `${rfqUrl.replace(/\/+$/, "")}/quote`;
   return {
     async quoteExactIn(input) {
-      const buy = input.inputMint === market.quoteMint && input.outputMint === market.baseMint;
-      const sell = input.inputMint === market.baseMint && input.outputMint === market.quoteMint;
-      if (!buy && !sell) throw new RouterSdkError("UNSUPPORTED_PAIR", "This example supports only mainnet aUSD ↔ aETH.");
+      const selected = [market, MAINNET_AHYPE_USD].find(candidate =>
+        (input.inputMint === candidate.quoteMint && input.outputMint === candidate.baseMint)
+        || (input.inputMint === candidate.baseMint && input.outputMint === candidate.quoteMint));
+      if (!selected) throw new RouterSdkError("UNSUPPORTED_PAIR", "This provider supports mainnet aUSD ↔ aETH/aHYPE.");
+      const buy = input.inputMint === selected.quoteMint;
       // Encode the u64 amount as a JSON numeric literal without a Number conversion.
       // All interpolated strings below are hex or fixed literals, and the SDK has
       // already validated the amount, user and slippage before invoking this provider.
-      const body = `{"base_mint":"${hex.encode(base58.decode(market.baseMint))}",`
-        + `"quote_mint":"${hex.encode(base58.decode(market.quoteMint))}","side":"${buy ? "buy" : "sell"}",`
+      const body = `{"base_mint":"${hex.encode(base58.decode(selected.baseMint))}",`
+        + `"quote_mint":"${hex.encode(base58.decode(selected.quoteMint))}","side":"${buy ? "buy" : "sell"}",`
         + `"amount":${input.amountIn.toString()},"user_pubkey":"${hex.encode(base58.decode(input.user))}",`
         + `"slippage_bps":${input.slippageBps}}`;
-      return decodeQuote(await post(url, body), buy);
+      return decodeQuote(await post(url, body), buy, selected);
     },
   };
 }
+
+/** Compatibility name; the provider handles both configured mainnet RFQ markets. */
+export const createAethUsdRfqProvider = createDirectRfqProvider;
 
 /** Quote first so the caller can review the amount before invoking the wallet. */
 export async function prepareAethUsdSwap(options: AethUsdExampleOptions, request: QuoteExactInRequest): Promise<PreparedAethUsdSwap> {

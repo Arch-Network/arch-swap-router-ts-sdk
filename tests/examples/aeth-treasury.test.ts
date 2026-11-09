@@ -18,7 +18,7 @@ function wire(quote: DirectRfqQuote) {
 beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(fixtures.now_ms); });
 afterEach(() => { vi.restoreAllMocks(); });
 
-it.each(Object.values(NETWORKS.mainnet.mints))("decodes the current legacy treasury HTTP quote after a prefix from %s", async input => {
+it.each(Object.values(NETWORKS.mainnet.mints))("preserves issued treasury HTTP authorization after a prefix from %s", async input => {
   const state = setupComposableAethTreasuryBuy(input);
   const post = vi.fn(async (_url: string, body: string) => JSON.stringify(wire(treasuryAethBuyQuote(BigInt(JSON.parse(body).amount)))));
   const client = createRouterClient({ ...state.options,
@@ -27,6 +27,20 @@ it.each(Object.values(NETWORKS.mainnet.mints))("decodes the current legacy treas
   expect(quote.hops.at(-1)!.kind).toBe("treasuryMint");
   expect(post).toHaveBeenCalledOnce();
   expect(JSON.parse(post.mock.calls[0]![1])).toMatchObject({ side: "buy", amount: Number(quote.hops.at(-1)!.amountIn) });
+});
+
+it("rejects an HTTP treasury quote missing authorization before opening the wallet or fetching a blockhash", async () => {
+  const state = signingSetup();
+  const payload = wire(state.rfq);
+  delete payload.treasury_authorization;
+  state.post.mockResolvedValue(JSON.stringify(payload));
+  await expect(prepareAethUsdSwap(state.options, state.request)).rejects.toMatchObject({
+    code: "INVALID_RFQ", message: "Treasury routing requires server-issued authorization.",
+  });
+  expect(state.post).toHaveBeenCalledOnce();
+  expect(state.options.getRecentBlockhash).not.toHaveBeenCalled();
+  expect(state.options.signMessage).not.toHaveBeenCalled();
+  expect(state.options.confirm).not.toHaveBeenCalled();
 });
 
 it("decodes authorization strings above Number.MAX_SAFE_INTEGER losslessly", async () => {

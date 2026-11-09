@@ -1,7 +1,7 @@
 import { buildRouteGraph, findRoutes, supportedPairs } from "./config/routes.js";
 import { NETWORKS, type NetworkConfig } from "./config/networks.js";
-import { MAINNET_AETH_USD as ethUsd } from "./config/aeth-usd.js";
-import { composableAethSwap } from "./direct-rfq.js";
+import { MAINNET_DIRECT_RFQ_MARKETS } from "./config/direct-rfq-markets.js";
+import { composableDirectRfqSwap } from "./direct-rfq.js";
 import { RouterSdkError } from "./errors.js";
 import type { RoutedRfqQuoteProvider } from "./propamm.js";
 import { quoteCandidates } from "./quote-candidates.js";
@@ -28,7 +28,8 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
   }
   const config: NetworkConfig | null = NETWORKS[network];
   const directProvider = network === "mainnet" ? directRfqQuoteProvider : undefined;
-  const enabledMarkets = [...(propAmmQuoteProvider ? ["btc-usd"] : []), ...(directProvider ? ["aeth-usd"] : [])];
+  const directMarkets = directProvider ? MAINNET_DIRECT_RFQ_MARKETS : [];
+  const enabledMarkets = [...(propAmmQuoteProvider ? ["btc-usd"] : []), ...directMarkets.map(market => market.id)];
   const graph = config ? buildRouteGraph(config, enabledMarkets) : undefined;
   const pairs = graph ? supportedPairs(graph) : [];
   async function quote(request: QuoteExactInRequest | QuoteForOutputRequest, amount: bigint, forOutput: boolean): Promise<RouterSwapQuote> {
@@ -36,21 +37,21 @@ export function createRouterClient({ source, network = "testnet", propAmmQuotePr
     const { inputMint, outputMint, slippageBps, user, deadlineMs } = request;
     validateRequest(request, amount, forOutput);
     const candidates = findRoutes(graph, inputMint, outputMint, { forOutput });
+    const directMarket = directMarkets.find(({ deployment }) => inputMint === deployment.baseMint || outputMint === deployment.baseMint);
     if (!candidates.length) {
-      throw new RouterSdkError("UNSUPPORTED_PAIR", forOutput && directProvider && (inputMint === ethUsd.baseMint || outputMint === ethUsd.baseMint)
-        ? "aETH/aUSD supports exact-input quotes only." : "The requested mint pair is not supported.");
+      throw new RouterSdkError("UNSUPPORTED_PAIR", forOutput && directMarket
+        ? `${directMarket.symbol}/aUSD supports exact-input quotes only.` : "The requested mint pair is not supported.");
     }
-    if ((inputMint === ethUsd.baseMint || outputMint === ethUsd.baseMint)
-      && deadlineMs <= Date.now()) {
-      throw new RouterSdkError("RFQ_EXPIRED", "Composable aETH swap deadline has expired.");
+    if (directMarket && deadlineMs <= Date.now()) {
+      throw new RouterSdkError("RFQ_EXPIRED", `Composable ${directMarket.symbol} swap deadline has expired.`);
     }
     const state = await prepareQuoteState(source, config, candidates);
     const providers = new Map<string, RoutedRfqQuoteProvider>();
     if (propAmmQuoteProvider) providers.set("btc-usd", propAmmQuoteProvider);
-    if (directProvider) providers.set("aeth-usd", {
+    if (directProvider) for (const { id, deployment } of directMarkets) providers.set(id, {
       async quoteExactIn(input) {
         const swap = { ...input, slippageBps, deadlineMs };
-        return composableAethSwap(swap, await directProvider.quoteExactIn({ ...swap }));
+        return composableDirectRfqSwap(swap, await directProvider.quoteExactIn({ ...swap }), deployment);
       },
     });
     return quoteCandidates({

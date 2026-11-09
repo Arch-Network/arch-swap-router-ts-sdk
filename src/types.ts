@@ -68,7 +68,7 @@ export interface DirectRfqQuote {
   /** Server expiry in Unix milliseconds. */
   readonly expiresAtMs: bigint;
   readonly estimatedAmountOut: bigint;
-  /** Present on bounded treasury quotes; omitted on native swaps and legacy direct mints. */
+  /** Required for routed treasury mints; preserve the server-issued bounds. Omit on native swaps. */
   readonly treasuryAuthorization?: TreasuryAuthorization;
 }
 
@@ -119,7 +119,7 @@ export interface RouterClientOptions {
   readonly source: RouterDataSource;
   /** Optional exact-input alternative to CLAMM; must use the selected network. Each RFQ waits at most 2s. */
   readonly propAmmQuoteProvider?: PropAmmQuoteProvider;
-  /** aETH/aUSD native swap or treasury packets; enables all mainnet aETH graph routes. */
+  /** aETH/aUSD and aHYPE/aUSD native or treasury packets; enables both markets' mainnet graph routes. */
   readonly directRfqQuoteProvider?: DirectRfqQuoteProvider;
 }
 

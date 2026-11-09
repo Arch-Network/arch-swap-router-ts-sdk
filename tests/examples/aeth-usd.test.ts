@@ -107,9 +107,10 @@ describe("aETH/aUSD HTTP, wallet and submission example (mocked)", () => {
     expect(prepared.quote.deadlineMs).toBe(state.request.deadlineMs);
   });
 
-  it("prepares legacy treasury buys for router signing", async () => {
+  it("prepares authorized treasury buys for router signing", async () => {
     const state = setup("buy");
     Object.assign(state.wire, TransactionUtil.toNumberArray(nativeTransaction(fixtures.cases.find(value => value.side === "buy")!.transaction_hex)));
+    Object.assign(state.wire, { treasury_authorization: { version: 1, min_amount_in: "995000", max_amount_in: "1005000" } });
     const prepared = await prepareAethUsdSwap(state.options, state.request);
     expect(prepared.quote.hops[0]!.kind).toBe("treasuryMint");
     expect(prepared.transaction.message.header).toMatchObject({ num_required_signatures: 2, num_readonly_signed_accounts: 0 });
