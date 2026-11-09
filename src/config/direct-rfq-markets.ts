@@ -4,13 +4,11 @@ import type { ProgramIds, PropAmmDeployment } from "./networks.js";
 
 export interface DirectRfqMarketDeployment extends PropAmmDeployment,
   Pick<ProgramIds, "tokenProgramId" | "associatedTokenProgramId" | "systemProgramId"> {
-  readonly baseDecimals: number;
-  readonly quoteDecimals: number;
   readonly baseVault: string;
   readonly quoteVault: string;
   readonly quoteSigner: string;
-  readonly treasuryAuthority: string;
-  readonly bridgeProgramId: string;
+  readonly treasuryAuthority?: string;
+  readonly bridgeProgramId?: string;
 }
 
 /** Trusted SDK markets; the provider supplies quotes for the selected native leg. */

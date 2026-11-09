@@ -72,6 +72,21 @@ export interface DirectRfqQuote {
   readonly treasuryAuthorization?: TreasuryAuthorization;
 }
 
+/** Identities shared by explicitly configured markets of one maker. */
+export interface DirectRfqDeployment {
+  readonly programId: Address;
+  readonly config: Address;
+  readonly quoteSigner: Address;
+  readonly treasuryAuthority?: Address;
+  readonly bridgeProgramId?: Address;
+}
+
+export interface DirectRfqMarket {
+  readonly baseMint: Address;
+  readonly quoteMint: Address;
+  readonly sides: readonly ("buy" | "sell")[];
+}
+
 export interface DirectRfqQuoteProvider {
   quoteExactIn(request: QuoteExactInRequest): Promise<DirectRfqQuote>;
 }
@@ -121,6 +136,10 @@ export interface RouterClientOptions {
   readonly propAmmQuoteProvider?: PropAmmQuoteProvider;
   /** aETH/aUSD and aHYPE/aUSD native or treasury packets; enables both markets' mainnet graph routes. */
   readonly directRfqQuoteProvider?: DirectRfqQuoteProvider;
+  /** Maker identities for the explicit market catalog. */
+  readonly directRfqDeployment?: DirectRfqDeployment;
+  /** Replaces the built-in catalog; [] disables direct RFQ markets. */
+  readonly directRfqMarkets?: readonly DirectRfqMarket[];
 }
 
 export interface RouterClient {

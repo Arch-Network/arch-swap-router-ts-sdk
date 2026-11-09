@@ -76,12 +76,16 @@ export function decodeTreasuryTemplate(request: QuoteExactInRequest, quote: Dire
   if (request.inputMint !== market.quoteMint || request.outputMint !== market.baseMint) {
     throw new RouterSdkError("UNSUPPORTED_PAIR", "Treasury buys require the configured quote → base mint pair.");
   }
-  const { user, deadlineMs, transaction, message, header, keys } = readDirectRfq(request, quote, market.treasuryAuthority, 2);
+  const { treasuryAuthority, bridgeProgramId } = market;
+  if (treasuryAuthority === undefined || bridgeProgramId === undefined) {
+    throw new RouterSdkError("INVALID_RFQ", "Treasury execution is not configured for this market.");
+  }
+  const { user, deadlineMs, transaction, message, header, keys } = readDirectRfq(request, quote, treasuryAuthority, 2);
   const payment = message.instructions[0]!;
   const mint = message.instructions[1]!;
   requireRfq(keys[payment.program_id_index] === market.tokenProgramId && payment.accounts.length === 3
     && bytes(payment.data, 9) && payment.data[0] === 3, "Expected the canonical aUSD transfer.");
-  requireRfq(keys[mint.program_id_index] === market.bridgeProgramId && mint.accounts.length === 11
+  requireRfq(keys[mint.program_id_index] === bridgeProgramId && mint.accounts.length === 11
     && bytes(mint.data, 73) && mint.data[0] === 21, "Expected the canonical treasury mint.");
   const paymentData = new DataView(payment.data.buffer, payment.data.byteOffset, payment.data.byteLength);
   const mintData = new DataView(mint.data.buffer, mint.data.byteOffset, mint.data.byteLength);
@@ -92,20 +96,20 @@ export function decodeTreasuryTemplate(request: QuoteExactInRequest, quote: Dire
 
   const paymentKeys = [userAta(user, market.quoteMint, market), market.quoteVault, request.user];
   const mintKeys = [
-    market.treasuryAuthority,
-    deriveAddress(market.bridgeProgramId, "config"),
-    deriveAddress(market.bridgeProgramId, "asset", decodeAddress(market.baseMint)),
-    deriveAddress(market.bridgeProgramId, "treasury_mint", mint.data.subarray(1, 33)),
+    treasuryAuthority,
+    deriveAddress(bridgeProgramId, "config"),
+    deriveAddress(bridgeProgramId, "asset", decodeAddress(market.baseMint)),
+    deriveAddress(bridgeProgramId, "treasury_mint", mint.data.subarray(1, 33)),
     market.baseMint,
-    deriveAddress(market.bridgeProgramId, "mint-authority", decodeAddress(market.baseMint)),
+    deriveAddress(bridgeProgramId, "mint-authority", decodeAddress(market.baseMint)),
     request.user, userAta(user, market.baseMint, market), market.tokenProgramId,
     market.associatedTokenProgramId, market.systemProgramId,
   ];
   requireRfq(payment.accounts.every((index, i) => keys[index] === paymentKeys[i])
     && mint.accounts.every((index, i) => keys[index] === mintKeys[i]), "Unexpected payment or mint accounts.");
   validateAccounts(keys, header.num_readonly_unsigned_accounts,
-    [...paymentKeys, ...mintKeys, market.tokenProgramId, market.bridgeProgramId],
-    [request.user, market.treasuryAuthority, paymentKeys[0]!, market.quoteVault, mintKeys[3]!, market.baseMint, mintKeys[7]!]);
+    [...paymentKeys, ...mintKeys, market.tokenProgramId, bridgeProgramId],
+    [request.user, treasuryAuthority, paymentKeys[0]!, market.quoteVault, mintKeys[3]!, market.baseMint, mintKeys[7]!]);
   if (deadlineMs <= Date.now()) throw new RouterSdkError("RFQ_EXPIRED", "Treasury-buy quote deadline has expired.");
 
   return { transaction, deadlineMs, amountOut, issuanceId: mint.data.slice(1, 33) };

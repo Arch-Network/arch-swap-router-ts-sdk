@@ -560,3 +560,23 @@ PropAMM `fill_limit_order` instruction for the expected order. The server's
 The ABI, layout, PDA and math tests use native PropAMM fixtures; see
 [tests/fixtures/limit-orders](tests/fixtures/limit-orders/README.md). They do
 not show that limit orders are deployed on either network.
+
+
+### Explicit RFQ market catalogs
+
+Existing callers that pass only `directRfqQuoteProvider` keep the built-in
+mainnet ETH/USD and HYPE/USD markets. To select other markets, pass
+`directRfqDeployment` with the maker's `programId`, `config` and `quoteSigner`,
+and `directRfqMarkets` with each pair's `baseMint`, `quoteMint` and allowed
+`sides`, `buy` or `sell`. The explicit list replaces the built-in direct catalog.
+An empty list enables no direct RFQ markets. A deployment without a list also
+enables none. Configured markets require the provider to enter the routing graph
+and are mainnet-only, like the existing direct RFQ integration.
+
+Inventory markets need no treasury settings. Treasury execution requires both
+`treasuryAuthority` and `bridgeProgramId`, plus the server-issued authorization
+already required by the router. Custody accounts are derived from the maker
+configuration and mints, and token program identities come from the network.
+The caller supplies trusted identities independently of the quote response.
+A configured BTC/USD market takes precedence over the legacy BTC/USD RFQ provider
+when both providers are supplied. CLAMM remains a candidate.

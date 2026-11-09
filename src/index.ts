@@ -3,6 +3,7 @@ export { createRouterClient } from "./client.js";
 export { MAINNET_AETH_USD } from "./config/aeth-usd.js";
 export { LIMIT_ORDER_DEPLOYMENTS, TESTNET_MINTS, type Network, type NetworkMints } from "./config/networks.js";
 export { decodeLimitOrder, encodeCancelLimitOrderData, encodeCreateLimitOrderData, LIMIT_ORDER_ACCOUNT_LEN } from "./codecs/limit-order.js";
+export { MAINNET_RFQ_DEPLOYMENT } from "./config/rfq-deployment.js";
 export { MAINNET_AHYPE_USD } from "./config/ahype-usd.js";
 export { SUPPORTED_PAIRS } from "./config/routes.js";
 export { RouterSdkError } from "./errors.js";
@@ -28,6 +29,8 @@ export { TRANSACTION_SIZE_LIMIT } from "./transactions/size.js";
 export type {
   Address,
   CreateLimitOrderParams,
+  DirectRfqDeployment,
+  DirectRfqMarket,
   DirectRfqQuote,
   DirectRfqQuoteProvider,
   LimitOrderAccount,
