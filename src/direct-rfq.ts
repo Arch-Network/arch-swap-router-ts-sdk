@@ -1,8 +1,7 @@
 import { base58 } from "@scure/base";
-import { MAINNET_AETH_USD as ethMarket } from "./config/aeth-usd.js";
 import type { DirectRfqMarketDeployment } from "./config/direct-rfq-markets.js";
 import { RouterSdkError } from "./errors.js";
-import type { DirectRfqQuote, PropAmmQuote, QuoteExactInRequest, ServerTransactionSwapQuote } from "./types.js";
+import type { DirectRfqQuote, PropAmmQuote, QuoteExactInRequest } from "./types.js";
 import type { TreasuryMintQuote } from "./treasury-mint.js";
 import { assertMessageLimits } from "./transactions/size.js";
 import { decodeAddress, deriveAddress, deriveProgramAddress, U64_MAX } from "./utils.js";
@@ -72,8 +71,8 @@ function validateAccounts(keys: readonly string[], readonlyUnsigned: number, exp
     "Unexpected account privileges."));
 }
 
-/** Decode the canonical native template shared by direct and composable mints. */
-function decodeTreasuryTemplate(request: QuoteExactInRequest, quote: DirectRfqQuote, market: DirectRfqMarketDeployment) {
+/** Validate the canonical treasury payment/mint packet; the router re-encodes its terms. */
+export function decodeTreasuryTemplate(request: QuoteExactInRequest, quote: DirectRfqQuote, market: DirectRfqMarketDeployment) {
   if (request.inputMint !== market.quoteMint || request.outputMint !== market.baseMint) {
     throw new RouterSdkError("UNSUPPORTED_PAIR", "Treasury buys require the configured quote → base mint pair.");
   }
@@ -112,22 +111,8 @@ function decodeTreasuryTemplate(request: QuoteExactInRequest, quote: DirectRfqQu
   return { transaction, deadlineMs, amountOut, issuanceId: mint.data.slice(1, 33) };
 }
 
-/** Validate the fixed treasury-buy template without recompiling the server's message. */
-export function normalizeAethUsdBuy(request: QuoteExactInRequest, quote: DirectRfqQuote): ServerTransactionSwapQuote {
-  const { transaction, deadlineMs, amountOut } = decodeTreasuryTemplate(request, quote, ethMarket);
-
-  return {
-    execution: "serverTransaction",
-    inputMint: request.inputMint, outputMint: request.outputMint, amountIn: request.amountIn,
-    estimatedAmountOut: amountOut, minAmountOut: amountOut, deadlineMs,
-    hops: [{ kind: "treasuryMint", inputMint: request.inputMint, outputMint: request.outputMint,
-      amountIn: request.amountIn, estimatedAmountOut: amountOut }],
-    transaction, rfq: { quoteId: quote.quoteId },
-  };
-}
-
-/** Pinned native ExecuteTrade for either side, with explicit minimum and creation accounts. */
-function normalizeNativeSwap(request: QuoteExactInRequest, quote: DirectRfqQuote, market: DirectRfqMarketDeployment): ServerTransactionSwapQuote {
+/** Validate a pinned native ExecuteTrade for either side; the router re-encodes its terms. */
+export function decodeNativeSwap(request: QuoteExactInRequest, quote: DirectRfqQuote, market: DirectRfqMarketDeployment) {
   const buy = request.inputMint === market.quoteMint && request.outputMint === market.baseMint;
   const sell = request.inputMint === market.baseMint && request.outputMint === market.quoteMint;
   if (!buy && !sell) {
@@ -158,22 +143,11 @@ function normalizeNativeSwap(request: QuoteExactInRequest, quote: DirectRfqQuote
   validateAccounts(keys, header.num_readonly_unsigned_accounts, [...tradeKeys, market.programId], tradeKeys.slice(0, 12));
   if (deadlineMs <= Date.now()) throw new RouterSdkError("RFQ_EXPIRED", "Native swap quote deadline has expired.");
 
-  return {
-    execution: "serverTransaction",
-    inputMint: request.inputMint, outputMint: request.outputMint, amountIn: request.amountIn,
-    estimatedAmountOut: quote.estimatedAmountOut, minAmountOut, deadlineMs,
-    hops: [{ kind: "propamm", inputMint: request.inputMint, outputMint: request.outputMint,
-      amountIn: request.amountIn, estimatedAmountOut: quote.estimatedAmountOut }],
-    transaction, rfq: { quoteId: quote.quoteId },
+  const terms: PropAmmQuote["terms"] = {
+    side: buy ? "buy" : "sell", baseAmount: data.getBigUint64(2, true), quoteAmount: data.getBigUint64(10, true),
+    expiryMs: data.getBigUint64(18, true), nonce: data.getBigUint64(26, true),
   };
-}
-
-/** Preserve the direct sell contract; direct buys retain their treasury validator. */
-export function normalizeAethUsdSell(request: QuoteExactInRequest, quote: DirectRfqQuote): ServerTransactionSwapQuote {
-  if (request.inputMint !== ethMarket.baseMint || request.outputMint !== ethMarket.quoteMint) {
-    throw new RouterSdkError("UNSUPPORTED_PAIR", "Direct sells require mainnet aETH → aUSD.");
-  }
-  return normalizeNativeSwap(request, quote, ethMarket);
+  return { transaction, deadlineMs, estimatedAmountOut: quote.estimatedAmountOut, minAmountOut, terms };
 }
 
 /** Resolve the returned packet, preserving the server's required treasury authorization. */
@@ -192,10 +166,7 @@ export function composableDirectRfqSwap(request: QuoteExactInRequest, quote: Dir
     const { minAmountIn: minInput, maxAmountIn: maxInput } = authorization;
     requireRfq(minInput * amountOut / request.amountIn > 0n
       && maxInput * amountOut / request.amountIn <= U64_MAX, "Treasury range produces a zero or overflowing mint.");
-    // The native program expires at the start of the expiry second. Do not
-    // advertise the last partial second as time available for wallet signing.
-    const expiryBoundary = quote.expiresAtMs / 1000n * 1000n;
-    if (expiryBoundary <= BigInt(Date.now())) throw new RouterSdkError("RFQ_EXPIRED", "Treasury quote has reached its execution expiry.");
+    // quotePropAmm clamps the route deadline to the start of the expiry second.
     return {
       kind: "treasuryMint", quoteId: quote.quoteId, estimatedAmountOut: amountOut,
       terms: { issuanceId, quotedInput: request.amountIn, quotedOutput: amountOut,
@@ -203,14 +174,6 @@ export function composableDirectRfqSwap(request: QuoteExactInRequest, quote: Dir
     };
   }
   requireRfq(quote?.treasuryAuthorization === undefined, "Native swaps cannot carry treasury authorization.");
-  normalizeNativeSwap(request, quote, market);
-  const data = quote.transaction.message.instructions[0]!.data;
-  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
-  return {
-    quoteId: quote.quoteId, quoteSigner: market.quoteSigner, estimatedAmountOut: quote.estimatedAmountOut,
-    terms: {
-      side: data[1] === 0 ? "buy" : "sell", baseAmount: view.getBigUint64(2, true), quoteAmount: view.getBigUint64(10, true),
-      expiryMs: view.getBigUint64(18, true), nonce: view.getBigUint64(26, true),
-    },
-  };
+  const { terms } = decodeNativeSwap(request, quote, market);
+  return { quoteId: quote.quoteId, quoteSigner: market.quoteSigner, estimatedAmountOut: quote.estimatedAmountOut, terms };
 }

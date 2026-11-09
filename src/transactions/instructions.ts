@@ -61,8 +61,7 @@ export function buildRouterInstruction(input: BuildSwapInput, programs: ProgramI
       aToB: step.aToB,
       sqrtPriceLimit: step.sqrtPriceLimit,
       supplementalTickArrayCount: step.supplementalTickArrays.length,
-    } : step.kind === "propamm" ? { kind: step.kind, terms: step.terms }
-      : step.kind === "treasuryMint" ? { kind: step.kind, terms: step.terms } : { kind: step.kind }),
+    } : step.kind === "propamm" || step.kind === "treasuryMint" ? step : { kind: step.kind }),
   });
   const mints = [input.inputMint, ...input.steps.map((step) => step.outputMint)];
   const writableMints = new Set<Address>();

@@ -1,6 +1,6 @@
 import { SystemInstruction } from "@arch-network/arch-sdk";
 import { RouterSdkError } from "../errors.js";
-import { assertIntegerRange, U64_MAX, U128_MAX } from "../utils.js";
+import { assertIntegerRange, rfqExpiryBoundaryMs, U64_MAX, U128_MAX } from "../utils.js";
 import type { RouteExactInV1Args, StepArgs } from "./types.js";
 
 const ROUTE_HEADER_LEN = 26;
@@ -92,7 +92,7 @@ export function encodeRouteExactInV1(args: RouteExactInV1Args): Uint8Array {
     if (!["treasuryMint", "vaultRedeem,treasuryMint", "clamm,treasuryMint", "vaultRedeem,clamm,treasuryMint"].includes(shape)) {
       throw new RouterSdkError("INVALID_INSTRUCTION", "Treasury minting requires a supported terminal route shape.");
     }
-    if (args.deadlineMs > treasury.terms.expiryMs) {
+    if (args.deadlineMs > rfqExpiryBoundaryMs(treasury.terms.expiryMs)) {
       throw new RouterSdkError("INVALID_INSTRUCTION", "Route deadline exceeds the treasury expiry.");
     }
   }

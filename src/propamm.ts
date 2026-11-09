@@ -3,7 +3,7 @@ import { RouterSdkError } from "./errors.js";
 import type { ResolvedStep } from "./transactions/types.js";
 import type { PropAmmQuote, PropAmmQuoteProvider, QuoteExactInRequest } from "./types.js";
 import { resolveTreasuryMint, type TreasuryMintQuote } from "./treasury-mint.js";
-import { decodeAddress, deriveAddress, U64_MAX } from "./utils.js";
+import { decodeAddress, deriveAddress, rfqExpiryBoundaryMs, U64_MAX } from "./utils.js";
 
 /** Internal providers also resolve validated treasury templates for the selected market. */
 export interface RoutedRfqQuoteProvider {
@@ -31,7 +31,7 @@ export async function quotePropAmm(
     clearTimeout(timer);
   }
   if (quote?.kind === "treasuryMint") {
-    const expiryBoundary = quote.terms.expiryMs / 1000n * 1000n;
+    const expiryBoundary = rfqExpiryBoundaryMs(quote.terms.expiryMs);
     const deadlineMs = Number(expiryBoundary < BigInt(request.deadlineMs) ? expiryBoundary : BigInt(request.deadlineMs));
     if (deadlineMs <= Date.now()) throw new RouterSdkError("RFQ_EXPIRED", "Treasury quote deadline has expired.");
     if (inputMint !== deployment.quoteMint || outputMint !== deployment.baseMint || quote.terms.quotedInput !== amountIn) {

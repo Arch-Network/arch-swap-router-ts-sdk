@@ -3,7 +3,7 @@ import { hex } from "@scure/base";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TRANSACTION_SIZE_LIMIT } from "../src/index.js";
 import { MAINNET_AETH_USD as market } from "../src/config/aeth-usd.js";
-import { normalizeAethUsdBuy } from "../src/direct-rfq.js";
+import { decodeTreasuryTemplate } from "../src/direct-rfq.js";
 import type { DirectRfqQuote, QuoteExactInRequest } from "../src/types.js";
 import { decodeAddress, deriveAddress, U64_MAX } from "../src/utils.js";
 import fixtures from "./fixtures/aeth-usd/transactions.json" with { type: "json" };
@@ -32,27 +32,22 @@ const writeU64 = (data: Uint8Array, offset: number, value: bigint) =>
 beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(fixtures.now_ms); });
 afterEach(() => { vi.restoreAllMocks(); });
 
-describe("aUSD → aETH treasury-buy normalization", () => {
-  it("normalizes the native buy without changing the transaction, blockhash or message bytes", () => {
-    const { request, quote } = setup();
-    const result = normalizeAethUsdBuy(request, quote);
+describe("aUSD → aETH treasury-buy validation", () => {
+  it("decodes the treasury buy without changing the transaction, blockhash or message bytes", () => {
+    const { request, quote, mint } = setup();
+    const result = decodeTreasuryTemplate(request, quote, market);
     expect(result).toEqual({
-      execution: "serverTransaction", inputMint: market.quoteMint, outputMint: market.baseMint,
-      amountIn: 1_000_000n, estimatedAmountOut: 400_000n, minAmountOut: 400_000n,
-      deadlineMs: fixture.expires_at_ms,
-      hops: [{ kind: "treasuryMint", inputMint: market.quoteMint, outputMint: market.baseMint,
-        amountIn: 1_000_000n, estimatedAmountOut: 400_000n }],
-      transaction: quote.transaction, rfq: { quoteId: "buy-quote" },
+      transaction: quote.transaction, deadlineMs: fixture.expires_at_ms, amountOut: 400_000n,
+      issuanceId: mint.data.slice(1, 33),
     });
     expect(result.transaction).toBe(quote.transaction);
     expect(hex.encode(TransactionUtil.serialize(result.transaction))).toBe(fixture.transaction_hex);
-    expect(result).not.toHaveProperty("instructions");
   });
 
   it("clamps to an earlier request deadline without rewriting the server message", () => {
     const { request, quote } = setup();
     const deadlineMs = fixtures.now_ms + 10_000;
-    const result = normalizeAethUsdBuy({ ...request, deadlineMs }, quote);
+    const result = decodeTreasuryTemplate({ ...request, deadlineMs }, quote, market);
     expect(result.deadlineMs).toBe(deadlineMs);
     expect(quote.expiresAtMs).toBe(BigInt(fixture.expires_at_ms));
     expect(hex.encode(TransactionUtil.serialize(result.transaction))).toBe(fixture.transaction_hex);
@@ -60,12 +55,12 @@ describe("aUSD → aETH treasury-buy normalization", () => {
 
   it("clamps a u64 server expiry without converting it through an unsafe number", () => {
     const { request, quote } = setup();
-    expect(normalizeAethUsdBuy(request, { ...quote, expiresAtMs: U64_MAX }).deadlineMs).toBe(request.deadlineMs);
+    expect(decodeTreasuryTemplate(request, { ...quote, expiresAtMs: U64_MAX }, market).deadlineMs).toBe(request.deadlineMs);
   });
 
   it.each([0, 9999])("retains the exact minted payout with slippage %s bps", slippageBps => {
     const { request, quote } = setup();
-    expect(normalizeAethUsdBuy({ ...request, slippageBps }, quote).minAmountOut).toBe(400_000n);
+    expect(decodeTreasuryTemplate({ ...request, slippageBps }, quote, market).amountOut).toBe(400_000n);
   });
 
   it("accepts a fresh mint ID only with its matching treasury-mint PDA", () => {
@@ -75,7 +70,7 @@ describe("aUSD → aETH treasury-buy normalization", () => {
       deriveAddress(market.bridgeProgramId, "treasury_mint", mint.data.subarray(1, 33)),
     );
     const before = TransactionUtil.serialize(quote.transaction);
-    const result = normalizeAethUsdBuy(request, quote);
+    const result = decodeTreasuryTemplate(request, quote, market);
     expect(TransactionUtil.serialize(result.transaction)).toEqual(before);
   });
 
@@ -83,10 +78,7 @@ describe("aUSD → aETH treasury-buy normalization", () => {
     const { request, quote, payment, mint } = setup();
     writeU64(payment.data, 1, amount);
     writeU64(mint.data, 33, amount);
-    const result = normalizeAethUsdBuy({ ...request, amountIn: amount }, { ...quote, estimatedAmountOut: amount });
-    expect(result.amountIn).toBe(amount);
-    expect(result.estimatedAmountOut).toBe(amount);
-    expect(result.minAmountOut).toBe(amount);
+    expect(decodeTreasuryTemplate({ ...request, amountIn: amount }, { ...quote, estimatedAmountOut: amount }, market).amountOut).toBe(amount);
   });
 
   const invalidRequests: Partial<QuoteExactInRequest>[] = [
@@ -97,16 +89,17 @@ describe("aUSD → aETH treasury-buy normalization", () => {
   ];
   it.each(invalidRequests)("rejects invalid request %#", invalid => {
     const { request, quote } = setup();
-    expect(() => normalizeAethUsdBuy({ ...request, ...invalid }, quote)).toThrow();
+    expect(() => decodeTreasuryTemplate({ ...request, ...invalid }, quote, market)).toThrow();
   });
 
   it.each(["request", "server"] as const)("rejects an expired %s deadline, including equality", source => {
     for (const offset of [-1, 0]) {
       const { request, quote } = setup();
       const expiry = fixtures.now_ms + offset;
-      expect(() => normalizeAethUsdBuy(
+      expect(() => decodeTreasuryTemplate(
         source === "request" ? { ...request, deadlineMs: expiry } : request,
         source === "server" ? { ...quote, expiresAtMs: BigInt(expiry) } : quote,
+        market,
       )).toThrow(expect.objectContaining({ code: "RFQ_EXPIRED" }));
     }
   });
@@ -119,7 +112,7 @@ describe("aUSD → aETH treasury-buy normalization", () => {
   ];
   it.each(metadata)("rejects inconsistent RFQ metadata %#", invalid => {
     const { request, quote } = setup();
-    expect(() => normalizeAethUsdBuy(request, { ...quote, ...invalid })).toThrow(expect.objectContaining({ code: "INVALID_RFQ" }));
+    expect(() => decodeTreasuryTemplate(request, { ...quote, ...invalid }, market)).toThrow(expect.objectContaining({ code: "INVALID_RFQ" }));
   });
 
   const tampering: [string, (value: Setup) => void][] = [
@@ -159,7 +152,7 @@ describe("aUSD → aETH treasury-buy normalization", () => {
   it.each(tampering)("rejects tampered %s", (_, mutate) => {
     const state = setup();
     mutate(state);
-    expect(() => normalizeAethUsdBuy(state.request, state.quote)).toThrow(expect.objectContaining({ code: "INVALID_RFQ" }));
+    expect(() => decodeTreasuryTemplate(state.request, state.quote, market)).toThrow(expect.objectContaining({ code: "INVALID_RFQ" }));
   });
 
   it.each([-1, 0.5, NaN, 256])("rejects invalid compiled account/program index %s", index => {
@@ -167,7 +160,7 @@ describe("aUSD → aETH treasury-buy normalization", () => {
       const state = setup();
       if (field === "account") state.payment.accounts[0] = index;
       else state.payment.program_id_index = index;
-      expect(() => normalizeAethUsdBuy(state.request, state.quote)).toThrow(expect.objectContaining({ code: "INVALID_RFQ" }));
+      expect(() => decodeTreasuryTemplate(state.request, state.quote, market)).toThrow(expect.objectContaining({ code: "INVALID_RFQ" }));
     }
   });
 
@@ -175,13 +168,13 @@ describe("aUSD → aETH treasury-buy normalization", () => {
   it.each(roles.map((role, index) => ({ role, index })))("rejects the wrong mint $role account", ({ index }) => {
     const { request, quote, mint } = setup();
     mint.accounts[index] = (mint.accounts[index]! + 1) % quote.transaction.message.account_keys.length;
-    expect(() => normalizeAethUsdBuy(request, quote)).toThrow(expect.objectContaining({ code: "INVALID_RFQ" }));
+    expect(() => decodeTreasuryTemplate(request, quote, market)).toThrow(expect.objectContaining({ code: "INVALID_RFQ" }));
   });
 
   it.each([0, 1, 2])("rejects substituted payment account %s", index => {
     const { request, quote, payment } = setup();
     payment.accounts[index] = (payment.accounts[index]! + 1) % quote.transaction.message.account_keys.length;
-    expect(() => normalizeAethUsdBuy(request, quote)).toThrow(expect.objectContaining({ code: "INVALID_RFQ" }));
+    expect(() => decodeTreasuryTemplate(request, quote, market)).toThrow(expect.objectContaining({ code: "INVALID_RFQ" }));
   });
 
   it("counts both missing signatures when rejecting an oversized message", () => {
@@ -191,7 +184,7 @@ describe("aUSD → aETH treasury-buy normalization", () => {
     expect(TransactionUtil.serializedSize(quote.transaction)).toBeLessThanOrEqual(TRANSACTION_SIZE_LIMIT);
     expect(TransactionUtil.serializedSize({ ...quote.transaction, signatures: [new Uint8Array(64), new Uint8Array(64)] }))
       .toBeGreaterThan(TRANSACTION_SIZE_LIMIT);
-    expect(() => normalizeAethUsdBuy(request, quote)).toThrow(expect.objectContaining({ code: "TRANSACTION_TOO_LARGE" }));
+    expect(() => decodeTreasuryTemplate(request, quote, market)).toThrow(expect.objectContaining({ code: "TRANSACTION_TOO_LARGE" }));
   });
 
   it("rejects 51 original message keys below the byte limit without modifying the server transaction", () => {
@@ -200,7 +193,7 @@ describe("aUSD → aETH treasury-buy normalization", () => {
     const before = TransactionUtil.serialize(quote.transaction);
     expect(TransactionUtil.serializedSize({ ...quote.transaction, signatures: [new Uint8Array(64), new Uint8Array(64)] }))
       .toBeLessThan(TRANSACTION_SIZE_LIMIT);
-    expect(() => normalizeAethUsdBuy(request, quote)).toThrow(expect.objectContaining({ code: "TRANSACTION_TOO_MANY_ACCOUNTS" }));
+    expect(() => decodeTreasuryTemplate(request, quote, market)).toThrow(expect.objectContaining({ code: "TRANSACTION_TOO_MANY_ACCOUNTS" }));
     expect(TransactionUtil.serialize(quote.transaction)).toEqual(before);
     expect(quote.transaction.signatures).toEqual([]);
   });
