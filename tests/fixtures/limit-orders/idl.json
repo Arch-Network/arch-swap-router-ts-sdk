@@ -1,0 +1,412 @@
+{
+  "source": "prop-amm idl/prop_amm.idl.json @ 2d7fa57e25f5f4583ba065878c0a38d1f290f450",
+  "instructions": [
+    {
+      "name": "create_limit_order",
+      "discriminator": [
+        7
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "owner",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "limit_order",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "escrow_token_account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "base_mint",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "quote_mint",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "owner_input_token_account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "owner_output_token_account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "apl_token_program",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "system_program",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "associated_token_program",
+          "writable": false,
+          "signer": false
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "CreateLimitOrderParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "cancel_limit_order",
+      "discriminator": [
+        8
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "owner",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "limit_order",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "escrow_token_account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "input_mint",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "owner_input_token_account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "rent_refund",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "apl_token_program",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "system_program",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "associated_token_program",
+          "writable": false,
+          "signer": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "fill_limit_order",
+      "discriminator": [
+        9
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "quote_signer",
+          "writable": false,
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "owner",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "limit_order",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "escrow_token_account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "base_vault",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "quote_vault",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "owner_input_token_account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "owner_output_token_account",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "base_mint",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "quote_mint",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "rent_refund",
+          "writable": true,
+          "signer": false
+        },
+        {
+          "name": "apl_token_program",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "system_program",
+          "writable": false,
+          "signer": false
+        },
+        {
+          "name": "associated_token_program",
+          "writable": false,
+          "signer": false
+        }
+      ],
+      "args": [
+        {
+          "name": "quote",
+          "type": {
+            "defined": {
+              "name": "CompactQuote"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "Side",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Buy"
+          },
+          {
+            "name": "Sell"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LimitOrderStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Filled"
+          },
+          {
+            "name": "Cancelled"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreateLimitOrderParams",
+      "docs": [
+        "Immutable owner-signed terms; identities come from instruction accounts. Token amounts are positive raw units. fill_allowance_lamports is prepaid by the payer, held by the order account, paid to the fill payer and refunded to rent_refund on cancel; zero means the owner funds their own fill. No order expiry."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "order_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": {
+                "name": "Side"
+              }
+            }
+          },
+          {
+            "name": "input_amount",
+            "type": "u64"
+          },
+          {
+            "name": "min_output_amount",
+            "type": "u64"
+          },
+          {
+            "name": "fill_allowance_lamports",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LimitOrder",
+      "docs": [
+        "V1 is 251 bytes including discriminator PROPORD1. Offsets: version=8, status=9, config=10, owner=42, order_id=74, base_mint=106, quote_mint=138, side=170, input_amount=171, min_output_amount=179, created_at=187, rent_refund=195, fill_allowance_lamports=227, closed_at=235, output_amount=243. created_at and closed_at are Unix seconds from the chain clock. Terms are immutable; status, closed_at and output_amount (the fill's actual payout, 0 on cancel) are set once by the terminal transition. Terminal accounts are retained as order history; the initial payer receives reclaimed escrow rent."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "LimitOrderStatus"
+              }
+            }
+          },
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "order_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "base_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": {
+                "name": "Side"
+              }
+            }
+          },
+          {
+            "name": "input_amount",
+            "type": "u64"
+          },
+          {
+            "name": "min_output_amount",
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "u64"
+          },
+          {
+            "name": "rent_refund",
+            "type": "pubkey"
+          },
+          {
+            "name": "fill_allowance_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "closed_at",
+            "type": "u64"
+          },
+          {
+            "name": "output_amount",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ],
+  "accounts": [
+    {
+      "name": "LimitOrder",
+      "discriminator": [
+        80,
+        82,
+        79,
+        80,
+        79,
+        82,
+        68,
+        49
+      ]
+    }
+  ]
+}
