@@ -58,6 +58,33 @@ it.each(["btcVault", "usdVault"] as const)("auto retains maker when %s reads fai
   expect((await f.client.quoteExactIn(f.request)).hops[0]!.kind).toBe("propamm");
   await expect(f.client.quoteExactIn({ ...f.request, routePreference: "vault" })).rejects.toThrow();
 });
+it.each([false, true])("keeps the direct Prime sale and USD vault when the optional BTC response is malformed, recovery=%s", async recovery => {
+  const f = await setup("btcVault");
+  f.price(f.reserve.estimatedAmountOut + 1000n);
+  const request = { ...f.request, outputMint: NETWORKS.mainnet.mints.primeUSD };
+  const control = await f.client.quoteExactIn(request);
+  expect(control.hops.map(hop => hop.kind)).toEqual(["propamm", "vaultMint"]);
+  f.source.getAccounts.mockClear();
+  f.directRfqQuoteProvider.quoteExactIn.mockClear();
+  f.accounts.get(NETWORKS.mainnet.venues.btcVault.address)!.data = [] as unknown as Uint8Array;
+  if (recovery) f.source.getAccounts.mockRejectedValueOnce(new Error("Initial batch unavailable"));
+
+  const quote = await f.client.quoteExactIn(request);
+  expect(quote.hops).toEqual(control.hops);
+  expect(quote.estimatedAmountOut).toBe(control.estimatedAmountOut);
+  expect(quote.rfq).toEqual({ quoteId: f.rfq.quoteId });
+  expect(f.directRfqQuoteProvider.quoteExactIn).toHaveBeenCalledExactlyOnceWith(f.request);
+  expect(f.source.getAccounts.mock.calls.map(([keys]) => keys.length)).toEqual(recovery ? [9, 8] : [9]);
+  if (recovery) expect(f.source.getAccounts.mock.calls[1]![0]).not.toContain(NETWORKS.mainnet.venues.clamm.address);
+});
+it("rejects a malformed shared USD vault before requesting the direct Prime sale", async () => {
+  const f = await setup("btcVault");
+  f.accounts.get(NETWORKS.mainnet.venues.usdVault.address)!.data = [] as unknown as Uint8Array;
+  await expect(f.client.quoteExactIn({ ...f.request, outputMint: NETWORKS.mainnet.mints.primeUSD }))
+    .rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  expect(f.directRfqQuoteProvider.quoteExactIn).not.toHaveBeenCalled();
+  expect(f.source.getAccounts).toHaveBeenCalledOnce();
+});
 it("excludes an RFQ that expires while waiting for reserve", async () => {
   const f = await setup();
   const read = f.source.getAccounts.getMockImplementation()!;

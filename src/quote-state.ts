@@ -3,7 +3,7 @@ import { loadClamm, prepareClammQuote } from "./clamm.js";
 import type { NetworkConfig } from "./config/networks.js";
 import type { CoreRouteStep, Route } from "./config/routes.js";
 import type { RouterDataSource } from "./types.js";
-import { createAccountLoader, decodeAddress, deriveAddress, readAccounts } from "./utils.js";
+import { createAccountLoader, decodeAddress, deriveAddress } from "./utils.js";
 import { prepareVaultQuote } from "./vault.js";
 
 type VaultStep = Exclude<CoreRouteStep, { readonly venue: "clamm" }>;
@@ -32,33 +32,38 @@ export async function prepareQuoteState(source: RouterDataSource, config: Networ
   const hasClamm = steps.some((step) => step.venue === "clamm");
   const pool = venues.clamm;
   const poolKeys = [pool.address, pool.tokenMintA, pool.tokenMintB];
-  const vaultKeys = steps.flatMap((step) => {
-    if (step.venue === "propamm" || step.venue === "clamm") return [];
+  const vaultSteps = steps.filter((step): step is VaultStep => step.venue !== "propamm" && step.venue !== "clamm");
+  const keysForVault = (step: VaultStep) => {
     const venue = venues[step.venue];
     return [venue.address, venue.assetMint, venue.shareMint,
       deriveAddress(programs.vaultProgramId, "reserve", decodeAddress(venue.shareMint))];
-  });
+  };
+  const vaultKeys = vaultSteps.flatMap(keysForVault);
   const keys = [...vaultKeys, ...(hasClamm ? poolKeys : [])];
   // Prime the cache in one batch. Each candidate consumes only its own accounts.
   // Attach a handler even when the RFQ needs no accounts and can start immediately.
   const initial = load(keys);
   void initial.catch(() => {});
-  let accountError: unknown;
-  const accounts = await (async () => hasRfq ? await load(vaultKeys).catch(async (error: unknown) => {
-    if (initialBatchAvailable || !hasClamm) throw error; // No optional CLAMM batch to recover from.
-    // A failed combined batch leaves no shared state. Spend the second read only
-    // on vaults for RFQ; CLAMM keeps its cached batch failure and cannot read ticks.
-    return readAccounts(boundedSource, vaultKeys);
-  }) : await initial)().catch(error => { accountError = error; return undefined; });
+  let loadVault = load;
+  try {
+    await (hasRfq ? load(vaultKeys) : initial);
+  } catch {
+    // Keep individual failures in the cache; each vault consumes only its keys.
+    if (hasRfq && hasClamm && !initialBatchAvailable) {
+      // Recover vaults in one batch after transport/framing failure. This cache
+      // also isolates malformed recovery accounts; CLAMM keeps its original failure.
+      loadVault = createAccountLoader(boundedSource);
+      void loadVault(vaultKeys).catch(() => {});
+    }
+  }
+  const results = await Promise.allSettled(vaultSteps.map(async step =>
+    prepareVaultQuote(await loadVault(keysForVault(step)), venues[step.venue], step.operation, now, programs)));
   const vaults = new Map<string, ReturnType<typeof prepareVaultQuote>>();
   const errors = new Map<string, unknown>();
-  for (const step of steps) {
-    if (step.venue !== "clamm" && step.venue !== "propamm") {
-      try {
-        if (!accounts) throw accountError;
-        vaults.set(step.id, prepareVaultQuote(accounts, venues[step.venue], step.operation, now, programs));
-      } catch (error) { errors.set(step.id, error); }
-    }
+  for (const [index, result] of results.entries()) {
+    const step = vaultSteps[index]!;
+    if (result.status === "fulfilled") vaults.set(step.id, result.value);
+    else errors.set(step.id, result.reason);
   }
   if (candidates.every(route => route.steps.some(step => errors.has(step.id)))) throw errors.values().next().value;
   const clamm = new Map<string, Promise<ReturnType<typeof prepareClammQuote>>>();
