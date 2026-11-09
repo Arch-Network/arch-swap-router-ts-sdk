@@ -127,3 +127,17 @@ describe("request-local quote preparation", () => {
     expect(Date.now).toHaveBeenCalledTimes(1);
   });
 });
+
+it("bounds a stalled recovery read after a failed combined batch", async () => {
+  vi.useFakeTimers();
+  try {
+    const { source } = setup();
+    source.getAccounts.mockRejectedValueOnce(new Error("combined batch unavailable"))
+      .mockImplementation(() => new Promise(() => {}));
+    const result = prepareQuoteState(source, config, findRoutes(graph, mints.aBTC, mints.primeUSD));
+    const rejected = expect(result).rejects.toThrow("Account read exceeded 2 seconds");
+    await vi.advanceTimersByTimeAsync(2000);
+    await rejected;
+    expect(source.getAccounts).toHaveBeenCalledTimes(2);
+  } finally { vi.useRealTimers(); }
+});

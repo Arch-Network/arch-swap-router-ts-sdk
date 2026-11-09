@@ -1,5 +1,8 @@
+import { MAINNET_MINTS } from "./mainnet-mints.js";
 import type { Address } from "../types.js";
 import { MAINNET_DIRECT_RFQ_MARKETS } from "./direct-rfq-markets.js";
+
+export { MAINNET_MINTS } from "./mainnet-mints.js";
 
 /** Fixed deployments; callers select a network rather than supplying addresses. */
 export const TESTNET = Object.freeze({
@@ -45,13 +48,6 @@ export const MAINNET = Object.freeze({
   tokenProgramId: "TokenT4em53UrV4gSvZ3nCS2mZeHaqTLapwt6iZt6Mk",
   associatedTokenProgramId: "ATok9pxLsNzM5zJJ3UQpXBrMriHpZiY5Yio3GKYU4we3",
   systemProgramId: "11111111111111111111111111111111",
-} as const);
-
-export const MAINNET_MINTS = Object.freeze({
-  aBTC: "78s6DsmwRnCYiQDvAKbJoeAbGDa68zifa1cgqTb4tBbM",
-  aUSD: "DQcBfwHu8gr8KGt3BE5BDUfBjGgFuDJYm9ByVTDsrww9",
-  primeBTC: "Bg138vbUo1h3cvRBQ9yRdqbGX2Cm2pwRexj1LaVVTQYj",
-  primeUSD: "C9fDCY2oJjM3KUHGkr5TidcbJMz7Me9FHHBR2YDnGVrK",
 } as const);
 
 export const MAINNET_VENUES = Object.freeze({
@@ -126,8 +122,8 @@ export const NETWORKS = Object.freeze({
       programId: "5KMw4VNavLhM5wxTxyQGm8hs5ymFhqMCZ5BpkHybcEBV",
       config: "3jwSNH8P5tNFMY72ZwFi5z3gEkK1vVor3xcAFvr4DHzr",
       baseMint: MAINNET_MINTS.aBTC, quoteMint: MAINNET_MINTS.aUSD,
-    }), ...MAINNET_DIRECT_RFQ_MARKETS.map(({ id, deployment }) => Object.freeze({
-      ...deployment, id, sides: Object.freeze(["sell", "buy"] as const), allowClamm: true,
+    }), ...MAINNET_DIRECT_RFQ_MARKETS.map(({ id, deployment, sides, allowClamm }) => Object.freeze({
+      ...deployment, id, sides, allowClamm,
     }))]),
   }),
 } satisfies Record<Network, NetworkConfig | null>);

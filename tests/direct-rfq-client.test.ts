@@ -258,13 +258,13 @@ describe("automatic ETH/USD router dispatch", () => {
     await expect(pending).resolves.toMatchObject({ amountIn: BigInt(state.fixture.amount_in) });
   });
 
-  it("keeps legacy exact-input and receive requests on the existing path when enabled", async () => {
+  it("does not request RFQs when every required prefix fails", async () => {
     const state = setup();
     const router = createRouterClient({ source: state.source, network: "mainnet", directRfqQuoteProvider: state.directRfqQuoteProvider });
     const request = { ...state.request, inputMint: MAINNET_MINTS.aBTC, outputMint: MAINNET_MINTS.aUSD };
-    await expect(router.quoteExactIn(request)).rejects.toThrow("Unexpected read");
+    await expect(router.quoteExactIn(request)).rejects.toMatchObject({ code: "NO_ROUTE" });
     await expect(router.quoteForOutput({ ...request, amountOut: 1000n })).rejects.toThrow("Unexpected read");
-    expect(state.source.getAccounts).toHaveBeenCalledTimes(2);
+    expect(state.source.getAccounts).toHaveBeenCalledTimes(3);
     expect(state.directRfqQuoteProvider.quoteExactIn).not.toHaveBeenCalled();
   });
 });
