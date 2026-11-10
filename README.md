@@ -608,9 +608,8 @@ not add an automatic redemption loop for PropMM's acquired shares.
 
 ### Direct BTC treasury buy packets
 
-A client that supports the BTC bridge mint packet can send
-`supports_btc_treasury: true` to PropMM's `/rfq/quote`. Pass a returned mint
-packet, the request, and trusted deployment pins to `prepareBtcTreasuryBuy`.
-Sign its original transaction message and submit it with the returned quote ID
-to `/rfq/swap`. Keep using the existing inventory path when PropMM returns an
-inventory quote. The BTC mint packet is a direct transaction.
+Use the standard `/rfq/quote` request for a direct aBTC buy. When PropMM
+returns a BTC mint packet, pass the request and response to
+`prepareBtcTreasuryBuy`. It uses the Velox mainnet deployment by default.
+Sign the original transaction message and submit it with its quote ID to
+`/rfq/swap`. Inventory quotes use the existing execution path.

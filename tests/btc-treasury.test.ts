@@ -11,9 +11,7 @@ function setup() {
   const baseMint = address(fixture.base_mint), quoteMint = address(fixture.quote_mint);
   const market: BtcTreasuryRfqDeployment = {
     ...MAINNET_AETH_USD,
-    programId, config, baseMint, quoteMint, baseDecimals: 8,
-    quoteSigner: address(fixture.quote_signer),
-    baseVault: deriveAddress(programId, "vault", decodeAddress(config), decodeAddress(baseMint)),
+    baseMint, quoteMint,
     quoteVault: deriveAddress(programId, "vault", decodeAddress(config), decodeAddress(quoteMint)),
     btcTreasury: {
       programId: address(fixture.bridge),

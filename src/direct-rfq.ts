@@ -1,5 +1,7 @@
 import { base58 } from "@scure/base";
 import type { DirectRfqMarketDeployment } from "./config/direct-rfq-markets.js";
+import { MAINNET_MINTS } from "./config/mainnet-mints.js";
+import { MAINNET_RFQ_DEPLOYMENT } from "./config/rfq-deployment.js";
 import { RouterSdkError } from "./errors.js";
 import type { DirectRfqQuote, PropAmmQuote, QuoteExactInRequest, ServerTransactionSwapQuote } from "./types.js";
 import type { TreasuryMintQuote } from "./treasury-mint.js";
@@ -57,7 +59,9 @@ function readDirectRfq(request: QuoteExactInRequest, quote: DirectRfqQuote, serv
   return { user, deadlineMs, transaction, message, header, keys };
 }
 
-function userAta(user: Uint8Array, mint: string, market: DirectRfqMarketDeployment): string {
+function userAta(
+  user: Uint8Array, mint: string, market: Pick<DirectRfqMarketDeployment, "tokenProgramId" | "associatedTokenProgramId">,
+): string {
   return deriveProgramAddress([
     user, decodeAddress(market.tokenProgramId), decodeAddress(mint),
   ], market.associatedTokenProgramId)[0];
@@ -115,7 +119,8 @@ export function decodeTreasuryTemplate(request: QuoteExactInRequest, quote: Dire
   return { transaction, deadlineMs, amountOut, issuanceId: mint.data.slice(1, 33) };
 }
 
-export interface BtcTreasuryRfqDeployment extends DirectRfqMarketDeployment {
+export interface BtcTreasuryRfqDeployment extends Pick<DirectRfqMarketDeployment,
+  "baseMint" | "quoteMint" | "quoteVault" | "tokenProgramId" | "associatedTokenProgramId" | "systemProgramId"> {
   readonly btcTreasury: {
     readonly programId: string;
     readonly initialAdmin: string;
@@ -123,11 +128,21 @@ export interface BtcTreasuryRfqDeployment extends DirectRfqMarketDeployment {
   };
 }
 
+const MAINNET_BTC_TREASURY: BtcTreasuryRfqDeployment = {
+  ...MAINNET_RFQ_DEPLOYMENT,
+  baseMint: MAINNET_MINTS.aBTC,
+  btcTreasury: {
+    programId: "9zvxchMMyBKYzmt4JTeGNFuU9SANUWU1v2UMU9pAkE5n",
+    initialAdmin: "8gxdp6MFVdjV6s3yGcKB1fk3xjzn6g1ofbCVUsY99wwW",
+    minter: MAINNET_RFQ_DEPLOYMENT.treasuryAuthority,
+  },
+};
+
 const COMPUTE_BUDGET = "ComputeBudget111111111111111111111111111111";
 
 /** Validate and preserve the BTC buy packet for direct submission to the RFQ server. */
 export function prepareBtcTreasuryBuy(
-  request: QuoteExactInRequest, quote: DirectRfqQuote, market: BtcTreasuryRfqDeployment,
+  request: QuoteExactInRequest, quote: DirectRfqQuote, market = MAINNET_BTC_TREASURY,
 ): ServerTransactionSwapQuote {
   if (request.inputMint !== market.quoteMint || request.outputMint !== market.baseMint) {
     throw new RouterSdkError("UNSUPPORTED_PAIR", "BTC treasury buys require the configured aUSD → aBTC pair.");
