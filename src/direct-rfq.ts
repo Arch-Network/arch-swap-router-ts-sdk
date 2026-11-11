@@ -1,7 +1,9 @@
 import { base58 } from "@scure/base";
 import type { DirectRfqMarketDeployment } from "./config/direct-rfq-markets.js";
+import { MAINNET_MINTS } from "./config/mainnet-mints.js";
+import { MAINNET_RFQ_DEPLOYMENT } from "./config/rfq-deployment.js";
 import { RouterSdkError } from "./errors.js";
-import type { DirectRfqQuote, PropAmmQuote, QuoteExactInRequest } from "./types.js";
+import type { DirectRfqQuote, PropAmmQuote, QuoteExactInRequest, ServerTransactionSwapQuote } from "./types.js";
 import type { TreasuryMintQuote } from "./treasury-mint.js";
 import { assertMessageLimits } from "./transactions/size.js";
 import { decodeAddress, deriveAddress, deriveProgramAddress, U64_MAX } from "./utils.js";
@@ -57,7 +59,9 @@ function readDirectRfq(request: QuoteExactInRequest, quote: DirectRfqQuote, serv
   return { user, deadlineMs, transaction, message, header, keys };
 }
 
-function userAta(user: Uint8Array, mint: string, market: DirectRfqMarketDeployment): string {
+function userAta(
+  user: Uint8Array, mint: string, market: Pick<DirectRfqMarketDeployment, "tokenProgramId" | "associatedTokenProgramId">,
+): string {
   return deriveProgramAddress([
     user, decodeAddress(market.tokenProgramId), decodeAddress(mint),
   ], market.associatedTokenProgramId)[0];
@@ -113,6 +117,83 @@ export function decodeTreasuryTemplate(request: QuoteExactInRequest, quote: Dire
   if (deadlineMs <= Date.now()) throw new RouterSdkError("RFQ_EXPIRED", "Treasury-buy quote deadline has expired.");
 
   return { transaction, deadlineMs, amountOut, issuanceId: mint.data.slice(1, 33) };
+}
+
+export interface BtcTreasuryRfqDeployment extends Pick<DirectRfqMarketDeployment,
+  "baseMint" | "quoteMint" | "quoteVault" | "tokenProgramId" | "associatedTokenProgramId" | "systemProgramId"> {
+  readonly btcTreasury: {
+    readonly programId: string;
+    readonly initialAdmin: string;
+    readonly minter: string;
+  };
+}
+
+const MAINNET_BTC_TREASURY: BtcTreasuryRfqDeployment = {
+  ...MAINNET_RFQ_DEPLOYMENT,
+  baseMint: MAINNET_MINTS.aBTC,
+  btcTreasury: {
+    programId: "9zvxchMMyBKYzmt4JTeGNFuU9SANUWU1v2UMU9pAkE5n",
+    initialAdmin: "8gxdp6MFVdjV6s3yGcKB1fk3xjzn6g1ofbCVUsY99wwW",
+    minter: MAINNET_RFQ_DEPLOYMENT.treasuryAuthority,
+  },
+};
+
+const COMPUTE_BUDGET = "ComputeBudget111111111111111111111111111111";
+
+/** Validate and preserve the BTC buy packet for direct submission to the RFQ server. */
+export function prepareBtcTreasuryBuy(
+  request: QuoteExactInRequest, quote: DirectRfqQuote, market = MAINNET_BTC_TREASURY,
+): ServerTransactionSwapQuote {
+  if (request.inputMint !== market.quoteMint || request.outputMint !== market.baseMint) {
+    throw new RouterSdkError("UNSUPPORTED_PAIR", "BTC treasury buys require the configured aUSD → aBTC pair.");
+  }
+  requireRfq(quote?.treasuryAuthorization === undefined, "Direct BTC buys cannot carry router authorization.");
+  const { programId, initialAdmin, minter } = market.btcTreasury;
+  const { user, deadlineMs, transaction, message, header, keys } = readDirectRfq(request, quote, minter, 6);
+  const [heap, compute, createAta, payment, mint, payout] = message.instructions;
+  const matches = (ix: typeof mint, program: string, accounts: readonly string[]) =>
+    keys[ix!.program_id_index] === program && ix!.accounts.length === accounts.length
+      && ix!.accounts.every((index, i) => keys[index] === accounts[i]);
+  const budget = (ix: typeof mint, tag: number, value: number) =>
+    matches(ix, COMPUTE_BUDGET, []) && bytes(ix!.data, 8)
+      && new DataView(ix!.data.buffer, ix!.data.byteOffset, 8).getUint32(0, true) === tag
+      && new DataView(ix!.data.buffer, ix!.data.byteOffset, 8).getUint32(4, true) === value;
+  requireRfq(budget(heap, 0, 256 * 1024) && budget(compute, 1, 1_400_000), "Unexpected BTC mint compute budget.");
+  requireRfq(bytes(mint!.data, 41) && mint!.data[0] === 8, "Unexpected BTC bridge mint data.");
+  const config = deriveAddress(programId, "bridge", decodeAddress(market.baseMint), decodeAddress(initialAdmin));
+  const credit = deriveAddress(programId, "treasury-credit", decodeAddress(config));
+  const operation = deriveAddress(programId, "treasury-operation", decodeAddress(config), mint!.data.subarray(1, 33));
+  const minterAta = userAta(decodeAddress(minter), market.baseMint, market);
+  const outputAta = userAta(user, market.baseMint, market);
+  const inputAta = userAta(user, market.quoteMint, market);
+  const ataKeys = [request.user, outputAta, request.user, market.baseMint, market.systemProgramId, market.tokenProgramId];
+  const paymentKeys = [inputAta, market.quoteVault, request.user];
+  const mintKeys = [
+    minter, config, credit, operation, market.baseMint, minterAta,
+    market.tokenProgramId, market.associatedTokenProgramId, market.systemProgramId,
+  ];
+  const payoutKeys = [minterAta, outputAta, minter];
+  const transfer = (ix: typeof mint, accounts: readonly string[], amount: bigint) =>
+    matches(ix, market.tokenProgramId, accounts) && bytes(ix!.data, 9) && ix!.data[0] === 3
+      && new DataView(ix!.data.buffer, ix!.data.byteOffset, 9).getBigUint64(1, true) === amount;
+  const amountOut = new DataView(mint!.data.buffer, mint!.data.byteOffset, 41).getBigUint64(33, true);
+  requireRfq(amountOut > 0n && amountOut === quote.estimatedAmountOut, "BTC mint differs from the quoted output.");
+  requireRfq(matches(createAta, market.associatedTokenProgramId, ataKeys)
+    && bytes(createAta!.data, 1) && createAta!.data[0] === 1, "Unexpected buyer aBTC account creation.");
+  requireRfq(transfer(payment, paymentKeys, request.amountIn), "Unexpected aUSD payment.");
+  requireRfq(matches(mint, programId, mintKeys), "Unexpected BTC treasury accounts.");
+  requireRfq(transfer(payout, payoutKeys, amountOut), "Unexpected aBTC payout.");
+  validateAccounts(keys, header.num_readonly_unsigned_accounts,
+    [...ataKeys, ...paymentKeys, ...mintKeys, ...payoutKeys, programId, COMPUTE_BUDGET],
+    [request.user, minter, inputAta, market.quoteVault, credit, operation, market.baseMint, minterAta, outputAta]);
+  if (deadlineMs <= Date.now()) throw new RouterSdkError("RFQ_EXPIRED", "BTC treasury quote deadline has expired.");
+  return {
+    execution: "serverTransaction", transaction, rfq: { quoteId: quote.quoteId }, deadlineMs,
+    inputMint: request.inputMint, outputMint: request.outputMint, amountIn: request.amountIn,
+    estimatedAmountOut: amountOut, minAmountOut: amountOut,
+    hops: [{ kind: "treasuryMint", inputMint: request.inputMint, outputMint: request.outputMint,
+      amountIn: request.amountIn, estimatedAmountOut: amountOut }],
+  };
 }
 
 /** Validate a pinned native ExecuteTrade for either side; the router re-encodes its terms. */

@@ -605,3 +605,11 @@ routes remain available without an RFQ provider. Account errors stay local to
 affected candidates, reads are bounded, and expired sell quotes are rejected.
 The quote retains its RFQ identity for PropMM co-signing. This SDK change does
 not add an automatic redemption loop for PropMM's acquired shares.
+
+### Direct BTC treasury buy packets
+
+Use the standard `/rfq/quote` request for a direct aBTC buy. When PropMM
+returns a BTC mint packet, pass the request and response to
+`prepareBtcTreasuryBuy`. It uses the Velox mainnet deployment by default.
+Sign the original transaction message and submit it with its quote ID to
+`/rfq/swap`. Inventory quotes use the existing execution path.

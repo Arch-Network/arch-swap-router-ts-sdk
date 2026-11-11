@@ -1,5 +1,6 @@
 export type { AccountInfoResult, RuntimeTransaction } from "@arch-network/arch-sdk";
 export { createRouterClient } from "./client.js";
+export { prepareBtcTreasuryBuy, type BtcTreasuryRfqDeployment } from "./direct-rfq.js";
 export { MAINNET_AETH_USD } from "./config/aeth-usd.js";
 export { LIMIT_ORDER_DEPLOYMENTS, MAINNET_MINTS, TESTNET_MINTS, type Network, type NetworkMints } from "./config/networks.js";
 export { decodeLimitOrder, encodeCancelLimitOrderData, encodeCreateLimitOrderData, LIMIT_ORDER_ACCOUNT_LEN } from "./codecs/limit-order.js";
