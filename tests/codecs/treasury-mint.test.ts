@@ -24,12 +24,13 @@ describe("treasury router wire contract", () => {
 
   it.each([
     [mint], [{ kind: "vaultRedeem" }, mint], [clamm, mint], [{ kind: "vaultRedeem" }, clamm, mint],
-  ])("encodes a supported terminal shape %#", (...steps) => {
+    [mint, { kind: "vaultMint" }], [mint, clamm], [mint, clamm, { kind: "vaultMint" }],
+  ])("encodes a supported treasury shape %#", (...steps) => {
     expect(encodeRouteExactInV1({ ...args, steps: steps as StepArgs[] })[25]).toBe(steps.length);
   });
 
   it.each([
-    [mint, { kind: "vaultMint" }], [mint, mint], [native, mint], [mint, native],
+    [mint, { kind: "vaultRedeem" }], [mint, clamm, clamm], [mint, mint], [native, mint], [mint, native],
     [{ kind: "vaultMint" }, mint], [clamm, clamm, mint], [clamm, { kind: "vaultRedeem" }, mint],
   ])("rejects unsupported shapes and multiple quoted steps %#", (...steps) => invalid({ ...args, steps }));
 

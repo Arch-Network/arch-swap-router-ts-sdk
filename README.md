@@ -9,8 +9,9 @@ Supported pairs use graph-generated one-to-three-hop paths
 through the two vaults and the aBTC/aUSD CLAMM, with optional PropAMM RFQs for
 exact-input swaps on either network. An optional mainnet direct RFQ provider adds
 aETH and aHYPE exact-input buys and sells against aUSD, primeUSD, aBTC and primeBTC.
-All client quotes return router instructions. A validated buy packet resolves
-into a native swap or a terminal treasury mint according to the server response.
+All client quotes return router instructions. A validated packet resolves into a
+native swap or treasury mint according to the server response. Treasury buys are
+terminal; treasury sells may precede a CLAMM swap and/or vault mint.
 
 **Current status:** all 12 core directions support exact-input quotes and receive
 sizing. A configured mainnet direct RFQ provider enables eight directions for each asset,
@@ -35,7 +36,7 @@ transaction byte and account limits.
 The internal graph uses the selected registry, simple paths of at most three
 hops, and at most one server-quoted step. Markets come from the fixed registry,
 with no automatic discovery or public graph configuration. aETH and aHYPE routes can combine
-CLAMM and one native RFQ or terminal treasury step. Co-signing and execution require
+CLAMM and one native RFQ or treasury step. Co-signing and execution require
 compatible server/router deployments with the matching venue bindings.
 
 ## Frontend API
@@ -370,8 +371,8 @@ const hypeBuy = await router.quoteExactIn({
 ```
 
 The provider receives the selected native aETH/aUSD or aHYPE/aUSD leg, including its estimated input
-after any redemption or CLAMM prefix. Sells always use native PropAMM terms;
-buys resolve into a native swap or terminal treasury mint according to the
+after any redemption or CLAMM prefix. Buys and sells resolve into a native swap
+or treasury mint according to the
 validated server packet. The original response remains unchanged. Each route
 makes one quote request, with slippage applied once to the final output.
 aETH/aHYPE receive sizing remains unsupported. aETH ↔ aHYPE requires two
@@ -396,13 +397,20 @@ interface DirectRfqQuote {
 }
 ```
 
-For treasury buys, copy the server's `treasury_authorization.version`,
+For treasury buys and sells, copy the server's `treasury_authorization.version`,
 `min_amount_in` and `max_amount_in` into this object, decoding the decimal-string
 amounts losslessly. Missing authorization rejects with `INVALID_RFQ` before a
 routed quote is returned. The SDK preserves the exact issued bounds, including
 an explicitly issued fixed interval. It never infers bounds from the nominal
 payment or the current policy. Existing HTTP providers must forward this new
-metadata. Native packets must omit it.
+metadata. Native `ExecuteTrade` packets must omit it.
+
+Treasury sells require a router deployment that accepts treasury-first routes
+and an RFQ server that authorizes sell input bounds and checks the quote-currency
+payout cap. The supported additions are treasury → vault mint, treasury → CLAMM,
+and treasury → CLAMM → vault mint. Upgrade the program and consuming client
+before the server starts returning sell authorization; older clients may reject
+that metadata. A program ID staying the same does not establish wire compatibility.
 
 The client validates the original packet's programs, accounts, amounts, signer
 privileges, expiry and transaction limits before building `[input ATA, router]`.

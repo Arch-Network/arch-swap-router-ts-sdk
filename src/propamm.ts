@@ -30,20 +30,21 @@ export async function quotePropAmm(
   } finally {
     clearTimeout(timer);
   }
+  const buy = inputMint === deployment.quoteMint && outputMint === deployment.baseMint;
+  const sell = inputMint === deployment.baseMint && outputMint === deployment.quoteMint;
+  if (!buy && !sell) throw new RouterSdkError("INVALID_RFQ", "PropAMM quote direction is invalid.");
   if (quote?.kind === "treasuryMint") {
     const expiryBoundary = rfqExpiryBoundaryMs(quote.terms.expiryMs);
     const deadlineMs = Number(expiryBoundary < BigInt(request.deadlineMs) ? expiryBoundary : BigInt(request.deadlineMs));
     if (deadlineMs <= Date.now()) throw new RouterSdkError("RFQ_EXPIRED", "Treasury quote deadline has expired.");
-    if (inputMint !== deployment.quoteMint || outputMint !== deployment.baseMint || quote.terms.quotedInput !== amountIn) {
-      throw new RouterSdkError("INVALID_RFQ", "Treasury quote input or direction differs from the requested swap.");
+    if (quote.terms.quotedInput !== amountIn) {
+      throw new RouterSdkError("INVALID_RFQ", "Treasury quote input differs from the requested swap.");
     }
     return { quoteId: quote.quoteId, estimatedAmountOut: quote.estimatedAmountOut, deadlineMs,
-      resolved: resolveTreasuryMint(quote, deployment) };
+      resolved: resolveTreasuryMint(quote, deployment, inputMint, outputMint) };
   }
   const terms = quote?.terms;
-  const buy = inputMint === deployment.quoteMint && outputMint === deployment.baseMint;
-  const sell = inputMint === deployment.baseMint && outputMint === deployment.quoteMint;
-  if ((!buy && !sell) || terms?.side !== (buy ? "buy" : "sell")
+  if (terms?.side !== (buy ? "buy" : "sell")
     || typeof quote?.quoteId !== "string" || !quote.quoteId.trim()) {
     throw new RouterSdkError("INVALID_RFQ", "PropAMM quote ID or direction is invalid.");
   }
