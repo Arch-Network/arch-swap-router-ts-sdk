@@ -89,8 +89,9 @@ export function encodeRouteExactInV1(args: RouteExactInV1Args): Uint8Array {
   const treasury = args.steps.find((step) => step.kind === "treasuryMint");
   if (treasury) {
     const shape = args.steps.map(step => step.kind).join(",");
-    if (!["treasuryMint", "vaultRedeem,treasuryMint", "clamm,treasuryMint", "vaultRedeem,clamm,treasuryMint"].includes(shape)) {
-      throw new RouterSdkError("INVALID_INSTRUCTION", "Treasury minting requires a supported terminal route shape.");
+    if (!["treasuryMint", "vaultRedeem,treasuryMint", "clamm,treasuryMint", "vaultRedeem,clamm,treasuryMint",
+      "treasuryMint,vaultMint", "treasuryMint,clamm", "treasuryMint,clamm,vaultMint"].includes(shape)) {
+      throw new RouterSdkError("INVALID_INSTRUCTION", "Treasury minting requires a supported buy or sell route shape.");
     }
     if (args.deadlineMs > rfqExpiryBoundaryMs(treasury.terms.expiryMs)) {
       throw new RouterSdkError("INVALID_INSTRUCTION", "Route deadline exceeds the treasury expiry.");

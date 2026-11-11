@@ -13,20 +13,20 @@ export interface TreasuryMintQuote {
 }
 
 /** Canonical addresses are derived locally; treasury routing adds no account read. */
-export function resolveTreasuryMint(quote: TreasuryMintQuote, deployment: PropAmmDeployment): ResolvedStep {
+export function resolveTreasuryMint(quote: TreasuryMintQuote, deployment: PropAmmDeployment, inputMint: string, outputMint: string): ResolvedStep {
   const { treasuryAuthority, bridgeProgramId } = deployment;
   if (!treasuryAuthority || !bridgeProgramId) {
     throw new RouterSdkError("INVALID_RFQ", "Treasury execution is not configured for this market.");
   }
   return {
-    kind: "treasuryMint", outputMint: deployment.baseMint,
+    kind: "treasuryMint", outputMint,
     terms: { ...quote.terms, issuanceId: quote.terms.issuanceId.slice() },
     bridgeProgramId, treasuryAuthority,
     bridgeConfig: deriveAddress(bridgeProgramId, "config"),
-    assetConfig: deriveAddress(bridgeProgramId, "asset", decodeAddress(deployment.baseMint)),
+    assetConfig: deriveAddress(bridgeProgramId, "asset", decodeAddress(outputMint)),
     issuanceReceipt: deriveAddress(bridgeProgramId, "treasury_mint", quote.terms.issuanceId),
-    mintAuthority: deriveAddress(bridgeProgramId, "mint-authority", decodeAddress(deployment.baseMint)),
+    mintAuthority: deriveAddress(bridgeProgramId, "mint-authority", decodeAddress(outputMint)),
     propammConfig: deployment.config,
-    paymentVault: deriveAddress(deployment.programId, "vault", decodeAddress(deployment.config), decodeAddress(deployment.quoteMint)),
+    paymentVault: deriveAddress(deployment.programId, "vault", decodeAddress(deployment.config), decodeAddress(inputMint)),
   };
 }
