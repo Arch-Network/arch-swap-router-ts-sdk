@@ -141,16 +141,17 @@ const MAINNET_BTC_TREASURY: BtcTreasuryRfqDeployment = {
   },
 };
 
-export interface BtcTreasurySellRfqDeployment extends Omit<BtcTreasuryRfqDeployment, "quoteVault"> {
-  readonly baseVault: string;
+export interface BtcTreasuryMarketDeployment extends Omit<BtcTreasuryRfqDeployment, "quoteVault"> {
+  readonly programId: string;
+  readonly config: string;
 }
 
-const MAINNET_BTC_TREASURY_SELL: BtcTreasurySellRfqDeployment = {
+const MAINNET_BTC_TREASURY_SELL: BtcTreasuryMarketDeployment = {
   ...MAINNET_BTC_TREASURY,
+  programId: MAINNET_RFQ_DEPLOYMENT.programId,
+  config: MAINNET_RFQ_DEPLOYMENT.config,
   baseMint: MAINNET_MINTS.primeBTC,
   quoteMint: MAINNET_MINTS.aBTC,
-  baseVault: deriveAddress(MAINNET_RFQ_DEPLOYMENT.programId, "vault",
-    decodeAddress(MAINNET_RFQ_DEPLOYMENT.config), decodeAddress(MAINNET_MINTS.primeBTC)),
 };
 
 type BtcTreasuryTradeDeployment = Pick<BtcTreasuryRfqDeployment,
@@ -164,13 +165,16 @@ const COMPUTE_BUDGET = "ComputeBudget111111111111111111111111111111";
 
 /** Validate and preserve the BTC buy packet for direct submission to the RFQ server. */
 export function prepareBtcTreasuryBuy(
-  request: QuoteExactInRequest, quote: DirectRfqQuote, market = MAINNET_BTC_TREASURY,
+  request: QuoteExactInRequest, quote: DirectRfqQuote,
+  market: BtcTreasuryRfqDeployment | BtcTreasuryMarketDeployment = MAINNET_BTC_TREASURY,
 ): ServerTransactionSwapQuote {
   if (request.inputMint !== market.quoteMint || request.outputMint !== market.baseMint) {
     throw new RouterSdkError("UNSUPPORTED_PAIR", "BTC treasury buys require the configured aUSD → aBTC pair.");
   }
   return prepareBtcTreasuryTrade(request, quote, {
-    ...market, paidMint: market.quoteMint, mintedMint: market.baseMint, paidVault: market.quoteVault,
+    ...market, paidMint: market.quoteMint, mintedMint: market.baseMint,
+    paidVault: "quoteVault" in market ? market.quoteVault
+      : deriveAddress(market.programId, "vault", decodeAddress(market.config), decodeAddress(market.quoteMint)),
   });
 }
 
@@ -182,7 +186,8 @@ export function prepareBtcTreasurySell(
     throw new RouterSdkError("UNSUPPORTED_PAIR", "BTC treasury sells require the configured base → aBTC pair.");
   }
   return prepareBtcTreasuryTrade(request, quote, {
-    ...market, paidMint: market.baseMint, mintedMint: market.quoteMint, paidVault: market.baseVault,
+    ...market, paidMint: market.baseMint, mintedMint: market.quoteMint,
+    paidVault: deriveAddress(market.programId, "vault", decodeAddress(market.config), decodeAddress(market.baseMint)),
   });
 }
 

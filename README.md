@@ -627,6 +627,8 @@ For a primeBTC/aBTC sell, pass a BTC-wrapper mint packet to
 `prepareBtcTreasurySell`. It validates payment of the requested primeBTC input
 into its base vault, minting of the exact quoted aBTC payout to the configured
 minter, and transfer to the user's aBTC ATA. The default is the Velox mainnet
-primeBTC/aBTC market; a caller can supply a trusted `BtcTreasurySellRfqDeployment`
-for another market quoted in aBTC. Preserve the original packet and quote ID for
+primeBTC/aBTC market; callers can supply a trusted `BtcTreasuryMarketDeployment`
+to either helper, binding the maker program/config, token pair and wrapper identities
+to the active deployment. The payment vault is derived from that program/config
+and the paid token. Preserve the original packet and quote ID for
 `/rfq/swap`; these wrapper packets are not router-composable treasury steps.

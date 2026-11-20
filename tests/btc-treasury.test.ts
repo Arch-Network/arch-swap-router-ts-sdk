@@ -50,6 +50,15 @@ describe("direct BTC treasury buy", () => {
     expect(result.minAmountOut).toBe(quote.estimatedAmountOut);
   });
 
+  test("derives the payment vault from an explicit maker deployment", () => {
+    const { market, request, quote } = setup();
+    const address = (key: string) => base58.encode(hex.decode(key));
+    const deployment = { ...market, programId: address(fixture.program), config: address(fixture.config) };
+    const { quoteVault: _, ...withoutVault } = deployment;
+    expect(prepareBtcTreasuryBuy(request, quote, withoutVault).transaction).toBe(quote.transaction);
+    expect(() => prepareBtcTreasuryBuy(request, quote, { ...withoutVault, config: request.user })).toThrow();
+  });
+
   test.each([0, 1, 2, 3, 4, 5])("rejects changes to instruction %i", index => {
     const { market, request, quote } = setup();
     const ix = quote.transaction.message.instructions[index]!;
