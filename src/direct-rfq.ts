@@ -141,6 +141,25 @@ const MAINNET_BTC_TREASURY: BtcTreasuryRfqDeployment = {
   },
 };
 
+export interface BtcTreasurySellRfqDeployment extends Omit<BtcTreasuryRfqDeployment, "quoteVault"> {
+  readonly baseVault: string;
+}
+
+const MAINNET_BTC_TREASURY_SELL: BtcTreasurySellRfqDeployment = {
+  ...MAINNET_BTC_TREASURY,
+  baseMint: MAINNET_MINTS.primeBTC,
+  quoteMint: MAINNET_MINTS.aBTC,
+  baseVault: deriveAddress(MAINNET_RFQ_DEPLOYMENT.programId, "vault",
+    decodeAddress(MAINNET_RFQ_DEPLOYMENT.config), decodeAddress(MAINNET_MINTS.primeBTC)),
+};
+
+type BtcTreasuryTradeDeployment = Pick<BtcTreasuryRfqDeployment,
+  "btcTreasury" | "tokenProgramId" | "associatedTokenProgramId" | "systemProgramId"> & {
+  readonly paidMint: string;
+  readonly mintedMint: string;
+  readonly paidVault: string;
+};
+
 const COMPUTE_BUDGET = "ComputeBudget111111111111111111111111111111";
 
 /** Validate and preserve the BTC buy packet for direct submission to the RFQ server. */
@@ -150,7 +169,27 @@ export function prepareBtcTreasuryBuy(
   if (request.inputMint !== market.quoteMint || request.outputMint !== market.baseMint) {
     throw new RouterSdkError("UNSUPPORTED_PAIR", "BTC treasury buys require the configured aUSD → aBTC pair.");
   }
-  requireRfq(quote?.treasuryAuthorization === undefined, "Direct BTC buys cannot carry router authorization.");
+  return prepareBtcTreasuryTrade(request, quote, {
+    ...market, paidMint: market.quoteMint, mintedMint: market.baseMint, paidVault: market.quoteVault,
+  });
+}
+
+/** Validate the BTC wrapper's quote-token payout on a sell, preserving the issued transaction. */
+export function prepareBtcTreasurySell(
+  request: QuoteExactInRequest, quote: DirectRfqQuote, market = MAINNET_BTC_TREASURY_SELL,
+): ServerTransactionSwapQuote {
+  if (request.inputMint !== market.baseMint || request.outputMint !== market.quoteMint) {
+    throw new RouterSdkError("UNSUPPORTED_PAIR", "BTC treasury sells require the configured base → aBTC pair.");
+  }
+  return prepareBtcTreasuryTrade(request, quote, {
+    ...market, paidMint: market.baseMint, mintedMint: market.quoteMint, paidVault: market.baseVault,
+  });
+}
+
+function prepareBtcTreasuryTrade(
+  request: QuoteExactInRequest, quote: DirectRfqQuote, market: BtcTreasuryTradeDeployment,
+): ServerTransactionSwapQuote {
+  requireRfq(quote?.treasuryAuthorization === undefined, "Direct BTC trades cannot carry router authorization.");
   const { programId, initialAdmin, minter } = market.btcTreasury;
   const { user, deadlineMs, transaction, message, header, keys } = readDirectRfq(request, quote, minter, 6);
   const [heap, compute, createAta, payment, mint, payout] = message.instructions;
@@ -163,16 +202,16 @@ export function prepareBtcTreasuryBuy(
       && new DataView(ix!.data.buffer, ix!.data.byteOffset, 8).getUint32(4, true) === value;
   requireRfq(budget(heap, 0, 256 * 1024) && budget(compute, 1, 1_400_000), "Unexpected BTC mint compute budget.");
   requireRfq(bytes(mint!.data, 41) && mint!.data[0] === 8, "Unexpected BTC bridge mint data.");
-  const config = deriveAddress(programId, "bridge", decodeAddress(market.baseMint), decodeAddress(initialAdmin));
+  const config = deriveAddress(programId, "bridge", decodeAddress(market.mintedMint), decodeAddress(initialAdmin));
   const credit = deriveAddress(programId, "treasury-credit", decodeAddress(config));
   const operation = deriveAddress(programId, "treasury-operation", decodeAddress(config), mint!.data.subarray(1, 33));
-  const minterAta = userAta(decodeAddress(minter), market.baseMint, market);
-  const outputAta = userAta(user, market.baseMint, market);
-  const inputAta = userAta(user, market.quoteMint, market);
-  const ataKeys = [request.user, outputAta, request.user, market.baseMint, market.systemProgramId, market.tokenProgramId];
-  const paymentKeys = [inputAta, market.quoteVault, request.user];
+  const minterAta = userAta(decodeAddress(minter), market.mintedMint, market);
+  const outputAta = userAta(user, market.mintedMint, market);
+  const inputAta = userAta(user, market.paidMint, market);
+  const ataKeys = [request.user, outputAta, request.user, market.mintedMint, market.systemProgramId, market.tokenProgramId];
+  const paymentKeys = [inputAta, market.paidVault, request.user];
   const mintKeys = [
-    minter, config, credit, operation, market.baseMint, minterAta,
+    minter, config, credit, operation, market.mintedMint, minterAta,
     market.tokenProgramId, market.associatedTokenProgramId, market.systemProgramId,
   ];
   const payoutKeys = [minterAta, outputAta, minter];
@@ -182,13 +221,13 @@ export function prepareBtcTreasuryBuy(
   const amountOut = new DataView(mint!.data.buffer, mint!.data.byteOffset, 41).getBigUint64(33, true);
   requireRfq(amountOut > 0n && amountOut === quote.estimatedAmountOut, "BTC mint differs from the quoted output.");
   requireRfq(matches(createAta, market.associatedTokenProgramId, ataKeys)
-    && bytes(createAta!.data, 1) && createAta!.data[0] === 1, "Unexpected buyer aBTC account creation.");
-  requireRfq(transfer(payment, paymentKeys, request.amountIn), "Unexpected aUSD payment.");
+    && bytes(createAta!.data, 1) && createAta!.data[0] === 1, "Unexpected recipient aBTC account creation.");
+  requireRfq(transfer(payment, paymentKeys, request.amountIn), "Unexpected token payment.");
   requireRfq(matches(mint, programId, mintKeys), "Unexpected BTC treasury accounts.");
   requireRfq(transfer(payout, payoutKeys, amountOut), "Unexpected aBTC payout.");
   validateAccounts(keys, header.num_readonly_unsigned_accounts,
     [...ataKeys, ...paymentKeys, ...mintKeys, ...payoutKeys, programId, COMPUTE_BUDGET],
-    [request.user, minter, inputAta, market.quoteVault, credit, operation, market.baseMint, minterAta, outputAta]);
+    [request.user, minter, inputAta, market.paidVault, credit, operation, market.mintedMint, minterAta, outputAta]);
   if (deadlineMs <= Date.now()) throw new RouterSdkError("RFQ_EXPIRED", "BTC treasury quote deadline has expired.");
   return {
     execution: "serverTransaction", transaction, rfq: { quoteId: quote.quoteId }, deadlineMs,
