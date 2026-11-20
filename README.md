@@ -607,17 +607,28 @@ const quote = await router.quoteExactIn({
 });
 ```
 
-The deployed primeBTC market settles in aUSD, not aBTC. Direct Prime buys use a
+These composable Prime sell routes settle in aUSD; the standalone BTC-wrapper
+route below settles primeBTC sells in aBTC. Direct Prime buys use a
 separate execution ABI and are not enabled here. Existing vault mint/redeem
 routes remain available without an RFQ provider. Account errors stay local to
 affected candidates, reads are bounded, and expired sell quotes are rejected.
 The quote retains its RFQ identity for PropMM co-signing. This SDK change does
 not add an automatic redemption loop for PropMM's acquired shares.
 
-### Direct BTC treasury buy packets
+### Direct BTC treasury packets
 
 Use the standard `/rfq/quote` request for a direct aBTC buy. When PropMM
 returns a BTC mint packet, pass the request and response to
 `prepareBtcTreasuryBuy`. It uses the Velox mainnet deployment by default.
 Sign the original transaction message and submit it with its quote ID to
 `/rfq/swap`. Inventory quotes use the existing execution path.
+
+For a primeBTC/aBTC sell, pass a BTC-wrapper mint packet to
+`prepareBtcTreasurySell`. It validates payment of the requested primeBTC input
+into its base vault, minting of the exact quoted aBTC payout to the configured
+minter, and transfer to the user's aBTC ATA. The default is the Velox mainnet
+primeBTC/aBTC market; callers can supply a trusted `BtcTreasuryMarketDeployment`
+to either helper, binding the maker program/config, token pair and wrapper identities
+to the active deployment. The payment vault is derived from that program/config
+and the paid token. Preserve the original packet and quote ID for
+`/rfq/swap`; these wrapper packets are not router-composable treasury steps.
