@@ -1,316 +1,56 @@
 # Tests
 
-## Live quote smoke test
-
-`quote.e2e.test.ts` contains 28 live cases: the 12 core directed pairs plus
-eight buy/sell routes for each of aETH and aHYPE (treasury buys and native sells).
-The direct RFQ provider also enables the built-in Prime sell markets.
-`prime-sells.e2e.test.ts` adds two live cases for primeBTC/aUSD and primeUSD/aUSD.
-No app-supplied deployment, market list or composability flags are required.
-
-| Route type | Pairs |
-| --- | --- |
-| Asset swap | aBTC ↔ aUSD |
-| Direct vault mint/redeem | aBTC ↔ primeBTC; aUSD ↔ primeUSD |
-| Vault plus swap | primeBTC ↔ aUSD; primeUSD ↔ aBTC |
-| Redeem, swap, mint | primeBTC ↔ primeUSD |
-| aETH native swap or treasury mint | aETH ↔ aUSD/primeUSD/aBTC/primeBTC |
-| aHYPE native swap or treasury mint | aHYPE ↔ aUSD/primeUSD/aBTC/primeBTC |
-
-Inputs are 1 aUSD/primeUSD, 0.00001 aBTC/primeBTC or 0.001 aETH/aHYPE. Tests assert
-explicit mint paths, operations, hop amounts, final-only slippage, RFQ terms
-and quote IDs, deadline clamping, signer privileges and transaction limits.
-Bundles are compiled with a zero blockhash and reserved signature bytes for
-measurement against the dependency's 4,096-byte and 50-account limits.
-No wallet signing or transaction submission occurs.
-
-Core BTC/USD swaps compare CLAMM with the optional native PropAMM provider.
-RFQ HTTP/decoding/expiry failures fail the smoke checks even when the SDK can
-fall back to CLAMM. Vault-only routes make no RFQ requests. The shared HTTP
-adapter is the exported `createDirectRfqProvider` from `examples/aeth-usd.ts`;
-every aETH/aHYPE route must use exactly one native RFQ. Account-read budgets are
-zero/one/two/two for the USD/primeUSD/BTC/primeBTC counterpart, with no repeated
-successfully fetched addresses. Buys use net aUSD input after any prefix.
+Run all current checks from the SDK root:
 
 ```sh
-ARCH_RPC_URL=https://rpc.mainnet.arch.network \
-  corepack pnpm exec vitest run tests/quote.e2e.test.ts
+corepack pnpm test
+corepack pnpm typecheck
+corepack pnpm build
 ```
 
-All live tests are skipped without `ARCH_RPC_URL`. Set `ARCH_RFQ_URL` to override
-the default `https://vaults.veloxapi.net/propamm/rfq` base (including `/rfq`,
-without `/quote`). The HTTP adapter aborts after 1.8 seconds, within the SDK's
-two-second RFQ budget, without retries. The RPC must match mainnet.
+## Native swap adapter
 
-Use `-t 'composable aETH'` or `-t aETH` for all eight ETH cases,
-`-t 'composable aETH buy'` for four buys, or `-t 'composable aETH sell'` for
-four sells. Use `-t aHYPE` for all eight HYPE cases, or
-`-t 'composable aHYPE buy'` / `-t 'composable aHYPE sell'` for either side.
+`native-swap-client.test.ts`, `native-swap-transaction.test.ts`, and
+`examples/native-swap.test.ts` cover request/response mapping, full-u64 amounts,
+discovery, slippage forwarding, cancellation, native packet decoding,
+user/treasury signer slots, private message snapshots, expiry around wallet
+signing, submission uncertainty, and explicit attempt recovery without retries.
 
-The last native buy run on **2026-11-03**, before removing the flags, executed
-all four cases and failed all four with `INVALID_RFQ`: the deployed service
-returned a token transfer (tag 3) plus bridge mint (tag 21). Native routes reject
-those packets. Its actual market configuration/deployment must serve native
-buys and have aETH inventory before rerunning. Report:
-`/tmp/router-native-aeth-buy-smoke.log`.
+Five packets were exported from the actual PropAMM native HTTP quote handler at
+revision 6fb6483 using loopback RPC/pricing fixtures. Tests compare both the
+message and the complete unsigned transaction against Rust-generated hex. See
+[fixture provenance and regeneration](fixtures/native-swap/README.md).
+Wallet signatures in TypeScript tests are synthetic. No production quote,
+funded transaction, or live submission is required.
 
-The previous sell-only run passed 3/4: aUSD and both BTC outputs passed, while
-primeUSD reported `STALE_NAV`. BTC outputs used two reads and 1,105/1,338 signed
-bytes. Report: `/tmp/router-aeth-clamm-smoke.log`. These historical live runs
-have not been repeated for the default-composition change. RPC, liquidity,
-NAV, queue, cap and deployment failures remain visible; they are not skipped.
-Funded signing, server co-signing and confirmation remain separate checks.
+## Limit orders and shared account utilities
 
-## Historical routing validation
+`limit-orders.test.ts` retains the native instruction/account bytes, account
+ordering and privileges, PDA/ATA derivations, create/cancel builders, limit-price
+math, previews, and account-loading checks for both networks. Instructions are
+compiled with the Arch SDK to verify the owner remains the fee payer and only
+user signer. Rust-ordered message compilation is no longer an SDK feature.
 
-The final routing validation on **2026-11-03** passed typecheck, build, and all
-**825 offline tests** (14 live cases skipped for that offline run). The separate
-network-enabled live suite passed **13/14**, with no skips: all twelve core
-directions and aETH → aUSD. aUSD → aETH failed with `INVALID_RFQ` because the
-server's treasury signer and bridge program differ from the pinned registry.
-Replaying a captured response through the baseline and current buy validators
-produces the same rejection. The test remains a failure; pins and validators
-were not relaxed. See the
-[Step 6 results](../DYNAMIC_ROUTING_IMPLEMENTATION_PLAN.md#step-6-results-2026-11-03)
-for commands, response identities, and the remaining deployment alignment.
+See [native order fixtures](fixtures/limit-orders/README.md) for their generator,
+IDL snapshot, account layouts, and math provenance. `accounts.test.ts` preserves
+address validation and the account reader's order, deduplication,
+absence, malformed-response, and transport-error behavior.
 
-The subsequent two-call batching follow-up passes typecheck, build, and **846
-offline tests**, including account-read limits and failure recovery. Its 14 live
-cases were skipped; the earlier live results above have not been rerun against
-that follow-up.
+`tests/types` checks both public lifecycles at compile time. Type checking also
+covers the application signing example. Legacy routing/quote suites, live
+router smoke tests, and their obsolete fixtures have been removed with the old
+implementation.
 
-`propamm-rfq-provider.test.ts` checks the HTTP adapter offline against the pinned
-native Buy/Sell trade bytes. It covers both payload lengths, account-index
-resolution, adjusted estimates, full-u64 precision, substituted identities,
-malformed payloads and HTTP errors without retries.
+The final suite passes 232 offline tests: 138 adapter/example checks, all 72
+order regressions, and 22 retained account-reader/address checks. Type checking
+and the clean production build pass. No live tests run in this suite.
 
-## aETH and aHYPE routing coverage
+## Package verification
 
-`composable-aeth.test.ts` has 42 sell/graph tests and
-`composable-aeth-buy.test.ts` has 28 buy tests. They cover all eight routes,
-28-pair metadata without switches, market/provider identity, prefix/suffix
-amounts, final slippage, native terms, two-read batching, u64 precision,
-expiry, malformed packets and provider failures without direct fallback.
-Treasury buys are covered separately by `composable-aeth-treasury.test.ts`.
-All four input routes preserve the server-issued authorization, including
-explicit fixed bounds and bounded ranges. Missing authorization rejects with
-`INVALID_RFQ` after one provider call; no bounds are synthesized and no fallback
-is attempted. The HTTP/signing example also verifies that rejection occurs before
-fetching a blockhash, opening the wallet or submitting a transaction.
-Clients without a direct RFQ provider retain the 12 core pairs;
-testnet ignores that provider.
+Build from a clean output directory before packing. Inspect the archive and its
+root exports for stale router clients, quote math, instruction builders, or
+configuration. This verification does not publish the package. The retained
+`RouterSdkError` and `RouterDataSource` names are order API compatibility only.
 
-`examples/aeth-native-buy.test.ts` retains 10 HTTP cases for metadata-free
-native buys, full-u64 fields, unsafe metadata and all four buy prefixes.
-`propamm-clamm.interop.test.ts` passes sixteen native SDK router packets and all
-four treasury routes per asset with fixed and bounded issued authorization (32 packets total)
-through the unmodified external Rust validator and Arch 0.13 runtime sanitizer.
-It uses the real server authorization module and native payment/mint builder.
-It rejects altered treasury terms/accounts/privileges, missing issued authorization
-and substituted nominal-only bounds, while retaining native and CLAMM mutation
-checks. See [the replay instructions](fixtures/propamm-clamm/README.md).
-The largest packet is 1,511 bytes with two signature slots and 36 accounts.
-This validates structural contracts, not signatures, transaction submission or execution.
-
-`config/aeth-usd.test.ts` replays unsigned buy/sell fixtures generated by the
-pinned Rust `minting` builders. It checks programs, account order, PDA/ATA
-derivations, output-account creation layouts, signer roles, raw amounts with
-9 aETH decimals and 6 aUSD decimals, blockhash and native serialized sizes
-(738/696 bytes with both signatures).
-See [fixture provenance](fixtures/aeth-usd/README.md).
-
-`direct-rfq.test.ts` and `direct-rfq-sell.test.ts` validate the two native
-templates. They reject substituted accounts/programs/signers/recipients, wrong
-input or output, account privileges, malformed framing, missing creation
-accounts, extra instructions, unsafe numeric metadata and expired deadlines.
-They also verify u64 precision, expiry clamping, signed minima and the 4,096-byte
-limit with both eventual signatures reserved. Both normalizers also reject a
-51-key original message below the byte limit and preserve the server transaction
-when rejecting it.
-
-`transactions/size.test.ts` checks the dependency-supplied byte/account limits,
-the size guard at 4,096 and 4,097 bytes with one and two signatures, automatic
-reservation of missing signature slots, and 50/51-key boundaries below the byte
-limit. Canonical compilation tests distinguish repeated instruction positions
-from unique message keys and count the program key. Measurement leaves unsigned
-messages and their signature arrays unchanged.
-PropAMM coverage retains the native fixture byte
-comparisons and verifies that a 1,257-byte bundle with distinct fee destinations
-is now eligible under the higher limit.
-
-`direct-rfq-client.test.ts` covers automatic mainnet graph dispatch, frozen
-28-pair metadata, native packet preservation with alternate account ordering
-and blockhashes, request validation, deadlines, timeout cleanup, provider
-failures and rejection of treasury/direct fallback. `types/direct-rfq.ts`
-checks that client results are directly usable as `RouterSwapQuote` and that
-the removed flags are rejected by TypeScript.
-
-`examples/aeth-usd.test.ts` has 56 mocked HTTP/wallet/submission cases. The
-example compiles the new router bundle with an application-provided fresh
-blockhash, while retaining the original quote packet unchanged. Tests cover
-blockhash format/fetch expiry, request snapshotting, full-u64 encoding, safe
-metadata decoding, mutation checks, exact-body retries, known-hash confirmation,
-concurrency and failure propagation. No deployed programs or CPIs are executed.
-
-`composable-ahype.test.ts` covers all eight HYPE directions, optional native-buy
-resolution, one quote ID, the 0/1/2/2 read budget, required treasury authorization,
-expiry and receive-sizing rejection, provider gating, timeouts and ETH/HYPE packet
-substitution. Metadata contains 28 unique pairs and excludes both two-RFQ ETH/HYPE
-directions. `examples/ahype-usd.test.ts` exercises the shared HTTP adapter's HYPE
-mints, prefix-sized amounts, treasury metadata and native expiry decoding.
-`config/ahype-usd.test.ts` verifies the mint, vault and bridge asset against the
-[captured public accounts and unsigned quotes](fixtures/ahype-usd/README.md).
-
-## Existing router coverage
-
-`client.test.ts` verifies request validation and unsupported/identical pairs,
-all before reads. It also covers default/explicit testnet metadata, immutable
-selection, unknown networks, valid mainnet-v2 deployments, and both mainnet quote
-methods using their own reader and propagating failures.
-`config/mainnet.test.ts` checks public RPC snapshots for actual mint decimals,
-CLAMM order, vault relationships and the config shared by the BTC/ETH markets.
-`config/routes.test.ts` checks all 12 directed pairs against
-native fixture paths, operation/venue order, route continuity, unique mints,
-one-to-three-hop lengths, and immutable public pair metadata.
-It verifies that the same paths use each deployment's venue endpoints and mint
-addresses. Graph tests also cover optional parallel CLAMM/PropAMM candidates,
-provider/deployment gating, receive-sizing RFQ exclusion, cycles and self loops,
-missing paths, the three-hop and one-RFQ bounds, deterministic discovery, frozen
-pair/candidate metadata, and construction without account or provider calls.
-Synthetic graphs exercise hop/RFQ limits beyond the current deployment topology.
-
-`utils.test.ts` checks shared address helpers and SDK-delegated ATA and
-vault/reserve/escrow derivation against Rust account-validation fixtures. Integer
-range and account-meta helpers remain covered through codec and builder tests.
-It also covers ordered/deduplicated batches, null preservation, malformed
-responses, and APL decoding bounds and initialization/option tags.
-Request-local loader tests cover overlapping in-flight batches, cached absence
-and failures without retries, empty loads, and fresh reads in the next request.
-They also verify that a malformed account response does not discard valid
-accounts from the same batch.
-Receive-sizing tests bound local work, preserve u64 precision, and reject
-unreachable targets or unrelated calculation errors.
-
-`quote-state.test.ts` checks that preparation fetches only the requested venues,
-shares decoded vault state between graph candidates, refreshes mutable mint
-supply on later requests, and shares concurrent CLAMM preparation and its reads.
-Known vault/pool/mint accounts share one initial batch, followed by at most one
-tick-array batch. If transport or framing loses the entire initial batch while
-RFQ is enabled, only required vaults are recovered in the second call; the
-original CLAMM failure remains cached and cannot trigger a third call.
-Confirmed invalid shared accounts still fail immediately. One vault-pricing
-timestamp is captured before asynchronous reads. `propamm.test.ts`
-also verifies that destination-vault caps can reject the larger swap estimate
-while retaining the smaller CLAMM or PropAMM candidate, and that common vault
-prefix failures prevent RFQ calls. All eight RFQ swap paths require two reader
-calls on successful loading, and all twelve receive-sizing paths retain the
-one-/two-call budget even with an RFQ provider configured. Failure tests cover
-per-account isolation, bounded vault recovery, original aggregate error causes,
-and RFQ concurrency with pending pool/tick reads.
-
-`quote-candidates.test.ts` checks the common graph evaluator's venue concurrency,
-CLAMM's preference on equal final output even with reversed candidate order,
-stable minimum-input receive sizing, provider exclusion from receive sizing,
-original aggregate failure causes, sole-candidate errors, and request-field
-stability across asynchronous account preparation. Synthetic local paths verify
-that receive sizing minimizes input even when another path has more output
-overshoot. `propamm.test.ts` retains coverage of final suffix rounding, native
-RFQ terms, prefix inputs, two-second timeout cleanup, and RFQ expiry after slower
-CLAMM reads, including the aggregate expiry cause when both venues are unusable.
-Eligibility tests inject synthetic compiled messages at the shared guard boundary
-to exercise 4,096/4,097 bytes and 50/51 accounts for both preferred venues. They
-verify acceptance at each limit, fallback when either larger candidate exceeds
-it, original limit causes when all candidates fail, and sole-candidate errors
-for exact-input/receive-sized CLAMM and vault-only public quotes. Each bundle is
-checked once with its real header and zero measurement blockhash; current native
-fixtures fit both limits and retain their original returned instruction layouts.
-
-`vault.test.ts` covers the native account layout, 12 Rust math vectors, fees,
-virtual offsets, caps, Mint NAV boundaries, immediate-redemption eligibility,
-and overflow. All four direct public quote paths match existing Rust account
-lists and encode the quoted amounts, final minimum and exact deadline. Tests
-verify one four-account batch, fresh subsequent reads, changed fee recipients
-and queue tails, missing state, wrong owners/relationships, and transport errors.
-Alternate deployment coverage verifies selected vault/mint identities, owners,
-reserve/escrow/entry/event PDAs, and fee ATAs.
-See [vault provenance and native behavior corrections](fixtures/vault/README.md).
-
-`clamm.test.ts` checks native serialized pool/tick layouts, 11 native tick prices,
-and 21 native swap cases. It covers both directions, negative ticks, fees and
-rounding, signed liquidity crossings, empty liquidity gaps, width overflow,
-three-array windows, boundary repetition and minimum-price recovery. Public
-quotes cover initialized/absent arrays, malformed state and transport failures,
-insufficient windows, fresh subsequent reads, and intermediate-hop failures.
-All 12 core directions match independently composed Rust outputs and existing
-Rust instruction account lists; encoded input/minimum/deadline and window
-limits are verified. Direct vault quotes read once; CLAMM routes share two
-batches total, with no repeated keys or construction reads. See
-[CLAMM provenance and regeneration](fixtures/clamm/README.md).
-Network coverage checks default/explicit testnet quote parity while a mainnet
-client coexists, plus alternate CLAMM pool/mint identities, account owners,
-tick/oracle PDAs and tick-to-pool validation through both loading stages.
-
-`quoteForOutput` is tested against all 12 native composed outputs. Each result
-matches a forward quote at the calculated input, while one raw input unit less
-falls short. Tests retain the one-/two-batch budget and cover fixed fees, vault
-caps and redemption coverage, unavailable state, tick crossings, u64-scale
-inputs, rounding overshoot, final slippage, and fresh reads on subsequent calls.
-
-`codecs/instruction.test.ts` and `codecs/result.test.ts` cover wire framing,
-integer widths/ranges, step counts, both CLAMM directions, result lengths and
-versions, and byte views. The strict result decoder stays internal; transaction
-status and confirmation are application responsibilities. See
-[codec fixture provenance](fixtures/router-codec/README.md).
-
-`transactions/instructions.test.ts` compares the single returned router
-instruction with its counterpart in all 18 original Rust fixtures. It preserves
-byte/account/privilege coverage, including duplicate fee/tick positions and
-native supplemental-array encoding. The fixture's leading input-ATA instruction
-is deliberately not returned. The router's ATA/system trailer is retained and
-construction performs no network reads.
-An alternate-program test verifies the selected router and CPI programs, user
-ATAs, and ATA/system trailer while preserving the native account order and bytes.
-
-Standalone router-instruction construction stays independent of transaction
-policy. Public quotes enforce byte/account limits on the actual returned bundle
-before selection. Original fixture JSON, generators, and provenance remain
-intact; recorded historical full-bundle sizes include the fixture's input ATA.
-See [transaction fixture provenance](fixtures/transactions/README.md).
-
-The Step 5 compatibility audit unpacks the built private package into a temporary
-consumer and resolves only its declared runtime dependencies. It checks the
-seven runtime exports, blocked private subpaths, packed consumer declarations,
-and the existing public type-narrowing contracts. It then runs the same 34 quote
-flows in Node and an ES2022 browser-targeted bundle in an isolated V8 context
-without `process`, `Buffer`, or `require`: twelve core exact-input routes,
-twelve receive-sizing routes, eight router RFQ routes, and both mainnet aETH
-directions. Both environments also exercise eight provider/network combinations
-and 24 early-validation cases, with no transport calls. Node/browser results
-match, including complete signed-size estimates and compiled account counts.
-See the dynamic routing plan's Step 5 log for commands and temporary artifacts.
-
-This audit does not launch an actual browser or consumer frontend. Step 6 covers
-final offline validation and live quote-only construction. No current fixture
-proves live executability or adequate compute provisioning.
-
-
-## Built-in Prime sell validation
-
-On 2026-11-09, both cases in `prime-sells.e2e.test.ts` passed against mainnet
-RPC and the public PropMM service. Each test compares Auto routing with the
-returned maker quote, then forces that same quote through the router. For
-1,000 raw primeBTC and 100,000 raw primeUSD, Auto selected vault redemption
-plus CLAMM and vault redemption respectively. Both forced maker bundles
-compiled to 756 bytes with signature space reserved. These are unsigned quote
-checks, not funded execution or server co-signing tests.
-
-```sh
-ARCH_RPC_URL=https://rpc.mainnet.arch.network \
-  corepack pnpm exec vitest run tests/prime-sells.e2e.test.ts
-```
-
-Captured responses in `fixtures/prime-sells/quotes.json` also run offline
-through the HTTP adapter and pinned router validators. The offline routing
-tests cover both deployed pairs, vault/direct preference isolation, provider
-and reserve failures, reserve-plus-BTC/USD RFQs, expiry, custody substitution,
-and the unsupported primeBTC/aBTC direct maker pair.
+Quote handoff coverage also exercises serialized restoration on a new client,
+service isolation, injected clocks, signature exclusion and consumed-quote conflicts.

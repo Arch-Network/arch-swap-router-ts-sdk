@@ -2,13 +2,13 @@ import { SanitizedMessageUtil, type Instruction } from "@arch-network/arch-sdk";
 import { base58, hex } from "@scure/base";
 import { describe, expect, it, vi } from "vitest";
 import {
-  buildCancelLimitOrderInstruction, buildCreateLimitOrderInstruction, compileRouterMessage, decodeLimitOrder,
+  buildCancelLimitOrderInstruction, buildCreateLimitOrderInstruction, decodeLimitOrder,
   deriveAssociatedTokenAddress, deriveLimitOrderAddress, deriveLimitOrderEscrowAddress, encodeCancelLimitOrderData,
   encodeCreateLimitOrderData, generateLimitOrderId, LIMIT_ORDER_ACCOUNT_LEN, LIMIT_ORDER_DEPLOYMENTS, loadLimitOrder,
   minimumOutputAtLimit, previewLimitOrder, RouterSdkError,
   type LimitOrderMarketConfig, type LimitOrderSide, type Network,
 } from "../src/index.js";
-import { NETWORKS } from "../src/config/networks.js";
+import { TOKEN_PROGRAMS } from "../src/config/shared.js";
 import native from "./fixtures/limit-orders/native.json" with { type: "json" };
 import idl from "./fixtures/limit-orders/idl.json" with { type: "json" };
 
@@ -97,9 +97,8 @@ describe("limit-order codecs", () => {
 
 describe("limit-order PDAs and builders", () => {
   it("uses each network's PropAMM deployment", () => {
-    for (const network of ["testnet", "mainnet"] as const) {
-      const market = NETWORKS[network].propammMarkets[0]!;
-      expect(LIMIT_ORDER_DEPLOYMENTS[network]).toEqual({ programId: market.programId, config: market.config });
+    for (const c of cases) {
+      expect(LIMIT_ORDER_DEPLOYMENTS[c.network]).toEqual({ programId: c.program, config: c.config });
     }
     expect(() => deriveLimitOrderAddress(cases[0]!.owner, new Uint8Array(32), { network: "devnet" as Network }))
       .toThrow(sdkError("INVALID_NETWORK"));
@@ -126,12 +125,12 @@ describe("limit-order PDAs and builders", () => {
     }
     const cancel = buildCancelLimitOrderInstruction(decodeLimitOrder(bytes(c.accounts.open.data_hex)), { network: c.network });
     expectNative(cancel, c.cancel);
-    // The owner is the only signer and the fee payer of both compiled messages.
-    for (const [ix, expected] of [[byPrice.instruction, c.create_message], [cancel, c.cancel_message]] as const) {
-      const message = compileRouterMessage([ix], c.owner, new Uint8Array(32));
+    // Applications compile order instructions with their Arch transaction integration.
+    for (const ix of [byPrice.instruction, cancel]) {
+      const message = SanitizedMessageUtil.createSanitizedMessage([ix], base58.decode(c.owner), new Uint8Array(32));
+      if (typeof message === "string") throw new Error(message);
       expect(message.header.num_required_signatures).toBe(1);
       expect(base58.encode(message.account_keys[0]!)).toBe(c.owner);
-      expect(hex.encode(SanitizedMessageUtil.serialize(message))).toBe(expected.message_hex);
     }
   });
 
@@ -139,7 +138,7 @@ describe("limit-order PDAs and builders", () => {
     const c = cases[0]!;
     const create = buildCreateLimitOrderInstruction({ ...createRequest(c), minOutputAmount: 1n });
     const cancel = buildCancelLimitOrderInstruction(decodeLimitOrder(bytes(c.accounts.open.data_hex)));
-    const programs = NETWORKS.testnet.programs;
+    const programs = TOKEN_PROGRAMS;
     const expected: Record<string, Record<string, string>> = {
       create_limit_order: {
         config: c.config, payer: c.owner, owner: c.owner, limit_order: c.order, escrow_token_account: c.escrow,
@@ -220,7 +219,7 @@ describe("loadLimitOrder", () => {
 
   it("treats missing and empty system accounts as not yet created", async () => {
     expect(await loadLimitOrder(source(null), c.order, options)).toBeNull();
-    expect(await loadLimitOrder(source(info(new Uint8Array(), NETWORKS.mainnet.programs.systemProgramId)), c.order, options)).toBeNull();
+    expect(await loadLimitOrder(source(info(new Uint8Array(), TOKEN_PROGRAMS.systemProgramId)), c.order, options)).toBeNull();
   });
 
   it("rejects foreign owners, other addresses and other configs", async () => {

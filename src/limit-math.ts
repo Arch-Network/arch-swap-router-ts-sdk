@@ -1,6 +1,6 @@
 import { RouterSdkError } from "./errors.js";
-import type { LimitOrderSide } from "./types.js";
-import { U64_MAX, U128_MAX } from "./utils.js";
+import type { LimitOrderSide } from "./limit-order-types.js";
+import { U64_MAX, U128_MAX } from "./integers.js";
 
 // Port of PropAMM program/src/limit_math.rs. Native errors map to SDK codes:
 // LimitOrderZeroAmounts -> INVALID_AMOUNT, LimitOrderPriceInvalid -> INVALID_LIMIT_PRICE,

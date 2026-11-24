@@ -1,7 +1,7 @@
 import { base58 } from "@scure/base";
 import { RouterSdkError } from "../errors.js";
-import type { CreateLimitOrderParams, LimitOrderAccount, LimitOrderStatus } from "../types.js";
-import { assertIntegerRange, U64_MAX } from "../utils.js";
+import type { CreateLimitOrderParams, LimitOrderAccount, LimitOrderStatus } from "../limit-order-types.js";
+import { assertIntegerRange, U64_MAX } from "../integers.js";
 
 // PropAMM program/src/limit_order.rs and instruction.rs, frozen at v1.
 export const CREATE_LIMIT_ORDER_TAG = 7;

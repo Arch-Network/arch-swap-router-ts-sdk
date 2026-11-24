@@ -1,14 +1,16 @@
 import type { Instruction } from "@arch-network/arch-sdk";
 import { base58 } from "@scure/base";
 import { assertOrderId, decodeLimitOrder, encodeCancelLimitOrderData, encodeCreateLimitOrderData } from "./codecs/limit-order.js";
-import { LIMIT_ORDER_DEPLOYMENTS, NETWORKS, type Network } from "./config/networks.js";
+import { LIMIT_ORDER_DEPLOYMENTS } from "./config/limit-orders.js";
+import { TOKEN_PROGRAMS, type Network } from "./config/shared.js";
 import { RouterSdkError } from "./errors.js";
 import { minimumOutputAtLimit } from "./limit-math.js";
-import type { Address, LimitOrderAccount, LimitOrderMarketConfig, LimitOrderSide, RouterDataSource } from "./types.js";
-import { account, accountData, decodeAddress, deriveAddress, deriveAssociatedTokenAddress as deriveAta, readAccounts, U64_MAX } from "./utils.js";
+import type { LimitOrderAccount, LimitOrderMarketConfig, LimitOrderSide } from "./limit-order-types.js";
+import { account, accountData, decodeAddress, deriveAddress, deriveAssociatedTokenAddress as deriveAta, readAccounts, type Address, type RouterDataSource } from "./accounts.js";
+import { U64_MAX } from "./integers.js";
 
 export interface LimitOrderNetworkOptions {
-  /** Defaults to testnet, like `createRouterClient`. */
+  /** Defaults to testnet. */
   readonly network?: Network;
 }
 
@@ -16,7 +18,7 @@ function deployment(network: Network = "testnet") {
   if (!Object.hasOwn(LIMIT_ORDER_DEPLOYMENTS, network)) {
     throw new RouterSdkError("INVALID_NETWORK", `Unknown network: ${network}.`);
   }
-  return { ...LIMIT_ORDER_DEPLOYMENTS[network], programs: NETWORKS[network].programs };
+  return { ...LIMIT_ORDER_DEPLOYMENTS[network], programs: TOKEN_PROGRAMS };
 }
 
 /** Order PDA: `["limit_order", config, owner, orderId]`. */
